@@ -53,6 +53,9 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllerRoute(
+    name: "areas",
+    pattern: "{area:exists}/{controller=BusinessUnits}/{action=Index}/{id?}");
+app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 if (!app.Configuration.GetValue<bool>("Auth:UseDevelopmentAuth"))

@@ -1,0 +1,31 @@
+@model SizingConversionEditModel
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "New Sizing Conversion" : "Edit Sizing Conversion";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<h2 class="h5">@ViewData["Title"]</h2>
+<form asp-action="@(isNew ? "CreateConversion" : "EditConversion")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Method" class="form-label"></label>
+        <select asp-for="Method" class="form-select">
+            <option value="@SizingMethod.TShirt">T-shirt</option>
+            <option value="@SizingMethod.StoryPoints">Story points</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Key" class="form-label"></label>
+        <input asp-for="Key" class="form-control" placeholder="e.g. M or 13" />
+        <span asp-validation-for="Key" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Hours" class="form-label"></label>
+        <input asp-for="Hours" class="form-control" type="number" step="0.5" min="0.5" />
+        <span asp-validation-for="Hours" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

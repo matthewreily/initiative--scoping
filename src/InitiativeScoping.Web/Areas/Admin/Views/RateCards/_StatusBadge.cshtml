@@ -1,0 +1,10 @@
+@model RateCardStatus
+@{
+    var cls = Model switch
+    {
+        RateCardStatus.Published => "bg-success",
+        RateCardStatus.Retired => "bg-secondary",
+        _ => "bg-warning text-dark"
+    };
+}
+<span class="badge @cls">@Model</span>

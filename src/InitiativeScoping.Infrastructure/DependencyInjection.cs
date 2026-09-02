@@ -1,7 +1,9 @@
+using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace InitiativeScoping.Infrastructure;
 
@@ -24,6 +26,9 @@ public static class DependencyInjection
                 options.UseSqlServer(connectionString, x => x.MigrationsAssembly("InitiativeScoping.Infrastructure"));
             }
         });
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IAuditLog, DbAuditLog>();
 
         return services;
     }

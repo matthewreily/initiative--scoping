@@ -10,6 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<RateCardEntry> RateCardEntries => Set<RateCardEntry>();
     public DbSet<SizingConversion> SizingConversions => Set<SizingConversion>();
+    public DbSet<AllocationTemplate> AllocationTemplates => Set<AllocationTemplate>();
+    public DbSet<AllocationTemplateLine> AllocationTemplateLines => Set<AllocationTemplateLine>();
     public DbSet<Initiative> Initiatives => Set<Initiative>();
     public DbSet<InitiativeMember> InitiativeMembers => Set<InitiativeMember>();
     public DbSet<Phase> Phases => Set<Phase>();
@@ -60,6 +62,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Key).HasMaxLength(50);
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.HasIndex(x => new { x.Method, x.Key }).IsUnique();
+        });
+
+        b.Entity<AllocationTemplate>(e =>
+        {
+            e.Property(x => x.SizeKey).HasMaxLength(50);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.HasIndex(x => new { x.Method, x.SizeKey }).IsUnique();
+            e.HasMany(x => x.Lines).WithOne(x => x.AllocationTemplate).HasForeignKey(x => x.AllocationTemplateId);
+        });
+
+        b.Entity<AllocationTemplateLine>(e =>
+        {
+            e.Property(x => x.PhaseName).HasMaxLength(200);
+            e.Property(x => x.Percent).HasPrecision(5, 2);
+            e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Initiative>(e =>

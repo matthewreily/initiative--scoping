@@ -1,0 +1,39 @@
+@model IReadOnlyList<RateCard>
+@{
+    ViewData["Title"] = "Rate Cards";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Rate Cards</h2>
+    <a class="btn btn-primary btn-sm" asp-action="Create">New rate card</a>
+</div>
+<p class="text-muted small">Forecasts use the latest <em>published</em> card whose effective start is on or before the phase start date.</p>
+<table class="table table-sm align-middle">
+    <thead><tr><th>Name</th><th>Effective start</th><th>Status</th><th>Entries</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var card in Model)
+    {
+        <tr>
+            <td><a asp-action="Details" asp-route-id="@card.Id">@card.Name</a></td>
+            <td>@card.EffectiveStart.ToString("yyyy-MM-dd")</td>
+            <td><partial name="_StatusBadge" model="card.Status" /></td>
+            <td>@card.Entries.Count</td>
+            <td class="text-end">
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@card.Id">Open</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Export" asp-route-id="@card.Id">Export CSV</a>
+                @if (card.Status == RateCardStatus.Draft)
+                {
+                    <form asp-action="Delete" asp-route-id="@card.Id" method="post" class="d-inline" onsubmit="return confirm('Delete draft @card.Name?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                    </form>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Count == 0)
+    {
+        <tr><td colspan="5" class="text-muted">No rate cards yet.</td></tr>
+    }
+    </tbody>
+</table>

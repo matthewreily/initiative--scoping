@@ -27,6 +27,18 @@ dotnet run --project src/InitiativeScoping.Web
 
 The `Development` environment uses SQLite (`initiative-scoping.dev.db`, created and seeded on startup) and a development auth scheme that signs every request in as `Dev User` with all roles (`appsettings.Development.json` → `Auth:Dev`). No Entra ID setup is needed locally.
 
+The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes delete `src/InitiativeScoping.Web/initiative-scoping.dev.db*` and restart to rebuild and reseed it.
+
+### Administration
+
+Users in the `Administrator` role get an **Admin** nav link (`/Admin/...`) for configuration (spec §5.1):
+
+- **Business Units** and **Resource Types** – CRUD with active/inactive flag; deletion is blocked while referenced (deactivate instead).
+- **Rate Cards** – Draft → Published → Retired lifecycle with an effective start date. Entries are keyed by resource type × business unit × seniority × location × internal/vendor. Entries can be added inline or bulk-imported via CSV (`ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate`; merge or replace; the file is rejected as a whole if any row is invalid). Export and a template download are available. Published cards cannot be deleted – retire them so historical baselines stay reproducible.
+- **Sizing** – T-shirt / story-point → hours conversions and optional allocation templates (phase × resource type × seniority percentages that must total 100%).
+
+Every admin create/update/delete/publish/retire/import writes an `AuditEvent` row (user, timestamp, JSON diff).
+
 ### SQL Server
 
 ```bash
