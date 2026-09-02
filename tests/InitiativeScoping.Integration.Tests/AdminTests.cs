@@ -17,6 +17,10 @@ public class ViewerOnlyFactory : WebAppFactory
     {
         base.ConfigureWebHost(builder);
         builder.UseSetting("Auth:Dev:Roles:0", "Viewer");
+        for (var i = 1; i < 5; i++)
+        {
+            builder.UseSetting($"Auth:Dev:Roles:{i}", "Viewer");
+        }
     }
 }
 

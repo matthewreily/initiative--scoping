@@ -32,6 +32,23 @@ public static class DbSeeder
             new SizingConversion { Method = SizingMethod.TShirt, Key = "L", Hours = 480 },
             new SizingConversion { Method = SizingMethod.TShirt, Key = "XL", Hours = 960 });
 
+        foreach (var (key, name) in new[] { ("M", "Medium feature - standard squad"), ("L", "Large feature - standard squad") })
+        {
+            db.AllocationTemplates.Add(new AllocationTemplate
+            {
+                Method = SizingMethod.TShirt, SizeKey = key, Name = name,
+                Lines =
+                [
+                    new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = types[2], Seniority = Seniority.Senior, Percent = 10 },
+                    new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = types[4], Seniority = Seniority.Mid, Percent = 10 },
+                    new AllocationTemplateLine { PhaseName = "Build", ResourceType = types[0], Seniority = Seniority.Senior, Percent = 45 },
+                    new AllocationTemplateLine { PhaseName = "Build", ResourceType = types[1], Seniority = Seniority.Mid, Percent = 15 },
+                    new AllocationTemplateLine { PhaseName = "Build", ResourceType = types[3], Seniority = Seniority.Mid, Percent = 10 },
+                    new AllocationTemplateLine { PhaseName = "Launch", ResourceType = types[0], Seniority = Seniority.Senior, Percent = 10 }
+                ]
+            });
+        }
+
         var card = new RateCard
         {
             Name = $"{DateTime.UtcNow.Year} Rate Card",

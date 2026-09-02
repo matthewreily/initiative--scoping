@@ -1,0 +1,66 @@
+@model AllocationEditModel
+@{
+    var initiative = (Initiative)ViewBag.Initiative;
+    var phases = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.Phases;
+    var resourceTypes = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.ResourceTypes;
+    ViewData["Title"] = "Edit Allocation";
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+    <li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>
+    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@initiative.Id">@initiative.Name</a></li>
+    <li class="breadcrumb-item active">Edit allocation</li>
+</ol></nav>
+<h1 class="h3">Edit allocation</h1>
+<form asp-action="EditAllocation" asp-route-id="@Model.Id" method="post" class="col-lg-8">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label asp-for="PhaseId" class="form-label"></label>
+            <select asp-for="PhaseId" asp-items="phases" class="form-select"></select>
+            <span asp-validation-for="PhaseId" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="ResourceTypeId" class="form-label"></label>
+            <select asp-for="ResourceTypeId" asp-items="resourceTypes" class="form-select"></select>
+            <span asp-validation-for="ResourceTypeId" class="text-danger"></span>
+        </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <label asp-for="Seniority" class="form-label"></label>
+            <select asp-for="Seniority" asp-items="Html.GetEnumSelectList<Seniority>()" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Location" class="form-label"></label>
+            <input asp-for="Location" class="form-control" />
+            <span asp-validation-for="Location" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="ResourcingClass" class="form-label"></label>
+            <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
+        </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <label asp-for="Quantity" class="form-label"></label>
+            <input asp-for="Quantity" class="form-control" type="number" min="1" />
+            <span asp-validation-for="Quantity" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="EstimatedHours" class="form-label"></label>
+            <input asp-for="EstimatedHours" class="form-control" type="number" min="0.25" step="0.25" />
+            <span asp-validation-for="EstimatedHours" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="ContractReference" class="form-label"></label>
+            <input asp-for="ContractReference" class="form-control" />
+        </div>
+        <div class="col-md-3">
+            <label asp-for="CostCenter" class="form-label"></label>
+            <input asp-for="CostCenter" class="form-control" />
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Details" asp-route-id="@initiative.Id" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }
