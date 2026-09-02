@@ -103,8 +103,8 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
 
     private async Task ValidateUniqueName(BusinessUnitEditModel model, CancellationToken ct)
     {
-        var name = model.Name.Trim();
-        if (await db.BusinessUnits.AnyAsync(b => b.Id != model.Id && b.Name == name, ct))
+        var name = model.Name.Trim().ToLowerInvariant();
+        if (await db.BusinessUnits.AnyAsync(b => b.Id != model.Id && b.Name.ToLower() == name, ct))
         {
             ModelState.AddModelError(nameof(model.Name), "A business unit with this name already exists.");
         }

@@ -106,8 +106,8 @@ public class ResourceTypesController(AppDbContext db, IAuditLog audit) : AdminCo
 
     private async Task ValidateUniqueName(ResourceTypeEditModel model, CancellationToken ct)
     {
-        var name = model.Name.Trim();
-        if (await db.ResourceTypes.AnyAsync(t => t.Id != model.Id && t.Name == name, ct))
+        var name = model.Name.Trim().ToLowerInvariant();
+        if (await db.ResourceTypes.AnyAsync(t => t.Id != model.Id && t.Name.ToLower() == name, ct))
         {
             ModelState.AddModelError(nameof(model.Name), "A resource type with this name already exists.");
         }

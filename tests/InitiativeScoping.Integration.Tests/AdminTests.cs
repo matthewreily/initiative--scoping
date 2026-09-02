@@ -64,6 +64,21 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     }
 
     [Fact]
+    public async Task Resource_type_names_are_unique_case_insensitively()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var name = $"Type-{Guid.NewGuid():N}"[..14];
+        var first = await PostFormAsync(client, "/Admin/ResourceTypes/Create", "/Admin/ResourceTypes/Create",
+            new() { ["Name"] = name, ["Discipline"] = "Data", ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
+
+        var second = await PostFormAsync(client, "/Admin/ResourceTypes/Create", "/Admin/ResourceTypes/Create",
+            new() { ["Name"] = name.ToUpperInvariant(), ["Discipline"] = "Data", ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Contains("already exists", await second.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Referenced_business_unit_cannot_be_deleted()
     {
         var client = factory.CreateClient(NoRedirect);

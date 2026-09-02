@@ -325,8 +325,8 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             parsed = RateCardCsv.Parse(reader);
         }
 
-        var resourceTypes = await db.ResourceTypes.ToDictionaryAsync(t => t.Name, t => t.Id, StringComparer.OrdinalIgnoreCase, ct);
-        var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name, b => b.Id, StringComparer.OrdinalIgnoreCase, ct);
+        var resourceTypes = ToLookup(await db.ResourceTypes.Select(t => new { t.Name, t.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
+        var businessUnits = ToLookup(await db.BusinessUnits.Select(b => new { b.Name, b.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
 
         var errors = parsed.Errors.Select(e => e.Line > 0 ? $"Line {e.Line}: {e.Message}" : e.Message).ToList();
         var unknownTypes = parsed.Rows.Select(r => r.ResourceType).Where(n => !resourceTypes.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -382,6 +382,10 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Import complete: {added} added, {updated} updated, {removed} removed.", "Details", new { id });
     }
+
+    private static Dictionary<string, int> ToLookup<T>(IEnumerable<T> items, Func<T, string> name, Func<T, int> id) =>
+        items.GroupBy(name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => id(g.First()), StringComparer.OrdinalIgnoreCase);
 
     private async Task<SelectList> ResourceTypeSelect(CancellationToken ct) =>
         new(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
