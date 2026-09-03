@@ -14,4 +14,8 @@ public static class AuditActions
     public const string Publish = "Publish";
     public const string Retire = "Retire";
     public const string Import = "Import";
+    public const string StatusChange = "StatusChange";
+    public const string Baseline = "Baseline";
+    public const string RebaselineRequest = "RebaselineRequest";
+    public const string RebaselineDecision = "RebaselineDecision";
 }

@@ -1,0 +1,74 @@
+@model AuditIndexModel
+@{
+    ViewData["Title"] = "Audit log";
+}
+<h1 class="h3">Audit log</h1>
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-2">
+        <label class="form-label small mb-0">Entity</label>
+        <select name="entity" class="form-select form-select-sm">
+            <option value="">All</option>
+            @foreach (var e in Model.Entities) { <option value="@e" selected="@(e == Model.Entity)">@e</option> }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small mb-0">Entity id</label>
+        <input name="entityId" class="form-control form-control-sm" value="@Model.EntityId" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small mb-0">Action</label>
+        <select name="act" class="form-select form-select-sm">
+            <option value="">All</option>
+            @foreach (var a in Model.Actions) { <option value="@a" selected="@(a == Model.Action)">@a</option> }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small mb-0">User</label>
+        <input name="userId" class="form-control form-control-sm" value="@Model.UserId" />
+    </div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Clear</a>
+    </div>
+</form>
+<p class="small text-muted">@Model.Total event(s) &middot; page @Model.Page of @Model.PageCount</p>
+<table class="table table-sm align-middle">
+    <thead><tr><th>When (UTC)</th><th>Entity</th><th>Id</th><th>Action</th><th>User</th><th>Details</th></tr></thead>
+    <tbody>
+    @foreach (var e in Model.Events)
+    {
+        <tr>
+            <td class="text-nowrap small">@e.At.ToString("yyyy-MM-dd HH:mm:ss")</td>
+            <td>@e.Entity</td>
+            <td>
+                @if (e.Entity == nameof(Initiative) && int.TryParse(e.EntityId, out var initiativeId))
+                {
+                    <a asp-controller="Initiatives" asp-action="Details" asp-route-id="@initiativeId">@e.EntityId</a>
+                }
+                else
+                {
+                    @e.EntityId
+                }
+            </td>
+            <td>@e.Action</td>
+            <td class="small">@e.UserId</td>
+            <td><code class="small text-break">@e.DiffJson</code></td>
+        </tr>
+    }
+    @if (Model.Events.Count == 0)
+    {
+        <tr><td colspan="6" class="text-muted">No audit events match.</td></tr>
+    }
+    </tbody>
+</table>
+@if (Model.PageCount > 1)
+{
+    <nav><ul class="pagination pagination-sm">
+        @for (var p = 1; p <= Model.PageCount; p++)
+        {
+            <li class="page-item @(p == Model.Page ? "active" : "")">
+                <a class="page-link" asp-action="Index" asp-route-page="@p" asp-route-entity="@Model.Entity" asp-route-entityId="@Model.EntityId" asp-route-act="@Model.Action" asp-route-userId="@Model.UserId">@p</a>
+            </li>
+        }
+    </ul></nav>
+}

@@ -18,6 +18,7 @@ namespace InitiativeScoping.Web.Controllers;
 public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock) : Controller
 {
     private const string Entity = nameof(Initiative);
+    private const string ScopeLockedMessage = "Scope is locked; it can only change in Draft or during an approved re-baseline.";
 
     // ----- List / create / edit -----
 
@@ -229,7 +230,11 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             Conversions = (await db.SizingConversions.ToListAsync(ct)).OrderBy(c => c.Method).ThenBy(c => c.Hours).ToList(),
             CanEdit = InitiativeAccess.CanEdit(currentUser, initiative),
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
-            ScopeEditable = InitiativeAccess.IsScopeEditable(initiative)
+            ScopeEditable = InitiativeAccess.IsScopeEditable(initiative),
+            CanApproveRebaseline = InitiativeAccess.CanApproveRebaseline(currentUser),
+            ActivationBlockers = initiative.Status == InitiativeStatus.Draft ? InitiativeLifecycle.BaselineBlockers(initiative, forecast) : [],
+            StatusTransitions = InitiativeLifecycle.AllowedTransitions(initiative.Status)
+                .Where(s => !(initiative.Status == InitiativeStatus.Draft && s == InitiativeStatus.Active)).ToList()
         };
         return View(model);
     }
@@ -252,7 +257,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         if (!InitiativeAccess.IsScopeEditable(initiative))
         {
-            return RedirectWithError("Scope is locked; only Draft initiatives can be changed.", id);
+            return RedirectWithError(ScopeLockedMessage, id);
         }
 
         ValidatePhase(model, initiative);
@@ -277,7 +282,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     public async Task<IActionResult> EditPhase(int id, CancellationToken ct)
     {
-        var phase = await db.Phases.Include(p => p.Initiative!).ThenInclude(i => i.Members).Include(p => p.DateHistory).FirstOrDefaultAsync(p => p.Id == id, ct);
+        var phase = await db.Phases.Include(p => p.Initiative!).ThenInclude(i => i.Members).Include(p => p.Initiative!).ThenInclude(i => i.RebaselineRequests).Include(p => p.DateHistory).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (phase is null)
         {
             return NotFound();
@@ -299,7 +304,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     [HttpPost]
     public async Task<IActionResult> EditPhase(int id, PhaseEditModel model, CancellationToken ct)
     {
-        var phase = await db.Phases.Include(p => p.Initiative!).ThenInclude(i => i.Members).Include(p => p.Initiative!).ThenInclude(i => i.Phases)
+        var phase = await db.Phases.Include(p => p.Initiative!).ThenInclude(i => i.Members).Include(p => p.Initiative!).ThenInclude(i => i.RebaselineRequests).Include(p => p.Initiative!).ThenInclude(i => i.Phases)
             .Include(p => p.DateHistory).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (phase is null)
         {
@@ -314,7 +319,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         if (!InitiativeAccess.IsScopeEditable(initiative))
         {
-            return RedirectWithError("Scope is locked; only Draft initiatives can be changed.", initiative.Id);
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
         }
 
         model.Id = id;
@@ -350,7 +355,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     [HttpPost]
     public async Task<IActionResult> DeletePhase(int id, CancellationToken ct)
     {
-        var phase = await db.Phases.Include(p => p.Initiative!).ThenInclude(i => i.Members).FirstOrDefaultAsync(p => p.Id == id, ct);
+        var phase = await db.Phases.Include(p => p.Initiative!).ThenInclude(i => i.Members).Include(p => p.Initiative!).ThenInclude(i => i.RebaselineRequests).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (phase is null)
         {
             return NotFound();
@@ -364,7 +369,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         if (!InitiativeAccess.IsScopeEditable(initiative))
         {
-            return RedirectWithError("Scope is locked; only Draft initiatives can be changed.", initiative.Id);
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
         }
 
         if (await db.InitiativeAllocations.AnyAsync(a => a.PhaseId == id, ct))
@@ -396,7 +401,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         if (!InitiativeAccess.IsScopeEditable(initiative))
         {
-            return RedirectWithError("Scope is locked; only Draft initiatives can be changed.", id);
+            return RedirectWithError(ScopeLockedMessage, id);
         }
 
         await ValidateAllocation(model, initiative, ct);
@@ -420,7 +425,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     public async Task<IActionResult> EditAllocation(int id, CancellationToken ct)
     {
-        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members)
+        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
             .Include(a => a.Initiative!).ThenInclude(i => i.Phases).FirstOrDefaultAsync(a => a.Id == id, ct);
         if (allocation is null)
         {
@@ -445,7 +450,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     [HttpPost]
     public async Task<IActionResult> EditAllocation(int id, AllocationEditModel model, CancellationToken ct)
     {
-        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members)
+        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
             .Include(a => a.Initiative!).ThenInclude(i => i.Phases).FirstOrDefaultAsync(a => a.Id == id, ct);
         if (allocation is null)
         {
@@ -460,7 +465,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         if (!InitiativeAccess.IsScopeEditable(initiative))
         {
-            return RedirectWithError("Scope is locked; only Draft initiatives can be changed.", initiative.Id);
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
         }
 
         model.Id = id;
@@ -490,7 +495,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     [HttpPost]
     public async Task<IActionResult> DeleteAllocation(int id, CancellationToken ct)
     {
-        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).FirstOrDefaultAsync(a => a.Id == id, ct);
+        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests).FirstOrDefaultAsync(a => a.Id == id, ct);
         if (allocation is null)
         {
             return NotFound();
@@ -504,7 +509,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         if (!InitiativeAccess.IsScopeEditable(initiative))
         {
-            return RedirectWithError("Scope is locked; only Draft initiatives can be changed.", initiative.Id);
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
         }
 
         db.InitiativeAllocations.Remove(allocation);
@@ -531,7 +536,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         if (!InitiativeAccess.IsScopeEditable(initiative))
         {
-            return RedirectWithError("Scope is locked; only Draft initiatives can be changed.", id);
+            return RedirectWithError(ScopeLockedMessage, id);
         }
 
         if (!ModelState.IsValid)
@@ -674,7 +679,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.BusinessUnit)
             .Include(i => i.Members)
             .Include(i => i.Phases)
-            .Include(i => i.Allocations).ThenInclude(a => a.ResourceType);
+            .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
+            .Include(i => i.Baselines)
+            .Include(i => i.RebaselineRequests);
         if (includeHistory)
         {
             query = query.Include(i => i.Phases).ThenInclude(p => p.DateHistory);

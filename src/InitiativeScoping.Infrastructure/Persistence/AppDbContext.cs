@@ -19,6 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<InitiativeAllocation> InitiativeAllocations => Set<InitiativeAllocation>();
     public DbSet<ForecastBaseline> ForecastBaselines => Set<ForecastBaseline>();
     public DbSet<ForecastBaselineLine> ForecastBaselineLines => Set<ForecastBaselineLine>();
+    public DbSet<RebaselineRequest> RebaselineRequests => Set<RebaselineRequest>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<InitiativeSourceMapping> InitiativeSourceMappings => Set<InitiativeSourceMapping>();
     public DbSet<ActualsImport> ActualsImports => Set<ActualsImport>();
@@ -121,6 +122,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.TotalCost).HasPrecision(18, 2);
             e.HasIndex(x => new { x.InitiativeId, x.Version }).IsUnique();
             e.HasMany(x => x.Lines).WithOne(x => x.ForecastBaseline).HasForeignKey(x => x.ForecastBaselineId);
+        });
+
+        b.Entity<RebaselineRequest>(e =>
+        {
+            e.Property(x => x.Reason).HasMaxLength(1000);
+            e.Property(x => x.RequestedBy).HasMaxLength(200);
+            e.Property(x => x.DecidedBy).HasMaxLength(200);
+            e.Property(x => x.DecisionNote).HasMaxLength(1000);
+            e.HasOne(x => x.Initiative).WithMany(i => i.RebaselineRequests).HasForeignKey(x => x.InitiativeId);
+            e.HasOne(x => x.ResultingBaseline).WithMany().HasForeignKey(x => x.ResultingBaselineId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<ForecastBaselineLine>(e =>

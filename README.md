@@ -47,7 +47,14 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 - **Allocations** – phase × resource type × seniority × location × internal/vendor × quantity × estimated hours. Seniority lives on the allocation, not the resource type.
 - **Sizing** – *Direct* hours, or *Apply size* (T-shirt / story points) which looks up the admin conversion + allocation template, creates any missing template phases and generates allocation lines from the template percentages (optionally replacing existing lines).
 - **Forecast** – live cost uses the published rate card in effect at each phase's planned start with exact-match rate resolution; lines with no matching rate show as **Unpriced** and the initiative forecast is flagged **Incomplete**. Rollups by phase, resource type and internal vs vendor, plus a Gantt-style phase timeline, are on the details page.
-- Scope (phases/allocations/sizing) is editable only while the initiative is **Draft**; activation/baselines arrive in the next phase.
+- Scope (phases/allocations/sizing) is editable only while the initiative is **Draft** or during an approved re-baseline (below).
+
+### Lifecycle, baselines and re-baselining
+
+- **Activate** (Administrator or Owner member) requires at least one phase, at least one allocation and no unpriced lines. It freezes the live forecast as **Forecast Baseline v1** (`ForecastBaseline` + per-line `HourlyRate`/`Cost`), sets the status to **Active** and locks scope. Baseline values never change when rate cards are later republished.
+- **Status transitions**: Draft → Active (via Activate) / Cancelled; Active → OnHold / Complete / Cancelled; OnHold → Active / Cancelled. Complete and Cancelled are terminal. Only Draft initiatives can be deleted.
+- **Re-baseline** (spec §5.4): an Owner requests a re-baseline with a reason → an **Administrator** approves (or rejects) from the initiative page or the `/Rebaselines` queue → scope is unlocked → the Owner **finalizes**, which captures baseline v*N+1*, marks it current and locks scope again. Every prior version is retained; `/Initiatives/{id}/Baselines` lists versions, line-level deltas vs. the previous version and the live-forecast drift vs. the current baseline. Withdrawing an open request re-locks scope; Cancelling an initiative withdraws any open request.
+- **Audit log** – `/Audit` (all roles, filterable by entity/id/action/user) shows every configuration, scope, status, baseline and re-baseline event. Each initiative page links to its own history.
 
 ### SQL Server
 
