@@ -1,0 +1,14 @@
+@model HomeViewModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<h1 class="mb-1">Initiative Scoping &amp; Cost Tracking</h1>
+<p class="text-muted">Signed in as @Model.UserDisplayName</p>
+
+<div class="row g-3 mt-2">
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Business Units</div><div class="fs-2">@Model.BusinessUnitCount</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Resource Types</div><div class="fs-2">@Model.ResourceTypeCount</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Published Rate Cards</div><div class="fs-2">@Model.PublishedRateCardCount</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Initiatives</div><div class="fs-2">@Model.InitiativeCount</div></div></div></div>
+</div>
