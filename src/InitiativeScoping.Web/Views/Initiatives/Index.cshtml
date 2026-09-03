@@ -1,0 +1,67 @@
+@model InitiativeIndexModel
+@{
+    ViewData["Title"] = "Initiatives";
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Initiatives</h1>
+    @if (Model.CanCreate)
+    {
+        <a class="btn btn-primary btn-sm" asp-action="Create">New initiative</a>
+    }
+</div>
+<partial name="_Alerts" />
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="Search by name" />
+    </div>
+    <div class="col-md-3">
+        <select name="status" class="form-select form-select-sm" asp-for="Status" asp-items="Html.GetEnumSelectList<InitiativeStatus>()">
+            <option value="">All statuses</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select name="businessUnitId" class="form-select form-select-sm" asp-for="BusinessUnitId" asp-items="Model.BusinessUnits">
+            <option value="">All business units</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
+        <a asp-action="Index" class="btn btn-link btn-sm">Clear</a>
+    </div>
+</form>
+
+<table class="table table-sm align-middle">
+    <thead>
+    <tr>
+        <th>Name</th><th>Business unit</th><th>Status</th><th>Sizing</th><th>Target start</th>
+        <th class="text-end">Phases</th><th class="text-end">Hours</th><th class="text-end">Forecast cost</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var item in Model.Items)
+    {
+        var i = item.Initiative;
+        <tr>
+            <td><a asp-action="Details" asp-route-id="@i.Id">@i.Name</a></td>
+            <td>@i.BusinessUnit?.Name</td>
+            <td><partial name="_StatusBadge" model="i.Status" /></td>
+            <td>@(i.SizingMethod == SizingMethod.Direct ? "Direct" : $"{i.SizingMethod} {i.SizeKey}")</td>
+            <td>@i.TargetStart.ToString("yyyy-MM-dd")</td>
+            <td class="text-end">@item.PhaseCount</td>
+            <td class="text-end">@item.TotalHours.ToString("N1")</td>
+            <td class="text-end">
+                @item.TotalCost.ToString("C0")
+                @if (!item.IsComplete)
+                {
+                    <span class="badge bg-warning text-dark ms-1" title="One or more allocations have no matching rate">Incomplete</span>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Items.Count == 0)
+    {
+        <tr><td colspan="8" class="text-muted">No initiatives match.</td></tr>
+    }
+    </tbody>
+</table>

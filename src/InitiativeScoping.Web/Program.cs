@@ -2,6 +2,7 @@ using InitiativeScoping.Infrastructure;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,6 +45,14 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+var culture = new CultureInfo(app.Configuration["Culture"] ?? "en-US");
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new(culture),
+    SupportedCultures = [culture],
+    SupportedUICultures = [culture]
+});
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseSerilogRequestLogging();
@@ -52,6 +61,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health").AllowAnonymous();
+app.MapControllerRoute(
+    name: "areas",
+    pattern: "{area:exists}/{controller=BusinessUnits}/{action=Index}/{id?}");
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

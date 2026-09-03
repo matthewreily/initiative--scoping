@@ -51,7 +51,8 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Reason")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.HasKey("Id");
 
@@ -74,6 +75,15 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("CalculatedCost")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ExternalPersonId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ExternalProjectId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<decimal>("Hours")
                         .HasPrecision(18, 2)
@@ -124,6 +134,10 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Property<int>("ErrorCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("FileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -131,6 +145,9 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("RecordCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SkippedCount")
                         .HasColumnType("int");
 
                     b.Property<string>("Source")
@@ -141,14 +158,86 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("StartedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("UnmappedCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ActualsImports");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.AllocationTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Method")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SizeKey")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("ActualsImports");
+                    b.HasIndex("Method", "SizeKey")
+                        .IsUnique();
+
+                    b.ToTable("AllocationTemplates");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.AllocationTemplateLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AllocationTemplateId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Percent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("PhaseName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ResourceTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Seniority")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AllocationTemplateId");
+
+                    b.HasIndex("ResourceTypeId");
+
+                    b.ToTable("AllocationTemplateLines");
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.AuditEvent", b =>
@@ -478,7 +567,11 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("ExternalIds")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Location")
                         .IsRequired()
@@ -644,6 +737,56 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.ToTable("RateCardEntries");
                 });
 
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.RebaselineRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DecidedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("InitiativeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("ResultingBaselineId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InitiativeId");
+
+                    b.HasIndex("ResultingBaselineId");
+
+                    b.ToTable("RebaselineRequests");
+                });
+
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.ResourceType", b =>
                 {
                     b.Property<int>("Id")
@@ -737,6 +880,25 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Navigation("Person");
                 });
 
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.AllocationTemplateLine", b =>
+                {
+                    b.HasOne("InitiativeScoping.Domain.Entities.AllocationTemplate", "AllocationTemplate")
+                        .WithMany("Lines")
+                        .HasForeignKey("AllocationTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("InitiativeScoping.Domain.Entities.ResourceType", "ResourceType")
+                        .WithMany()
+                        .HasForeignKey("ResourceTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AllocationTemplate");
+
+                    b.Navigation("ResourceType");
+                });
+
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.ForecastBaseline", b =>
                 {
                     b.HasOne("InitiativeScoping.Domain.Entities.Initiative", "Initiative")
@@ -811,7 +973,7 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.InitiativeSourceMapping", b =>
                 {
                     b.HasOne("InitiativeScoping.Domain.Entities.Initiative", "Initiative")
-                        .WithMany()
+                        .WithMany("SourceMappings")
                         .HasForeignKey("InitiativeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -887,9 +1049,32 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Navigation("ResourceType");
                 });
 
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.RebaselineRequest", b =>
+                {
+                    b.HasOne("InitiativeScoping.Domain.Entities.Initiative", "Initiative")
+                        .WithMany("RebaselineRequests")
+                        .HasForeignKey("InitiativeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("InitiativeScoping.Domain.Entities.ForecastBaseline", "ResultingBaseline")
+                        .WithMany()
+                        .HasForeignKey("ResultingBaselineId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Initiative");
+
+                    b.Navigation("ResultingBaseline");
+                });
+
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.ActualsImport", b =>
                 {
                     b.Navigation("Entries");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.AllocationTemplate", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.ForecastBaseline", b =>
@@ -906,6 +1091,10 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Navigation("Members");
 
                     b.Navigation("Phases");
+
+                    b.Navigation("RebaselineRequests");
+
+                    b.Navigation("SourceMappings");
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.Phase", b =>

@@ -40,6 +40,7 @@ public static class AuthSetup
             .AddPolicy(AppPolicies.CanEditInitiatives, p => p.RequireRole(AppRoles.Administrator, AppRoles.InitiativeOwner, AppRoles.Contributor))
             .AddPolicy(AppPolicies.CanView, p => p.RequireRole(AppRoles.All))
             .AddPolicy(AppPolicies.CanExport, p => p.RequireRole(AppRoles.Administrator, AppRoles.FinancePmo))
+            .AddPolicy(AppPolicies.CanManageActuals, p => p.RequireRole(AppRoles.Administrator, AppRoles.FinancePmo))
             .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
         services.AddHttpContextAccessor();

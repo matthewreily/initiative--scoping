@@ -17,4 +17,5 @@ public static class AppPolicies
     public const string CanEditInitiatives = "CanEditInitiatives";
     public const string CanView = "CanView";
     public const string CanExport = "CanExport";
+    public const string CanManageActuals = "CanManageActuals";
 }

@@ -1,0 +1,44 @@
+@model EntriesModel
+@{
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+<p class="small text-muted">@Model.Total entr@(Model.Total == 1 ? "y" : "ies") &middot; page @Model.Page of @Model.PageCount</p>
+<table class="table table-sm align-middle">
+    <thead><tr><th>Reference</th><th>Import</th><th>Project</th><th>Person</th><th>Date</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th>Initiative</th><th style="min-width: 24rem"></th></tr></thead>
+    <tbody>
+    @foreach (var e in Model.Entries)
+    {
+        <tr class="@(e.IsUnmapped ? "table-warning" : "")">
+            <td class="small">@e.SourceReference</td>
+            <td class="small"><a asp-action="Details" asp-route-id="@e.ActualsImportId">#@e.ActualsImportId</a> @e.ActualsImport?.Source</td>
+            <td class="small">@e.ExternalProjectId</td>
+            <td class="small">
+                @if (e.Person is not null) { <text>@e.Person.DisplayName</text> }
+                else { <span class="text-danger">@(e.ExternalPersonId ?? "(blank)")</span> }
+            </td>
+            <td class="small">@e.WorkDate.ToString("yyyy-MM-dd")</td>
+            <td class="text-end">@e.Hours.ToString("N1")</td>
+            <td class="text-end">
+                @if (e.EffectiveCost is null) { <span class="badge bg-warning text-dark" title="No matching published rate for this person on the work date">Unpriced</span> }
+                else { <text>@e.EffectiveCost.Value.ToString("C0")</text> @if (e.SourcedCost is not null) { <span class="text-muted small" title="Cost supplied by the source">(sourced)</span> } }
+            </td>
+            <td class="small">
+                @if (e.Initiative is not null) { <a asp-controller="Initiatives" asp-action="Details" asp-route-id="@e.InitiativeId">@e.Initiative.Name</a> }
+                else { <span class="text-danger">Unmapped</span> }
+            </td>
+            <td>
+                <form asp-action="Remap" asp-route-id="@e.Id" method="post" class="d-flex gap-1">
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <select name="initiativeId" asp-items="Model.Initiatives" class="form-select form-select-sm"><option value="">@(e.InitiativeId is null ? "Initiative…" : "Keep initiative")</option></select>
+                    <select name="personId" asp-items="Model.People" class="form-select form-select-sm"><option value="">@(e.PersonId is null ? "Person…" : "Keep person")</option></select>
+                    <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Assign</button>
+                </form>
+            </td>
+        </tr>
+    }
+    @if (Model.Entries.Count == 0)
+    {
+        <tr><td colspan="9" class="text-muted">No entries.</td></tr>
+    }
+    </tbody>
+</table>

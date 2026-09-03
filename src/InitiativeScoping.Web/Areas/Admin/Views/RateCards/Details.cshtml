@@ -1,0 +1,163 @@
+@model RateCardDetailsModel
+@{
+    var card = Model.Card;
+    ViewData["Title"] = card.Name;
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h2 class="h5 mb-1">@card.Name <partial name="_StatusBadge" model="card.Status" /></h2>
+        <div class="text-muted small">Effective from @card.EffectiveStart.ToString("yyyy-MM-dd") &middot; @card.Entries.Count entr@(card.Entries.Count == 1 ? "y" : "ies") shown</div>
+    </div>
+    <div class="btn-group">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@card.Id">Edit card</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Export" asp-route-id="@card.Id">Export CSV</a>
+        @if (card.Status == RateCardStatus.Draft)
+        {
+            <form asp-action="Publish" asp-route-id="@card.Id" method="post" class="d-inline" onsubmit="return confirm('Publish @card.Name? It becomes eligible for forecasts.');">
+                <button type="submit" class="btn btn-success btn-sm">Publish</button>
+            </form>
+        }
+        else if (card.Status == RateCardStatus.Published)
+        {
+            <form asp-action="Retire" asp-route-id="@card.Id" method="post" class="d-inline" onsubmit="return confirm('Retire @card.Name? New forecasts will no longer use it.');">
+                <button type="submit" class="btn btn-warning btn-sm">Retire</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (card.Status == RateCardStatus.Published)
+{
+    <div class="alert alert-info py-2 small">This card is published. Rate changes affect future forecast calculations only; committed baselines keep their snapshotted rates.</div>
+}
+else if (card.Status == RateCardStatus.Retired)
+{
+    <div class="alert alert-secondary py-2 small">This card is retired and read-only.</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <form method="get" class="row g-2 align-items-end mb-2">
+            <div class="col-auto">
+                <label class="form-label small mb-0">Filter by resource type</label>
+                <select name="resourceType" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    @foreach (var item in Model.ResourceTypes)
+                    {
+                        <option value="@item.Text" selected="@(item.Text == Model.FilterResourceType)">@item.Text</option>
+                    }
+                </select>
+            </div>
+        </form>
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Hourly rate</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var e in card.Entries)
+            {
+                <tr>
+                    <td>@e.ResourceType!.Name</td>
+                    <td>@e.BusinessUnit!.Name</td>
+                    <td>@e.Seniority</td>
+                    <td>@e.Location</td>
+                    <td>@(e.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
+                    <td class="text-end">
+                        @if (Model.IsEditable)
+                        {
+                            <form asp-action="UpdateEntry" asp-route-id="@card.Id" method="post" class="d-inline-flex gap-1 justify-content-end">
+                                <input type="hidden" name="entryId" value="@e.Id" />
+                                <input type="number" name="hourlyRate" value="@e.HourlyRate" step="0.01" min="0" class="form-control form-control-sm text-end" style="width: 7rem" />
+                                <button type="submit" class="btn btn-outline-primary btn-sm">Save</button>
+                            </form>
+                        }
+                        else
+                        {
+                            @e.HourlyRate.ToString("0.00")
+                        }
+                    </td>
+                    <td class="text-end">
+                        @if (Model.IsEditable)
+                        {
+                            <form asp-action="DeleteEntry" asp-route-id="@card.Id" method="post" class="d-inline" onsubmit="return confirm('Remove this entry?');">
+                                <input type="hidden" name="entryId" value="@e.Id" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm">&times;</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (card.Entries.Count == 0)
+            {
+                <tr><td colspan="7" class="text-muted">No entries. Add one below or import a CSV.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.IsEditable)
+    {
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header py-2">Add entry</div>
+                <div class="card-body">
+                    <form asp-action="AddEntry" asp-route-id="@card.Id" method="post">
+                        <div class="mb-2">
+                            <label asp-for="NewEntry.ResourceTypeId" class="form-label small"></label>
+                            <select asp-for="NewEntry.ResourceTypeId" asp-items="Model.ResourceTypes" class="form-select form-select-sm" name="ResourceTypeId"></select>
+                        </div>
+                        <div class="mb-2">
+                            <label asp-for="NewEntry.BusinessUnitId" class="form-label small"></label>
+                            <select asp-for="NewEntry.BusinessUnitId" asp-items="Model.BusinessUnits" class="form-select form-select-sm" name="BusinessUnitId"></select>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col">
+                                <label asp-for="NewEntry.Seniority" class="form-label small"></label>
+                                <select asp-for="NewEntry.Seniority" asp-items="Html.GetEnumSelectList<Seniority>()" class="form-select form-select-sm" name="Seniority"></select>
+                            </div>
+                            <div class="col">
+                                <label asp-for="NewEntry.ResourcingClass" class="form-label small"></label>
+                                <select asp-for="NewEntry.ResourcingClass" class="form-select form-select-sm" name="ResourcingClass">
+                                    <option value="@ResourcingClass.InternalFte">Internal</option>
+                                    <option value="@ResourcingClass.Vendor">Vendor</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col">
+                                <label asp-for="NewEntry.Location" class="form-label small"></label>
+                                <input asp-for="NewEntry.Location" class="form-control form-control-sm" name="Location" />
+                            </div>
+                            <div class="col">
+                                <label asp-for="NewEntry.HourlyRate" class="form-label small"></label>
+                                <input asp-for="NewEntry.HourlyRate" class="form-control form-control-sm" name="HourlyRate" type="number" step="0.01" min="0" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Add entry</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header py-2">Import CSV</div>
+                <div class="card-body">
+                    <form asp-action="Import" asp-route-id="@card.Id" method="post" enctype="multipart/form-data">
+                        <div class="mb-2">
+                            <input type="file" name="File" accept=".csv,text/csv" class="form-control form-control-sm" required />
+                        </div>
+                        <div class="form-check mb-2">
+                            <input type="checkbox" name="Replace" value="true" class="form-check-input" id="replace" />
+                            <label class="form-check-label small" for="replace">Replace existing entries (otherwise merge: add new, update changed rates)</label>
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
+                        <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
+                    </form>
+                    <p class="text-muted small mt-2 mb-0">Columns: ResourceType, BusinessUnit, Seniority, Location, ResourcingClass (Internal/Vendor), HourlyRate. The whole file is rejected if any row is invalid.</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>

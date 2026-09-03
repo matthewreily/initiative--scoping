@@ -10,6 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<RateCardEntry> RateCardEntries => Set<RateCardEntry>();
     public DbSet<SizingConversion> SizingConversions => Set<SizingConversion>();
+    public DbSet<AllocationTemplate> AllocationTemplates => Set<AllocationTemplate>();
+    public DbSet<AllocationTemplateLine> AllocationTemplateLines => Set<AllocationTemplateLine>();
     public DbSet<Initiative> Initiatives => Set<Initiative>();
     public DbSet<InitiativeMember> InitiativeMembers => Set<InitiativeMember>();
     public DbSet<Phase> Phases => Set<Phase>();
@@ -17,6 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<InitiativeAllocation> InitiativeAllocations => Set<InitiativeAllocation>();
     public DbSet<ForecastBaseline> ForecastBaselines => Set<ForecastBaseline>();
     public DbSet<ForecastBaselineLine> ForecastBaselineLines => Set<ForecastBaselineLine>();
+    public DbSet<RebaselineRequest> RebaselineRequests => Set<RebaselineRequest>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<InitiativeSourceMapping> InitiativeSourceMappings => Set<InitiativeSourceMapping>();
     public DbSet<ActualsImport> ActualsImports => Set<ActualsImport>();
@@ -60,6 +63,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Key).HasMaxLength(50);
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.HasIndex(x => new { x.Method, x.Key }).IsUnique();
+        });
+
+        b.Entity<AllocationTemplate>(e =>
+        {
+            e.Property(x => x.SizeKey).HasMaxLength(50);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.HasIndex(x => new { x.Method, x.SizeKey }).IsUnique();
+            e.HasMany(x => x.Lines).WithOne(x => x.AllocationTemplate).HasForeignKey(x => x.AllocationTemplateId);
+        });
+
+        b.Entity<AllocationTemplateLine>(e =>
+        {
+            e.Property(x => x.PhaseName).HasMaxLength(200);
+            e.Property(x => x.Percent).HasPrecision(5, 2);
+            e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Initiative>(e =>
@@ -106,6 +124,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasMany(x => x.Lines).WithOne(x => x.ForecastBaseline).HasForeignKey(x => x.ForecastBaselineId);
         });
 
+        b.Entity<RebaselineRequest>(e =>
+        {
+            e.Property(x => x.Reason).HasMaxLength(1000);
+            e.Property(x => x.RequestedBy).HasMaxLength(200);
+            e.Property(x => x.DecidedBy).HasMaxLength(200);
+            e.Property(x => x.DecisionNote).HasMaxLength(1000);
+            e.HasOne(x => x.Initiative).WithMany(i => i.RebaselineRequests).HasForeignKey(x => x.InitiativeId);
+            e.HasOne(x => x.ResultingBaseline).WithMany().HasForeignKey(x => x.ResultingBaselineId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         b.Entity<ForecastBaselineLine>(e =>
         {
             e.Property(x => x.Location).HasMaxLength(100);
@@ -117,6 +145,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Person>(e =>
         {
             e.Property(x => x.DisplayName).HasMaxLength(200);
+            e.Property(x => x.ExternalIds).HasMaxLength(1000);
             e.Property(x => x.Location).HasMaxLength(100);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
@@ -127,18 +156,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Source).HasMaxLength(50);
             e.Property(x => x.ExternalProjectId).HasMaxLength(200);
             e.HasIndex(x => new { x.Source, x.ExternalProjectId }).IsUnique();
+            e.HasOne(x => x.Initiative).WithMany(i => i.SourceMappings).HasForeignKey(x => x.InitiativeId);
         });
 
         b.Entity<ActualsImport>(e =>
         {
             e.Property(x => x.Source).HasMaxLength(50);
             e.Property(x => x.Status).HasMaxLength(50);
+            e.Property(x => x.StartedBy).HasMaxLength(200);
+            e.Property(x => x.FileName).HasMaxLength(260);
             e.HasMany(x => x.Entries).WithOne(x => x.ActualsImport).HasForeignKey(x => x.ActualsImportId);
         });
 
         b.Entity<ActualEntry>(e =>
         {
             e.Property(x => x.SourceReference).HasMaxLength(200);
+            e.Property(x => x.ExternalProjectId).HasMaxLength(200);
+            e.Property(x => x.ExternalPersonId).HasMaxLength(200);
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.Property(x => x.SourcedCost).HasPrecision(18, 2);
             e.Property(x => x.CalculatedCost).HasPrecision(18, 2);
@@ -151,6 +185,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);
+            e.Property(x => x.Reason).HasMaxLength(1000);
             e.Property(x => x.CreatedBy).HasMaxLength(200);
         });
 

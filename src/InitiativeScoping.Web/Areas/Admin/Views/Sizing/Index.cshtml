@@ -1,0 +1,74 @@
+@model SizingIndexModel
+@{
+    ViewData["Title"] = "Sizing";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h5 mb-0">Sizing conversions</h2>
+            <a class="btn btn-primary btn-sm" asp-action="CreateConversion">New conversion</a>
+        </div>
+        <p class="text-muted small">Maps a relative size (T-shirt or story points) to total estimated hours.</p>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Method</th><th>Key</th><th class="text-end">Hours</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var c in Model.Conversions)
+            {
+                <tr>
+                    <td>@c.Method</td>
+                    <td>@c.Key</td>
+                    <td class="text-end">@c.Hours.ToString("0.##")</td>
+                    <td class="text-end">
+                        <a class="btn btn-outline-secondary btn-sm" asp-action="EditConversion" asp-route-id="@c.Id">Edit</a>
+                        <form asp-action="DeleteConversion" asp-route-id="@c.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @c.Method @c.Key?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (Model.Conversions.Count == 0)
+            {
+                <tr><td colspan="4" class="text-muted">No conversions yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h5 mb-0">Allocation templates</h2>
+            <a class="btn btn-primary btn-sm" asp-action="CreateTemplate">New template</a>
+        </div>
+        <p class="text-muted small">Optional default split of a relative-sized estimate across phases, resource types and seniority. Lines must total 100%.</p>
+        @foreach (var t in Model.Templates)
+        {
+            <div class="card mb-3">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                    <span><strong>@t.Name</strong> <span class="text-muted small">(@t.Method @t.SizeKey)</span></span>
+                    <span>
+                        <a class="btn btn-outline-secondary btn-sm" asp-action="EditTemplate" asp-route-id="@t.Id">Edit</a>
+                        <form asp-action="DeleteTemplate" asp-route-id="@t.Id" method="post" class="d-inline" onsubmit="return confirm('Delete template @t.Name?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </span>
+                </div>
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th class="text-end">%</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in t.Lines.OrderBy(l => l.PhaseName).ThenBy(l => l.ResourceType!.Name))
+                    {
+                        <tr><td>@l.PhaseName</td><td>@l.ResourceType!.Name</td><td>@l.Seniority</td><td class="text-end">@l.Percent.ToString("0.##")</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (Model.Templates.Count == 0)
+        {
+            <p class="text-muted">No templates yet.</p>
+        }
+    </div>
+</div>
