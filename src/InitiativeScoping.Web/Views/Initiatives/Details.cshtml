@@ -25,6 +25,8 @@
         </div>
     </div>
     <div class="text-nowrap">
+        <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit</a>
         @if (Model.CanEdit)
         {
             <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@i.Id">Edit</a>
@@ -42,9 +44,107 @@
 {
     <p>@i.Description</p>
 }
-@if (!Model.ScopeEditable)
+@{
+    var open = i.OpenRebaseline;
+    var current = i.CurrentBaseline;
+}
+@if (i.Status == InitiativeStatus.Draft)
 {
-    <div class="alert alert-secondary py-2">Scope is locked while the initiative is @i.Status. Costs below reflect current published rate cards.</div>
+    <div class="alert @(Model.ActivationBlockers.Count == 0 ? "alert-info" : "alert-warning") py-2 d-flex justify-content-between align-items-center">
+        <div>
+            @if (Model.ActivationBlockers.Count == 0)
+            {
+                <text>Ready to activate: the current forecast will be frozen as <strong>baseline v1</strong> and scope will lock.</text>
+            }
+            else
+            {
+                <strong>Not ready to activate:</strong> @string.Join(" ", Model.ActivationBlockers)
+            }
+        </div>
+        @if (Model.CanManage)
+        {
+            <form asp-controller="Lifecycle" asp-action="Activate" asp-route-id="@i.Id" method="post" class="d-flex gap-2 ms-3" onsubmit="return confirm('Activate and capture baseline v1? Scope will be locked.');">
+                <input name="reason" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
+                <button type="submit" class="btn btn-success btn-sm text-nowrap" disabled="@(Model.ActivationBlockers.Count > 0)">Activate</button>
+            </form>
+        }
+    </div>
+}
+else
+{
+    <div class="alert @(Model.ScopeEditable ? "alert-warning" : "alert-secondary") py-2">
+        @if (current is not null)
+        {
+            <div>
+                <strong>Baseline v@(current.Version)</strong> (current) &middot; @current.TotalHours.ToString("N1") h &middot; @current.TotalCost.ToString("C0")
+                &middot; captured @current.SnapshotAt.ToString("yyyy-MM-dd") by @current.SnapshotBy
+                @if (Model.Forecast.TotalCost != current.TotalCost || Model.Forecast.TotalHours != current.TotalHours)
+                {
+                    var dh = Model.Forecast.TotalHours - current.TotalHours;
+                    var dc = Model.Forecast.TotalCost - current.TotalCost;
+                    <span class="ms-2 badge @(dc > 0 ? "bg-danger" : "bg-success")" title="Live forecast (current scope at current published rates) vs. current baseline">
+                        Live forecast @(dh >= 0 ? "+" : "")@dh.ToString("N1") h / @(dc >= 0 ? "+" : "")@dc.ToString("C0")
+                    </span>
+                }
+            </div>
+        }
+        @if (open is null)
+        {
+            <div class="small">Scope is locked while the initiative is @i.Status. @if (i.Status == InitiativeStatus.Active) { <text>Request a re-baseline to change it.</text> }</div>
+        }
+        else if (open.Status == RebaselineStatus.Pending)
+        {
+            <div class="small"><strong>Re-baseline requested</strong> by @open.RequestedBy on @open.RequestedAt.ToString("yyyy-MM-dd"): &ldquo;@open.Reason&rdquo; &mdash; awaiting Administrator approval.</div>
+        }
+        else
+        {
+            <div class="small"><strong>Re-baseline approved</strong> by @open.DecidedBy &mdash; scope is unlocked. Finalize to capture baseline v@(current?.Version + 1 ?? 1) and lock scope again.</div>
+        }
+        @if (Model.CanManage || Model.CanApproveRebaseline)
+        {
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                @if (Model.CanManage && i.Status == InitiativeStatus.Active && open is null)
+                {
+                    <form asp-controller="Lifecycle" asp-action="RequestRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2">
+                        <input name="reason" class="form-control form-control-sm" placeholder="Reason for re-baseline" style="width: 18rem" required />
+                        <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Request re-baseline</button>
+                    </form>
+                }
+                @if (Model.CanApproveRebaseline && open?.Status == RebaselineStatus.Pending)
+                {
+                    <form asp-controller="Lifecycle" asp-action="DecideRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2">
+                        <input type="hidden" name="requestId" value="@open.Id" />
+                        <input name="note" class="form-control form-control-sm" placeholder="Decision note (optional)" style="width: 14rem" />
+                        <button type="submit" name="approve" value="true" class="btn btn-success btn-sm">Approve</button>
+                        <button type="submit" name="approve" value="false" class="btn btn-outline-danger btn-sm">Reject</button>
+                    </form>
+                }
+                @if (Model.CanManage && open?.Status == RebaselineStatus.Approved)
+                {
+                    <form asp-controller="Lifecycle" asp-action="FinalizeRebaseline" asp-route-id="@i.Id" method="post" onsubmit="return confirm('Capture a new baseline from the current scope and lock it?');">
+                        <button type="submit" class="btn btn-success btn-sm" disabled="@(!Model.Forecast.IsComplete)">Finalize baseline v@(current?.Version + 1 ?? 1)</button>
+                    </form>
+                }
+                @if (Model.CanManage && open is not null)
+                {
+                    <form asp-controller="Lifecycle" asp-action="WithdrawRebaseline" asp-route-id="@i.Id" method="post">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">Withdraw request</button>
+                    </form>
+                }
+            </div>
+        }
+    </div>
+}
+@if (Model.CanManage && Model.StatusTransitions.Count > 0)
+{
+    <form asp-controller="Lifecycle" asp-action="ChangeStatus" asp-route-id="@i.Id" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3 small" onsubmit="return confirm('Change status to ' + this.to.value + '?');">
+        <span class="text-muted">Change status:</span>
+        <select name="to" class="form-select form-select-sm w-auto">
+            @foreach (var s in Model.StatusTransitions) { <option value="@s">@s</option> }
+        </select>
+        <input name="note" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Apply</button>
+    </form>
 }
 
 <div class="row g-3 mb-4">
@@ -92,12 +192,9 @@
                     <td class="text-end">@((roll?.Hours ?? 0).ToString("N1"))</td>
                     <td class="text-end">@((roll?.Cost ?? 0).ToString("C0")) @if (roll?.HasUnpriced == true) { <span class="text-warning" title="Unpriced lines">&#9888;</span> }</td>
                     <td class="text-end text-nowrap">
-                        @if (Model.CanEdit)
-                        {
-                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditPhase" asp-route-id="@p.Id">Edit</a>
-                        }
                         @if (Model.ScopeWritable)
                         {
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditPhase" asp-route-id="@p.Id">Edit</a>
                             <form asp-action="DeletePhase" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Delete phase @p.Name?');">
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
                             </form>

@@ -1,0 +1,119 @@
+@model BaselinesModel
+@{
+    var i = Model.Initiative;
+    ViewData["Title"] = $"{i.Name} – Baselines";
+    var sel = Model.Selected;
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+    <li class="breadcrumb-item"><a asp-controller="Initiatives" asp-action="Index">Initiatives</a></li>
+    <li class="breadcrumb-item"><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@i.Id">@i.Name</a></li>
+    <li class="breadcrumb-item active">Baselines</li>
+</ol></nav>
+<h1 class="h3">@i.Name <partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="i.Status" /> <small class="text-muted fs-6">Forecast baselines</small></h1>
+<partial name="~/Views/Initiatives/_Alerts.cshtml" />
+
+@if (Model.Baselines.Count == 0)
+{
+    <div class="alert alert-secondary">No baseline yet. Baseline v1 is captured when the initiative is activated.</div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <h2 class="h5">Versions</h2>
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Ver.</th><th>Captured</th><th class="text-end">Hours</th><th class="text-end">Cost</th></tr></thead>
+                <tbody>
+                @foreach (var b in Model.Baselines)
+                {
+                    <tr class="@(b.Version == sel?.Version ? "table-active" : "")">
+                        <td><a asp-action="Baselines" asp-route-id="@i.Id" asp-route-version="@b.Version">v@(b.Version)</a> @if (b.IsCurrent) { <span class="badge bg-success">current</span> }</td>
+                        <td class="small">@b.SnapshotAt.ToString("yyyy-MM-dd")<br /><span class="text-muted">@b.SnapshotBy</span></td>
+                        <td class="text-end">@b.TotalHours.ToString("N1")</td>
+                        <td class="text-end">@b.TotalCost.ToString("C0")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            <div class="card mb-3">
+                <div class="card-body small">
+                    <div class="text-muted">Live forecast (current scope, current published rates)</div>
+                    <div class="fs-5">@Model.LiveForecast.TotalHours.ToString("N1") h &middot; @Model.LiveForecast.TotalCost.ToString("C0")
+                        @if (!Model.LiveForecast.IsComplete) { <span class="badge bg-warning text-dark">unpriced lines</span> }</div>
+                    @if (i.CurrentBaseline is { } cur)
+                    {
+                        var dc = Model.LiveForecast.TotalCost - cur.TotalCost;
+                        <div class="@(dc > 0 ? "text-danger" : dc < 0 ? "text-success" : "text-muted")">
+                            @(dc >= 0 ? "+" : "")@dc.ToString("C0") vs. current baseline v@(cur.Version)
+                            @if (cur.TotalCost != 0) { <text>(@((dc / cur.TotalCost * 100).ToString("N1"))%)</text> }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            @if (sel is not null)
+            {
+                <h2 class="h5">Baseline v@(sel.Version) @if (sel.IsCurrent) { <span class="badge bg-success">current</span> }</h2>
+                <p class="small text-muted mb-2">
+                    Captured @sel.SnapshotAt.ToString("yyyy-MM-dd HH:mm") UTC by @sel.SnapshotBy
+                    @if (!string.IsNullOrEmpty(sel.Reason)) { <text>&middot; &ldquo;@sel.Reason&rdquo;</text> }
+                    @if (Model.Previous is not null) { <text>&middot; deltas vs. v@(Model.Previous.Version)</text> }
+                </p>
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th>
+                        @if (Model.Previous is not null) { <th class="text-end">Δ Hours</th><th class="text-end">Δ Cost</th> }</tr></thead>
+                    <tbody>
+                    @foreach (var l in Model.Lines)
+                    {
+                        <tr class="@(l.Hours == 0 ? "text-muted" : "")">
+                            <td>@l.Phase</td><td>@l.ResourceType</td><td>@l.Seniority</td><td>@l.Location</td>
+                            <td>@(l.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : "Vendor")</td>
+                            <td class="text-end">@l.Hours.ToString("N1")</td>
+                            <td class="text-end">@l.HourlyRate.ToString("C2")</td>
+                            <td class="text-end">@l.Cost.ToString("C0")</td>
+                            @if (Model.Previous is not null)
+                            {
+                                <td class="text-end @(l.HoursDelta > 0 ? "text-danger" : l.HoursDelta < 0 ? "text-success" : "")">@(l.HoursDelta is { } dh && dh != 0 ? (dh > 0 ? "+" : "") + dh.ToString("N1") : "–")</td>
+                                <td class="text-end @(l.CostDelta > 0 ? "text-danger" : l.CostDelta < 0 ? "text-success" : "")">@(l.CostDelta is { } dc && dc != 0 ? (dc > 0 ? "+" : "") + dc.ToString("C0") : "–")</td>
+                            }
+                        </tr>
+                    }
+                    </tbody>
+                    <tfoot><tr class="fw-semibold"><td colspan="5">Total</td><td class="text-end">@sel.TotalHours.ToString("N1")</td><td></td><td class="text-end">@sel.TotalCost.ToString("C0")</td>
+                        @if (Model.Previous is not null)
+                        {
+                            var dh = sel.TotalHours - Model.Previous.TotalHours;
+                            var dc = sel.TotalCost - Model.Previous.TotalCost;
+                            <td class="text-end">@(dh >= 0 ? "+" : "")@dh.ToString("N1")</td><td class="text-end">@(dc >= 0 ? "+" : "")@dc.ToString("C0")</td>
+                        }</tr></tfoot>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+<h2 class="h5 mt-4">Re-baseline requests</h2>
+@if (Model.Requests.Count == 0)
+{
+    <p class="text-muted small">None.</p>
+}
+else
+{
+    <table class="table table-sm">
+        <thead><tr><th>#</th><th>Status</th><th>Requested</th><th>Reason</th><th>Decision</th><th>Result</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Requests)
+        {
+            <tr>
+                <td>@r.Id</td>
+                <td><span class="badge @(r.Status switch { RebaselineStatus.Pending => "bg-warning text-dark", RebaselineStatus.Approved => "bg-info text-dark", RebaselineStatus.Completed => "bg-success", RebaselineStatus.Rejected => "bg-danger", _ => "bg-secondary" })">@r.Status</span></td>
+                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @r.RequestedBy</td>
+                <td>@r.Reason</td>
+                <td class="small">@if (r.DecidedAt is not null) { <text>@r.DecidedAt.Value.ToString("yyyy-MM-dd") by @r.DecidedBy</text> @if (!string.IsNullOrEmpty(r.DecisionNote)) { <br /><span class="text-muted">@r.DecisionNote</span> } }</td>
+                <td>@if (r.ResultingBaselineId is not null) { var rb = Model.Baselines.FirstOrDefault(b => b.Id == r.ResultingBaselineId); if (rb is not null) { <a asp-action="Baselines" asp-route-id="@i.Id" asp-route-version="@rb.Version">v@(rb.Version)</a> } }</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

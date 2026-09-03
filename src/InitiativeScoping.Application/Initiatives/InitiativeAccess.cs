@@ -20,6 +20,11 @@ public static class InitiativeAccess
         user.IsInRole(AppRoles.Administrator) ||
         CanCreate(user) && initiative.Members.Any(m => m.UserId == user.UserId && m.Role == InitiativeMemberRole.Owner);
 
-    /// <summary>Scope (phases/allocations/sizing) is only editable while the initiative is in Draft.</summary>
-    public static bool IsScopeEditable(Initiative initiative) => initiative.Status == InitiativeStatus.Draft;
+    /// <summary>Scope (phases/allocations/sizing) is editable in Draft, or on an Active initiative with an approved re-baseline in progress.</summary>
+    public static bool IsScopeEditable(Initiative initiative) =>
+        initiative.Status == InitiativeStatus.Draft ||
+        initiative.Status == InitiativeStatus.Active && initiative.OpenRebaseline?.Status == RebaselineStatus.Approved;
+
+    /// <summary>Only Administrators approve or reject re-baseline requests.</summary>
+    public static bool CanApproveRebaseline(ICurrentUser user) => user.IsInRole(AppRoles.Administrator);
 }

@@ -132,4 +132,32 @@ public class InitiativeDetailsModel
     public bool CanManage { get; init; }
     public bool ScopeEditable { get; init; }
     public bool ScopeWritable => CanEdit && ScopeEditable;
+    public bool CanApproveRebaseline { get; init; }
+    public IReadOnlyList<string> ActivationBlockers { get; init; } = [];
+    public IReadOnlyList<InitiativeStatus> StatusTransitions { get; init; } = [];
 }
+
+public class BaselinesModel
+{
+    public required Initiative Initiative { get; init; }
+    public required IReadOnlyList<ForecastBaseline> Baselines { get; init; }
+    public ForecastBaseline? Selected { get; init; }
+    public ForecastBaseline? Previous { get; init; }
+    public required ForecastResult LiveForecast { get; init; }
+    public required IReadOnlyList<BaselineLineRow> Lines { get; init; }
+    public required IReadOnlyList<RebaselineRequest> Requests { get; init; }
+    public bool CanManage { get; init; }
+    public bool CanApprove { get; init; }
+}
+
+public sealed record BaselineLineRow(
+    string Phase,
+    string ResourceType,
+    Seniority Seniority,
+    string Location,
+    ResourcingClass ResourcingClass,
+    decimal Hours,
+    decimal HourlyRate,
+    decimal Cost,
+    decimal? HoursDelta,
+    decimal? CostDelta);
