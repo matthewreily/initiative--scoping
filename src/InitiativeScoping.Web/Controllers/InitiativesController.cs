@@ -732,7 +732,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     {
         if (initiative.Phases.All(p => p.Id != model.PhaseId))
         {
-            ModelState.AddModelError(nameof(model.PhaseId), "Add a phase before adding allocations.");
+            ModelState.AddModelError(nameof(model.PhaseId), initiative.Phases.Count == 0
+                ? "Add a phase before adding allocations."
+                : "Select a phase that belongs to this initiative.");
         }
 
         if (!await db.ResourceTypes.AnyAsync(t => t.Id == model.ResourceTypeId, ct))

@@ -33,6 +33,32 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
+    public async Task Viewer_who_is_owner_member_still_cannot_edit()
+    {
+        await using var viewerFactory = new ViewerOnlyFactory();
+        int id;
+        using (var scope = viewerFactory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var initiative = new Initiative
+            {
+                Name = "Viewer owned", BusinessUnitId = (await db.BusinessUnits.FirstAsync()).Id, TargetStart = new DateOnly(2026, 1, 1),
+                CreatedBy = "dev-user", CreatedAt = DateTimeOffset.UtcNow,
+                Members = [new InitiativeMember { UserId = "dev-user", Role = InitiativeMemberRole.Owner }]
+            };
+            db.Initiatives.Add(initiative);
+            await db.SaveChangesAsync();
+            id = initiative.Id;
+        }
+
+        var client = viewerFactory.CreateClient(NoRedirect);
+        var details = await client.GetAsync($"/Initiatives/Details/{id}");
+        Assert.Equal(HttpStatusCode.OK, details.StatusCode);
+        Assert.DoesNotContain("/Initiatives/AddPhase/", await details.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/Initiatives/Edit/{id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Create_adds_creator_as_owner_and_writes_audit()
     {
         var client = factory.CreateClient(NoRedirect);
