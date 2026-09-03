@@ -14,7 +14,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var provider = configuration["Database:Provider"] ?? "SqlServer";
+        var provider = configuration["Database:Provider"] ?? "PostgreSql";
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
 
@@ -26,7 +26,7 @@ public static class DependencyInjection
             }
             else
             {
-                options.UseSqlServer(connectionString, x => x.MigrationsAssembly("InitiativeScoping.Infrastructure"));
+                options.UseNpgsql(connectionString, x => x.MigrationsAssembly("InitiativeScoping.Infrastructure"));
             }
         });
 

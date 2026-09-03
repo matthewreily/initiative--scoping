@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/*.db
+**/*.db-*
+**/TestResults/
+.git/
+.github/
+deploy/
+tests/
+*.md
