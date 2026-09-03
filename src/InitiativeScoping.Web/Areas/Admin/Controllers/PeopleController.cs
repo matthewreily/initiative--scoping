@@ -15,6 +15,7 @@ namespace InitiativeScoping.Web.Areas.Admin.Controllers;
 public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControllerBase
 {
     private const long MaxImportBytes = 5 * 1024 * 1024;
+    private const long MaxImportRequestBytes = MaxImportBytes + 2 * 1024 * 1024;
 
     public async Task<IActionResult> Index(string? search, CancellationToken ct)
     {
@@ -162,12 +163,17 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
     /// (case-insensitive). The whole file is rejected if any row is invalid or references unknown reference data.
     /// </summary>
     [HttpPost]
-    [RequestSizeLimit(MaxImportBytes)]
+    [RequestSizeLimit(MaxImportRequestBytes)]
     public async Task<IActionResult> Import(PeopleImportModel model, CancellationToken ct)
     {
         if (model.File is null || model.File.Length == 0)
         {
             return RedirectWithError("Choose a CSV file to import.");
+        }
+
+        if (model.File.Length > MaxImportBytes)
+        {
+            return RedirectWithError($"File exceeds the {MaxImportBytes / (1024 * 1024)} MB import limit; no changes made.");
         }
 
         PeopleCsvResult parsed;

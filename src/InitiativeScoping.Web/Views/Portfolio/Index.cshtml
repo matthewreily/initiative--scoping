@@ -26,12 +26,12 @@
 
 <form method="get" class="row g-2 align-items-center mb-3">
     <div class="col-md-3">
-        <select name="status" class="form-select form-select-sm" asp-for="Status" asp-items="Html.GetEnumSelectList<InitiativeStatus>()">
+        <select name="status" class="form-select form-select-sm" aria-label="Filter by status" asp-for="Status" asp-items="Html.GetEnumSelectList<InitiativeStatus>()">
             <option value="">All open statuses</option>
         </select>
     </div>
     <div class="col-md-3">
-        <select name="businessUnitId" class="form-select form-select-sm" asp-for="BusinessUnitId" asp-items="Model.BusinessUnits">
+        <select name="businessUnitId" class="form-select form-select-sm" aria-label="Filter by business unit" asp-for="BusinessUnitId" asp-items="Model.BusinessUnits">
             <option value="">All business units</option>
         </select>
     </div>
