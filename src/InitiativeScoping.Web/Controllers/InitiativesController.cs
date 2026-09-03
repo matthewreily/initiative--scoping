@@ -6,6 +6,7 @@ using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Domain.Services;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Models;
+using InitiativeScoping.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -15,7 +16,7 @@ namespace InitiativeScoping.Web.Controllers;
 
 [Authorize(Policy = AppPolicies.CanView)]
 [AutoValidateAntiforgeryToken]
-public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock) : Controller
+public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IConfiguration config) : Controller
 {
     private const string Entity = nameof(Initiative);
     private const string ScopeLockedMessage = "Scope is locked; it can only change in Draft or during an approved re-baseline.";
@@ -200,6 +201,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var typeNames = await db.ResourceTypes.ToDictionaryAsync(t => t.Id, t => t.Name, ct);
         var phaseNames = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
         var orderedPhases = initiative.Phases.OrderBy(p => p.Sequence).ThenBy(p => p.PlannedStart).ToList();
+        var actuals = await db.LoadActualsAsync(initiative, config.GetValue<decimal?>(ActualsQueries.DefaultThresholdKey), ct);
+        var unmappedForProjects = await db.ActualEntries.CountAsync(e => e.InitiativeId == id && e.IsUnmapped, ct);
 
         var model = new InitiativeDetailsModel
         {
@@ -234,7 +237,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             CanApproveRebaseline = InitiativeAccess.CanApproveRebaseline(currentUser),
             ActivationBlockers = initiative.Status == InitiativeStatus.Draft ? InitiativeLifecycle.BaselineBlockers(initiative, forecast) : [],
             StatusTransitions = InitiativeLifecycle.AllowedTransitions(initiative.Status)
-                .Where(s => !(initiative.Status == InitiativeStatus.Draft && s == InitiativeStatus.Active)).ToList()
+                .Where(s => !(initiative.Status == InitiativeStatus.Draft && s == InitiativeStatus.Active)).ToList(),
+            Variance = actuals.Variance,
+            UnmappedForMappedProjects = unmappedForProjects
         };
         return View(model);
     }
@@ -671,6 +676,70 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return RedirectWithSuccess($"{userId} removed.", id);
     }
 
+    // ----- Source mappings -----
+
+    [HttpPost]
+    public async Task<IActionResult> AddSourceMapping(int id, string source, string externalProjectId, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanManage(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!ActualsSources.All.Contains(source) || string.IsNullOrWhiteSpace(externalProjectId))
+        {
+            return RedirectWithError("Choose a source and enter the external project id.", id);
+        }
+
+        externalProjectId = externalProjectId.Trim();
+        var taken = await db.InitiativeSourceMappings
+            .FirstOrDefaultAsync(m => m.Source == source && m.ExternalProjectId.ToLower() == externalProjectId.ToLower(), ct);
+        if (taken is not null)
+        {
+            return RedirectWithError(taken.InitiativeId == id
+                ? "That mapping already exists."
+                : $"{source} project '{externalProjectId}' is already mapped to another initiative.", id);
+        }
+
+        initiative.SourceMappings.Add(new InitiativeSourceMapping { Source = source, ExternalProjectId = externalProjectId });
+        audit.Record(Entity, initiative.Id, AuditActions.Update, new { Action = "AddSourceMapping", Source = source, ExternalProjectId = externalProjectId });
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"Mapped {source} project '{externalProjectId}'. Future imports for it will land here; existing unmapped entries can be assigned from the Actuals page.", id);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> RemoveSourceMapping(int id, int mappingId, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanManage(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        var mapping = initiative.SourceMappings.FirstOrDefault(m => m.Id == mappingId);
+        if (mapping is null)
+        {
+            return NotFound();
+        }
+
+        initiative.SourceMappings.Remove(mapping);
+        db.InitiativeSourceMappings.Remove(mapping);
+        audit.Record(Entity, initiative.Id, AuditActions.Update, new { Action = "RemoveSourceMapping", mapping.Source, mapping.ExternalProjectId });
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"Mapping to {mapping.Source} '{mapping.ExternalProjectId}' removed.", id);
+    }
+
     // ----- Helpers -----
 
     private Task<Initiative?> LoadAsync(int id, CancellationToken ct, bool includeHistory = false)
@@ -680,8 +749,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.Members)
             .Include(i => i.Phases)
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
-            .Include(i => i.Baselines)
-            .Include(i => i.RebaselineRequests);
+            .Include(i => i.Baselines).ThenInclude(b => b.Lines)
+            .Include(i => i.RebaselineRequests)
+            .Include(i => i.SourceMappings);
         if (includeHistory)
         {
             query = query.Include(i => i.Phases).ThenInclude(p => p.DateHistory);

@@ -56,6 +56,16 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 - **Re-baseline** (spec §5.4): an Owner requests a re-baseline with a reason → an **Administrator** approves (or rejects) from the initiative page or the `/Rebaselines` queue → scope is unlocked → the Owner **finalizes**, which captures baseline v*N+1*, marks it current and locks scope again. Every prior version is retained; `/Initiatives/{id}/Baselines` lists versions, line-level deltas vs. the previous version and the live-forecast drift vs. the current baseline. Withdrawing an open request re-locks scope; Cancelling an initiative withdraws any open request.
 - **Audit log** – `/Audit` (all roles, filterable by entity/id/action/user) shows every configuration, scope, status, baseline and re-baseline event. Each initiative page links to its own history.
 
+### Actuals, roster and variance
+
+- **People roster** (`/Admin/People`, Administrator) – each person carries the rate-card dimensions (resource type, BU, seniority, location, internal/vendor) plus semicolon-separated **external IDs** (Planview resource id, e-mail, Jira account id…). External IDs are unique across the roster (case-insensitive); inactive people never match new imports; people with imported actuals can only be deactivated, not deleted.
+- **Source mappings** – on the initiative page an Owner/Administrator maps external project ids per source (`Csv`, `Planview`, `Jira`). `(Source, ExternalProjectId)` is unique case-insensitively.
+- **Import** (`/Actuals`, Administrator or Finance/PMO) – upload a CSV `ExternalProjectId,ExternalPersonId,WorkDate,Hours[,Cost][,Reference]` (`WorkDate` = `yyyy-MM-dd`; template at `/Actuals/Template`). Files with any invalid row are rejected before anything is written. Rows are matched to an initiative via source mappings and to a person via external IDs; a row missing either lands in the **unmapped queue**. `Cost` from the source wins; otherwise cost = hours × the exact published rate in effect on the work date (no fallback — a missing rate leaves the row *unpriced*, counted as $0 and flagged). Rows whose `(Source, Reference)` was already imported are skipped, so re-uploading a file is idempotent. Every import records who/when/file/counts/log; `/Actuals/Imports/{id}` lists its rows.
+- **Unmapped review** (`/Actuals/Unmapped`) – assign an initiative and/or person to a row (re-priced on assignment, audited) or *Re-apply mappings* after adding mappings/people.
+- **Adjustments** – initiative managers add hours/cost adjustments with a mandatory reason (creator and time recorded, audited); they are included in variance.
+- **Variance** (`/Initiatives/{id}/Actuals` and the summary on the initiative page) – mapped actuals + adjustments vs. the **current** baseline, in total and by phase (actuals bucketed by work date) and by resource type (from the person's roster record). Cost variance % is compared with the initiative's `VarianceThresholdPct` (default `Variance:DefaultThresholdPct`). Historical baselines are never touched by imports, rate changes or roster edits.
+- `IActualsSource` is the connector seam: the CSV upload and future Planview/Jira connectors feed the same `IActualsImporter`.
+
 ### SQL Server
 
 ```bash
@@ -84,3 +94,4 @@ Microsoft Entra ID via OpenID Connect (`Microsoft.Identity.Web`). Configure `Azu
 | `Database:MigrateOnStartup` | Apply migrations (SQL Server) / create schema (SQLite) at startup |
 | `Database:SeedOnStartup` | Seed a sample BU, resource types, sizing conversions, and a published rate card |
 | `Auth:UseDevelopmentAuth` | Bypass Entra ID with a fixed dev identity (ignored in Production) |
+| `Variance:DefaultThresholdPct` | Cost-variance % that flags an initiative when it has no threshold of its own (default 10) |

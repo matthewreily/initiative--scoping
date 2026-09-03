@@ -1,0 +1,56 @@
+@model PersonEditModel
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "New Person" : "Edit Person";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<h2 class="h5">@ViewData["Title"]</h2>
+<form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="DisplayName" class="form-label"></label>
+        <input asp-for="DisplayName" class="form-control" />
+        <span asp-validation-for="DisplayName" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="ExternalIds" class="form-label"></label>
+        <input asp-for="ExternalIds" class="form-control" placeholder="e.g. PV-1042; jane.doe@example.com" />
+        <div class="form-text">Separate multiple IDs with semicolons. Actuals rows are matched on any of them (case-insensitive).</div>
+        <span asp-validation-for="ExternalIds" class="text-danger"></span>
+    </div>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label asp-for="ResourceTypeId" class="form-label"></label>
+            <select asp-for="ResourceTypeId" asp-items="ViewBag.ResourceTypes" class="form-select"><option value="">Choose…</option></select>
+            <span asp-validation-for="ResourceTypeId" class="text-danger"></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label asp-for="BusinessUnitId" class="form-label"></label>
+            <select asp-for="BusinessUnitId" asp-items="ViewBag.BusinessUnits" class="form-select"><option value="">Choose…</option></select>
+            <span asp-validation-for="BusinessUnitId" class="text-danger"></span>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label asp-for="Seniority" class="form-label"></label>
+            <select asp-for="Seniority" asp-items="Html.GetEnumSelectList<Seniority>()" class="form-select"></select>
+        </div>
+        <div class="col-md-4 mb-3">
+            <label asp-for="Location" class="form-label"></label>
+            <input asp-for="Location" class="form-control" />
+            <span asp-validation-for="Location" class="text-danger"></span>
+        </div>
+        <div class="col-md-4 mb-3">
+            <label asp-for="ResourcingClass" class="form-label"></label>
+            <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
+        </div>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label">Active (inactive people are not matched by new imports)</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

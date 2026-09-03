@@ -120,3 +120,29 @@ public class SizingIndexModel
     public required IReadOnlyList<SizingConversion> Conversions { get; init; }
     public required IReadOnlyList<AllocationTemplate> Templates { get; init; }
 }
+
+public class PersonEditModel
+{
+    public int Id { get; set; }
+    [Required, StringLength(200), Display(Name = "Display name")]
+    public string DisplayName { get; set; } = string.Empty;
+    [StringLength(1000), Display(Name = "External IDs")]
+    public string? ExternalIds { get; set; }
+    [Required, Display(Name = "Resource type")]
+    public int ResourceTypeId { get; set; }
+    [Required, Display(Name = "Business unit")]
+    public int BusinessUnitId { get; set; }
+    [Required]
+    public Seniority Seniority { get; set; } = Seniority.Mid;
+    [Required, StringLength(100)]
+    public string Location { get; set; } = "Onshore";
+    [Required, Display(Name = "Class")]
+    public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    public bool IsActive { get; set; } = true;
+}
+
+public class PersonListItem
+{
+    public required Person Person { get; init; }
+    public int EntryCount { get; init; }
+}

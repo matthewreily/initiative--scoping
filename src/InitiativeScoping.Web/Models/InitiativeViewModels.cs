@@ -135,6 +135,29 @@ public class InitiativeDetailsModel
     public bool CanApproveRebaseline { get; init; }
     public IReadOnlyList<string> ActivationBlockers { get; init; } = [];
     public IReadOnlyList<InitiativeStatus> StatusTransitions { get; init; } = [];
+    public required VarianceResult Variance { get; init; }
+    public int UnmappedForMappedProjects { get; init; }
+}
+
+public class InitiativeActualsModel
+{
+    public required Initiative Initiative { get; init; }
+    public required VarianceResult Variance { get; init; }
+    public required IReadOnlyList<ActualEntry> Entries { get; init; }
+    public required IReadOnlyList<ActualAdjustment> Adjustments { get; init; }
+    public required AdjustmentEditModel NewAdjustment { get; init; }
+    public bool CanManage { get; init; }
+}
+
+public class AdjustmentEditModel
+{
+    public int InitiativeId { get; set; }
+    [Required, Range(-1000000, 1000000)]
+    public decimal Hours { get; set; }
+    [Required, Range(-1000000000, 1000000000)]
+    public decimal Cost { get; set; }
+    [Required, StringLength(1000)]
+    public string Reason { get; set; } = string.Empty;
 }
 
 public class BaselinesModel

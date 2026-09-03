@@ -18,4 +18,6 @@ public static class AuditActions
     public const string Baseline = "Baseline";
     public const string RebaselineRequest = "RebaselineRequest";
     public const string RebaselineDecision = "RebaselineDecision";
+    public const string Remap = "Remap";
+    public const string Adjustment = "Adjustment";
 }

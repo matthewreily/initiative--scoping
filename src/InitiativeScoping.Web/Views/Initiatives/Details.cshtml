@@ -26,6 +26,7 @@
     </div>
     <div class="text-nowrap">
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit</a>
         @if (Model.CanEdit)
         {
@@ -389,6 +390,64 @@ else
                 <div class="col-4">
                     <label class="form-label small mb-0">Role</label>
                     <select name="Role" asp-items="roles" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add</button></div>
+            </form>
+        }
+
+        <h2 class="h5 mt-4">Actuals <a class="small fw-normal ms-2" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">details</a></h2>
+        @{ var v = Model.Variance; }
+        <table class="table table-sm">
+            <tbody>
+            <tr><th>Baseline @(v.Baseline is null ? "" : $"v{v.Baseline.Version}")</th><td class="text-end">@v.BaselineHours.ToString("N1") h</td><td class="text-end">@v.BaselineCost.ToString("C0")</td></tr>
+            <tr><th>Actual to date</th><td class="text-end">@v.ActualHours.ToString("N1") h</td><td class="text-end">@v.ActualCost.ToString("C0")</td></tr>
+            <tr class="@(v.ExceedsThreshold ? "table-danger" : "")">
+                <th>Variance</th>
+                <td class="text-end">@((v.HoursVariance >= 0 ? "+" : "") + v.HoursVariance.ToString("N1")) h</td>
+                <td class="text-end">@((v.CostVariance >= 0 ? "+" : "") + v.CostVariance.ToString("C0")) @(v.CostVariancePct is null ? "" : $"({(v.CostVariancePct >= 0 ? "+" : "")}{v.CostVariancePct}%)")</td>
+            </tr>
+            </tbody>
+        </table>
+        @if (v.ExceedsThreshold) { <div class="alert alert-danger py-1 small">Cost variance exceeds the @v.ThresholdPct% threshold.</div> }
+        @if (v.UnpricedEntries > 0) { <div class="alert alert-warning py-1 small">@v.UnpricedEntries actual entr@(v.UnpricedEntries == 1 ? "y is" : "ies are") unpriced (no matching rate).</div> }
+        @if (Model.UnmappedForMappedProjects > 0) { <div class="alert alert-warning py-1 small">@Model.UnmappedForMappedProjects imported entr@(Model.UnmappedForMappedProjects == 1 ? "y" : "ies") for this initiative's projects await person mapping and are excluded above.</div> }
+
+        <h2 class="h5 mt-4">Source mappings</h2>
+        <p class="small text-muted">External project identifiers whose actuals belong to this initiative.</p>
+        <table class="table table-sm">
+            <thead><tr><th>Source</th><th>External project id</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var m in i.SourceMappings.OrderBy(m => m.Source).ThenBy(m => m.ExternalProjectId))
+            {
+                <tr>
+                    <td>@m.Source</td>
+                    <td>@m.ExternalProjectId</td>
+                    <td class="text-end">
+                        @if (Model.CanManage)
+                        {
+                            <form asp-action="RemoveSourceMapping" asp-route-id="@i.Id" method="post" class="d-inline">
+                                <input type="hidden" name="mappingId" value="@m.Id" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm">&times;</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (i.SourceMappings.Count == 0) { <tr><td colspan="3" class="text-muted">No mappings; imported actuals for this initiative will land in the unmapped queue.</td></tr> }
+            </tbody>
+        </table>
+        @if (Model.CanManage)
+        {
+            <form asp-action="AddSourceMapping" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
+                <div class="col-4">
+                    <label class="form-label small mb-0">Source</label>
+                    <select name="source" class="form-select form-select-sm">
+                        @foreach (var s in ActualsSources.All) { <option value="@s">@s</option> }
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label small mb-0">External project id</label>
+                    <input name="externalProjectId" class="form-control form-control-sm" placeholder="e.g. PV-PROJ-100" required maxlength="200" />
                 </div>
                 <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add</button></div>
             </form>

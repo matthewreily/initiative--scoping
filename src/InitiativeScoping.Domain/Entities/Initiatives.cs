@@ -22,6 +22,7 @@ public class Initiative
     public List<InitiativeMember> Members { get; set; } = [];
     public List<ForecastBaseline> Baselines { get; set; } = [];
     public List<RebaselineRequest> RebaselineRequests { get; set; } = [];
+    public List<InitiativeSourceMapping> SourceMappings { get; set; } = [];
 
     public ForecastBaseline? CurrentBaseline => Baselines.FirstOrDefault(b => b.IsCurrent);
 

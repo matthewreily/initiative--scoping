@@ -1,0 +1,36 @@
+@model ImportDetailsModel
+@{
+    var i = Model.Import;
+    ViewData["Title"] = $"Import #{i.Id}";
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Actuals imports</a></li><li class="breadcrumb-item active">Import #@i.Id</li></ol></nav>
+<h1 class="h3">Import #@i.Id <span class="text-muted fs-6">@i.Source @i.FileName</span></h1>
+<partial name="~/Views/Initiatives/_Alerts.cshtml" />
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted small">Status</div><div>@i.Status</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted small">Records</div><div class="fs-4">@i.RecordCount</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted small">Unmapped at import</div><div class="fs-4">@i.UnmappedCount</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted small">Skipped (duplicates)</div><div class="fs-4">@i.SkippedCount</div></div></div></div>
+</div>
+<p class="small text-muted">Started @i.StartedAt.ToString("yyyy-MM-dd HH:mm") by @i.StartedBy@(i.FinishedAt is null ? "" : $", finished {i.FinishedAt:yyyy-MM-dd HH:mm}").</p>
+@if (!string.IsNullOrEmpty(i.Log))
+{
+    <details class="mb-3">
+        <summary class="small">Import log</summary>
+        <pre class="small bg-light p-2 border rounded" style="max-height: 16rem; overflow: auto">@i.Log</pre>
+    </details>
+}
+<div class="d-flex gap-2 mb-2">
+    <a class="btn btn-sm @(Model.UnmappedOnly ? "btn-outline-secondary" : "btn-secondary")" asp-action="Details" asp-route-id="@i.Id">All entries</a>
+    <a class="btn btn-sm @(Model.UnmappedOnly ? "btn-warning" : "btn-outline-warning")" asp-action="Details" asp-route-id="@i.Id" asp-route-unmappedOnly="true">Unmapped only</a>
+</div>
+<partial name="_Entries" model="Model.Entries" />
+@if (Model.Entries.PageCount > 1)
+{
+    <nav><ul class="pagination pagination-sm">
+        @for (var p = 1; p <= Model.Entries.PageCount; p++)
+        {
+            <li class="page-item @(p == Model.Entries.Page ? "active" : "")"><a class="page-link" asp-action="Details" asp-route-id="@i.Id" asp-route-page="@p" asp-route-unmappedOnly="@Model.UnmappedOnly">@p</a></li>
+        }
+    </ul></nav>
+}
