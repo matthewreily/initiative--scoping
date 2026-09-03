@@ -1,0 +1,301 @@
+@model InitiativeDetailsModel
+@{
+    var i = Model.Initiative;
+    ViewData["Title"] = i.Name;
+    var seniorities = Html.GetEnumSelectList<Seniority>();
+    var classes = Html.GetEnumSelectList<ResourcingClass>();
+    var roles = Html.GetEnumSelectList<InitiativeMemberRole>();
+    var phaseNames = i.Phases.ToDictionary(p => p.Id, p => p.Name);
+    var lineByAllocation = Model.Forecast.Lines.ToDictionary(l => l.Allocation.Id);
+    var orderedAllocations = i.Allocations
+        .OrderBy(a => i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence ?? int.MaxValue)
+        .ThenBy(a => Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId))
+        .ThenBy(a => a.Seniority).ToList();
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li><li class="breadcrumb-item active">@i.Name</li></ol></nav>
+<div class="d-flex justify-content-between align-items-start mb-2">
+    <div>
+        <h1 class="h3 mb-1">@i.Name <partial name="_StatusBadge" model="i.Status" /></h1>
+        <div class="text-muted small">
+            @i.BusinessUnit?.Name
+            @if (!string.IsNullOrEmpty(i.SponsoringTeam)) { <span> &middot; @i.SponsoringTeam</span> }
+            &middot; Target start @i.TargetStart.ToString("yyyy-MM-dd")
+            &middot; Sizing: @(i.SizingMethod == SizingMethod.Direct ? "Direct hours" : $"{i.SizingMethod} {i.SizeKey}")
+            @if (i.VarianceThresholdPct is not null) { <span> &middot; Variance threshold @i.VarianceThresholdPct%</span> }
+        </div>
+    </div>
+    <div class="text-nowrap">
+        @if (Model.CanEdit)
+        {
+            <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@i.Id">Edit</a>
+        }
+        @if (Model.CanManage && i.Status == InitiativeStatus.Draft)
+        {
+            <form asp-action="Delete" asp-route-id="@i.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this initiative and all its scope?');">
+                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+            </form>
+        }
+    </div>
+</div>
+<partial name="_Alerts" />
+@if (!string.IsNullOrEmpty(i.Description))
+{
+    <p>@i.Description</p>
+}
+@if (!Model.ScopeEditable)
+{
+    <div class="alert alert-secondary py-2">Scope is locked while the initiative is @i.Status. Costs below reflect current published rate cards.</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast hours</div><div class="fs-3">@Model.Forecast.TotalHours.ToString("N1")</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3">@Model.Forecast.TotalCost.ToString("C0")</div>
+        @if (!Model.Forecast.IsComplete) { <span class="badge bg-warning text-dark">Incomplete – unpriced lines</span> }</div></div></div>
+    @foreach (var row in Model.ByClass)
+    {
+        <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">@row.Label</div><div class="fs-3">@row.Cost.ToString("C0")</div><div class="small text-muted">@row.Hours.ToString("N1") h</div></div></div></div>
+    }
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5">Phases</h2>
+        @if (Model.Gantt.Count > 0)
+        {
+            <div class="mb-3 border rounded p-2 bg-light">
+                @foreach (var bar in Model.Gantt)
+                {
+                    <div class="d-flex align-items-center small mb-1">
+                        <div class="text-truncate" style="width: 9rem" title="@bar.Phase.Name">@bar.Phase.Name</div>
+                        <div class="flex-grow-1 position-relative" style="height: 1.25rem">
+                            <div class="position-absolute bg-primary rounded text-white text-nowrap overflow-hidden px-1"
+                                 style="left: @bar.LeftPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; width: @bar.WidthPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; height: 100%; font-size: .7rem; line-height: 1.25rem"
+                                 title="@bar.Phase.PlannedStart.ToString("yyyy-MM-dd") → @bar.Phase.PlannedEnd.ToString("yyyy-MM-dd")">
+                                @bar.Phase.PlannedStart.ToString("MMM d") – @bar.Phase.PlannedEnd.ToString("MMM d")
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        <table class="table table-sm align-middle">
+            <thead><tr><th>#</th><th>Phase</th><th>Start</th><th>End</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var p in i.Phases.OrderBy(p => p.Sequence))
+            {
+                var roll = Model.ByPhase.FirstOrDefault(r => r.Label == p.Name);
+                <tr>
+                    <td>@p.Sequence</td>
+                    <td>@p.Name @if (p.DateHistory.Count > 0) { <span class="badge bg-light text-dark border" title="Dates changed @p.DateHistory.Count time(s)">@p.DateHistory.Count</span> }</td>
+                    <td>@p.PlannedStart.ToString("yyyy-MM-dd")</td>
+                    <td>@p.PlannedEnd.ToString("yyyy-MM-dd")</td>
+                    <td class="text-end">@((roll?.Hours ?? 0).ToString("N1"))</td>
+                    <td class="text-end">@((roll?.Cost ?? 0).ToString("C0")) @if (roll?.HasUnpriced == true) { <span class="text-warning" title="Unpriced lines">&#9888;</span> }</td>
+                    <td class="text-end text-nowrap">
+                        @if (Model.CanEdit)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditPhase" asp-route-id="@p.Id">Edit</a>
+                        }
+                        @if (Model.ScopeWritable)
+                        {
+                            <form asp-action="DeletePhase" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Delete phase @p.Name?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (i.Phases.Count == 0)
+            {
+                <tr><td colspan="7" class="text-muted">No phases yet. Add at least one phase before allocating resources.</td></tr>
+            }
+            </tbody>
+        </table>
+        @if (Model.ScopeWritable)
+        {
+            <form asp-action="AddPhase" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
+                <div class="col-md-5">
+                    <label class="form-label small mb-0">Phase name</label>
+                    <input name="Name" class="form-control form-control-sm" placeholder="e.g. Discovery" required />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Planned start</label>
+                    <input name="PlannedStart" type="date" class="form-control form-control-sm" value="@Model.NewPhase.PlannedStart.ToString("yyyy-MM-dd")" required />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Planned end</label>
+                    <input name="PlannedEnd" type="date" class="form-control form-control-sm" value="@Model.NewPhase.PlannedEnd.ToString("yyyy-MM-dd")" required />
+                </div>
+                <div class="col-md-1"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
+            </form>
+        }
+
+        <h2 class="h5">Allocations</h2>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th><th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var a in orderedAllocations)
+            {
+                var line = lineByAllocation[a.Id];
+                <tr class="@(line.IsUnpriced ? "table-warning" : "")">
+                    <td>@phaseNames.GetValueOrDefault(a.PhaseId)</td>
+                    <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
+                    <td>@a.Seniority</td>
+                    <td>@a.Location</td>
+                    <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
+                    <td class="text-end">@a.Quantity</td>
+                    <td class="text-end">@line.Hours.ToString("N1")</td>
+                    <td class="text-end">@(line.HourlyRate is decimal r ? r.ToString("C2") : Html.Raw("<span class='text-danger' title='No exact rate-card match for this resource type / BU / seniority / location / class'>Unpriced</span>"))</td>
+                    <td class="text-end">@line.Cost.ToString("C0")</td>
+                    <td class="text-end text-nowrap">
+                        @if (Model.ScopeWritable)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditAllocation" asp-route-id="@a.Id">Edit</a>
+                            <form asp-action="DeleteAllocation" asp-route-id="@a.Id" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">&times;</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (i.Allocations.Count == 0)
+            {
+                <tr><td colspan="10" class="text-muted">No allocations yet.</td></tr>
+            }
+            </tbody>
+            @if (i.Allocations.Count > 0)
+            {
+                <tfoot class="fw-semibold"><tr><td colspan="6" class="text-end">Total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.TotalCost.ToString("C0")</td><td></td></tr></tfoot>
+            }
+        </table>
+        @if (Model.ScopeWritable && i.Phases.Count > 0)
+        {
+            <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Phase</label>
+                    <select name="PhaseId" asp-items="Model.Phases" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Resource type</label>
+                    <select name="ResourceTypeId" asp-items="Model.ResourceTypes" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Seniority</label>
+                    <select name="Seniority" asp-items="seniorities" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Location</label>
+                    <input name="Location" class="form-control form-control-sm" value="Onshore" required />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Class</label>
+                    <select name="ResourcingClass" asp-items="classes" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Quantity</label>
+                    <input name="Quantity" type="number" min="1" class="form-control form-control-sm" value="1" required />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Hours (each)</label>
+                    <input name="EstimatedHours" type="number" min="0.25" step="0.25" class="form-control form-control-sm" required />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Contract ref</label>
+                    <input name="ContractReference" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Cost center</label>
+                    <input name="CostCenter" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
+            </form>
+        }
+    </div>
+
+    <div class="col-lg-5">
+        <h2 class="h5">Rollup by resource type</h2>
+        <table class="table table-sm">
+            <thead><tr><th>Resource type</th><th class="text-end">Hours</th><th class="text-end">Cost</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model.ByResourceType)
+            {
+                <tr><td>@row.Label</td><td class="text-end">@row.Hours.ToString("N1")</td><td class="text-end">@row.Cost.ToString("C0") @if (row.HasUnpriced) { <span class="text-warning">&#9888;</span> }</td></tr>
+            }
+            @if (Model.ByResourceType.Count == 0) { <tr><td colspan="3" class="text-muted">Nothing allocated.</td></tr> }
+            </tbody>
+        </table>
+
+        @if (Model.ScopeWritable)
+        {
+            <h2 class="h5 mt-4">Apply relative size</h2>
+            <p class="small text-muted mb-2">Converts a size to hours (admin conversion table) and splits them per the matching allocation template, creating any missing phases.</p>
+            <form asp-action="ApplySize" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
+                <div class="col-5">
+                    <label class="form-label small mb-0">Method</label>
+                    <select name="Method" class="form-select form-select-sm">
+                        <option value="@SizingMethod.TShirt" selected="@(Model.ApplySize.Method == SizingMethod.TShirt)">T-shirt</option>
+                        <option value="@SizingMethod.StoryPoints" selected="@(Model.ApplySize.Method == SizingMethod.StoryPoints)">Story points</option>
+                    </select>
+                </div>
+                <div class="col-3">
+                    <label class="form-label small mb-0">Size</label>
+                    <input name="SizeKey" class="form-control form-control-sm" value="@Model.ApplySize.SizeKey" list="size-keys" required />
+                    <datalist id="size-keys">
+                        @foreach (var c in Model.Conversions) { <option value="@c.Key">@c.Method @c.Key = @c.Hours h</option> }
+                    </datalist>
+                </div>
+                <div class="col-4">
+                    <label class="form-label small mb-0">Location</label>
+                    <input name="Location" class="form-control form-control-sm" value="@Model.ApplySize.Location" required />
+                </div>
+                <div class="col-5">
+                    <label class="form-label small mb-0">Class</label>
+                    <select name="ResourcingClass" asp-items="classes" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-4 form-check ms-2 mb-1">
+                    <input name="Replace" type="checkbox" value="true" class="form-check-input" id="replace" checked />
+                    <label class="form-check-label small" for="replace">Replace existing</label>
+                </div>
+                <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Apply</button></div>
+            </form>
+        }
+
+        <h2 class="h5 mt-4">Members</h2>
+        <table class="table table-sm">
+            <thead><tr><th>User</th><th>Role</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var m in i.Members.OrderBy(m => m.Role).ThenBy(m => m.UserId))
+            {
+                <tr>
+                    <td>@m.UserId</td>
+                    <td>@m.Role</td>
+                    <td class="text-end">
+                        @if (Model.CanManage)
+                        {
+                            <form asp-action="RemoveMember" asp-route-id="@i.Id" method="post" class="d-inline">
+                                <input type="hidden" name="userId" value="@m.UserId" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm">&times;</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        @if (Model.CanManage)
+        {
+            <form asp-action="AddMember" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
+                <div class="col-6">
+                    <label class="form-label small mb-0">User id</label>
+                    <input name="UserId" class="form-control form-control-sm" placeholder="user id / object id" required />
+                </div>
+                <div class="col-4">
+                    <label class="form-label small mb-0">Role</label>
+                    <select name="Role" asp-items="roles" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add</button></div>
+            </form>
+        }
+        <p class="small text-muted mt-2">Created by @i.CreatedBy on @i.CreatedAt.ToString("yyyy-MM-dd")</p>
+    </div>
+</div>

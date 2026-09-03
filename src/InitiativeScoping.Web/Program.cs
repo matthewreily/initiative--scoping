@@ -2,6 +2,7 @@ using InitiativeScoping.Infrastructure;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,6 +44,14 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
+
+var culture = new CultureInfo(app.Configuration["Culture"] ?? "en-US");
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new(culture),
+    SupportedCultures = [culture],
+    SupportedUICultures = [culture]
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

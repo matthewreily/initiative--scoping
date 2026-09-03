@@ -39,6 +39,16 @@ Users in the `Administrator` role get an **Admin** nav link (`/Admin/...`) for c
 
 Every admin create/update/delete/publish/retire/import writes an `AuditEvent` row (user, timestamp, JSON diff).
 
+### Initiatives (scoping)
+
+`/Initiatives` (spec §5.2–5.3) is readable by every role; Administrators, Initiative Owners and Contributors can create initiatives. The creator becomes the initiative's **Owner** member; per-initiative editing is limited to Administrators and members with the Owner/Contributor role, and member management to Administrators/Owners.
+
+- **Phases** – planned start/end with sequence; every date change is recorded in `PhaseDateHistory` (old/new dates, who, why).
+- **Allocations** – phase × resource type × seniority × location × internal/vendor × quantity × estimated hours. Seniority lives on the allocation, not the resource type.
+- **Sizing** – *Direct* hours, or *Apply size* (T-shirt / story points) which looks up the admin conversion + allocation template, creates any missing template phases and generates allocation lines from the template percentages (optionally replacing existing lines).
+- **Forecast** – live cost uses the published rate card in effect at each phase's planned start with exact-match rate resolution; lines with no matching rate show as **Unpriced** and the initiative forecast is flagged **Incomplete**. Rollups by phase, resource type and internal vs vendor, plus a Gantt-style phase timeline, are on the details page.
+- Scope (phases/allocations/sizing) is editable only while the initiative is **Draft**; activation/baselines arrive in the next phase.
+
 ### SQL Server
 
 ```bash
