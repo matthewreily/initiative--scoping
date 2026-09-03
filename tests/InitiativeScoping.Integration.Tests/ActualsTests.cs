@@ -130,6 +130,16 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
             Assert.Equal(6, await db.ActualEntries.CountAsync(e => e.SourceReference.StartsWith(tag)));
         }
 
+        // Reference matching is case-insensitive at the database level too.
+        var third = await ImportAsync(client, csv.ToUpperInvariant());
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var import = await db.ActualsImports.SingleAsync(i => i.Id == third);
+            Assert.Equal(0, import.RecordCount);
+            Assert.Equal(6, import.SkippedCount);
+        }
+
         // Initiative variance excludes unmapped rows, counts sourced cost and flags the unpriced one.
         var actuals = await client.GetStringAsync($"/Initiatives/{id}/Actuals");
         Assert.Contains("19.0", actuals);            // 10 + 5 + 4 hours
