@@ -64,6 +64,44 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     }
 
     [Fact]
+    public async Task People_csv_import_upserts_by_external_id_then_name_and_rejects_bad_files()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var (typeId, buId) = await LookupsAsync(factory);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Ann {tag}", $"ANN-{tag}", typeId, buId));
+        var annId = await PersonIdAsync(factory, $"Ann {tag}");
+
+        const string header = "DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,IsActive\n";
+
+        // Unknown BU rejects the whole file: Bob is not created.
+        await ImportPeopleAsync(client, header + $"Bob {tag},BOB-{tag},Software Engineer,Nope,Mid,Onshore,Vendor,true\n");
+        Assert.Contains("Import rejected", await client.GetStringAsync("/Admin/People"));
+        Assert.Equal(0, await CountPeopleAsync(factory, $"Bob {tag}"));
+
+        // Ann renamed via external-id match (case-variant id), Bob added, Cy added with default IsActive.
+        await ImportPeopleAsync(client, header +
+            $"Ann B {tag},ann-{tag};ann.{tag}@x.com,Software Engineer,Boarding,Senior,Offshore,Vendor,false\n" +
+            $"Bob {tag},BOB-{tag},Software Engineer,Boarding,Mid,Onshore,Internal,true\n" +
+            $"Cy {tag},,Software Engineer,Boarding,Associate,Onshore,Vendor,\n");
+        Assert.Contains("2 added, 1 updated", await client.GetStringAsync("/Admin/People"));
+        Assert.Equal(0, await CountPeopleAsync(factory, $"Ann {tag}"));
+        Assert.Equal(annId, await PersonIdAsync(factory, $"Ann B {tag}"));
+        Assert.Equal($"ann-{tag};ann.{tag}@x.com", await ExternalIdsAsync(factory, annId));
+        Assert.Equal(1, await CountPeopleAsync(factory, $"Cy {tag}"));
+
+        // Re-import of the same rows is idempotent; Cy (no ids) matches by name.
+        await ImportPeopleAsync(client, header + $"cy {tag},CY-{tag},Software Engineer,Boarding,Associate,Onshore,Vendor,true\n");
+        Assert.Contains("0 added, 1 updated", await client.GetStringAsync("/Admin/People"));
+        Assert.Equal(1, await CountPeopleAsync(factory, $"cy {tag}"));
+
+        // Export round-trips through the parser.
+        var export = await client.GetStringAsync("/Admin/People/Export");
+        Assert.Contains($"Bob {tag},BOB-{tag},Software Engineer,Boarding,Mid,Onshore,InternalFte,true", export);
+        Assert.True(InitiativeScoping.Application.People.PeopleCsv.Parse(new StringReader(export)).IsValid);
+    }
+
+    [Fact]
     public async Task Csv_import_maps_prices_skips_duplicates_and_rejects_invalid_files()
     {
         var client = factory.CreateClient(NoRedirect);
@@ -387,6 +425,16 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var match = ImportRegex.Match(response.Headers.Location!.ToString());
         Assert.Equal(expectSuccess, match.Success);
         return match.Success ? int.Parse(match.Groups[1].Value) : null;
+    }
+
+    private static async Task ImportPeopleAsync(HttpClient client, string csv)
+    {
+        var content = new MultipartFormDataContent { { new StringContent(await GetTokenAsync(client, "/Admin/People")), "__RequestVerificationToken" } };
+        var file = new StringContent(csv);
+        file.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+        content.Add(file, "File", "people.csv");
+        var response = await client.PostAsync("/Admin/People/Import", content);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     }
 
     private static async Task<string> GetTokenAsync(HttpClient client, string page)

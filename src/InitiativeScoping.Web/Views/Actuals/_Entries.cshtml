@@ -29,8 +29,8 @@
             <td>
                 <form asp-action="Remap" asp-route-id="@e.Id" method="post" class="d-flex gap-1">
                     <input type="hidden" name="returnUrl" value="@returnUrl" />
-                    <select name="initiativeId" asp-items="Model.Initiatives" class="form-select form-select-sm"><option value="">@(e.InitiativeId is null ? "Initiative…" : "Keep initiative")</option></select>
-                    <select name="personId" asp-items="Model.People" class="form-select form-select-sm"><option value="">@(e.PersonId is null ? "Person…" : "Keep person")</option></select>
+                    <select name="initiativeId" aria-label="Initiative" asp-items="Model.Initiatives" class="form-select form-select-sm"><option value="">@(e.InitiativeId is null ? "Initiative…" : "Keep initiative")</option></select>
+                    <select name="personId" aria-label="Person" asp-items="Model.People" class="form-select form-select-sm"><option value="">@(e.PersonId is null ? "Person…" : "Keep person")</option></select>
                     <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Assign</button>
                 </form>
             </td>

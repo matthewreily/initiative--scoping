@@ -75,7 +75,7 @@
         @if (Model.CanManage)
         {
             <form asp-controller="Lifecycle" asp-action="Activate" asp-route-id="@i.Id" method="post" class="d-flex gap-2 ms-3" onsubmit="return confirm('Activate and capture baseline v1? Scope will be locked.');">
-                <input name="reason" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
+                <input name="reason" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
                 <button type="submit" class="btn btn-success btn-sm text-nowrap" disabled="@(Model.ActivationBlockers.Count > 0)">Activate</button>
             </form>
         }
@@ -117,7 +117,7 @@ else
                 @if (Model.CanManage && i.Status == InitiativeStatus.Active && open is null)
                 {
                     <form asp-controller="Lifecycle" asp-action="RequestRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2">
-                        <input name="reason" class="form-control form-control-sm" placeholder="Reason for re-baseline" style="width: 18rem" required />
+                        <input name="reason" aria-label="Reason for re-baseline" class="form-control form-control-sm" placeholder="Reason for re-baseline" style="width: 18rem" required />
                         <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Request re-baseline</button>
                     </form>
                 }
@@ -125,7 +125,7 @@ else
                 {
                     <form asp-controller="Lifecycle" asp-action="DecideRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2">
                         <input type="hidden" name="requestId" value="@open.Id" />
-                        <input name="note" class="form-control form-control-sm" placeholder="Decision note (optional)" style="width: 14rem" />
+                        <input name="note" aria-label="Decision note (optional)" class="form-control form-control-sm" placeholder="Decision note (optional)" style="width: 14rem" />
                         <button type="submit" name="approve" value="true" class="btn btn-success btn-sm">Approve</button>
                         <button type="submit" name="approve" value="false" class="btn btn-outline-danger btn-sm">Reject</button>
                     </form>
@@ -150,10 +150,10 @@ else
 {
     <form asp-controller="Lifecycle" asp-action="ChangeStatus" asp-route-id="@i.Id" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3 small" onsubmit="return confirm('Change status to ' + this.to.value + '?');">
         <span class="text-muted">Change status:</span>
-        <select name="to" class="form-select form-select-sm w-auto">
+        <select name="to" aria-label="New status" class="form-select form-select-sm w-auto">
             @foreach (var s in Model.StatusTransitions) { <option value="@s">@s</option> }
         </select>
-        <input name="note" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
+        <input name="note" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
         <button type="submit" class="btn btn-outline-secondary btn-sm">Apply</button>
     </form>
 }
@@ -223,16 +223,16 @@ else
         {
             <form asp-action="AddPhase" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
                 <div class="col-md-5">
-                    <label class="form-label small mb-0">Phase name</label>
-                    <input name="Name" class="form-control form-control-sm" placeholder="e.g. Discovery" required />
+                    <label for="name" class="form-label small mb-0">Phase name</label>
+                    <input name="Name" id="name" class="form-control form-control-sm" placeholder="e.g. Discovery" required />
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small mb-0">Planned start</label>
-                    <input name="PlannedStart" type="date" class="form-control form-control-sm" value="@Model.NewPhase.PlannedStart.ToString("yyyy-MM-dd")" required />
+                    <label for="plannedstart" class="form-label small mb-0">Planned start</label>
+                    <input name="PlannedStart" id="plannedstart" type="date" class="form-control form-control-sm" value="@Model.NewPhase.PlannedStart.ToString("yyyy-MM-dd")" required />
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small mb-0">Planned end</label>
-                    <input name="PlannedEnd" type="date" class="form-control form-control-sm" value="@Model.NewPhase.PlannedEnd.ToString("yyyy-MM-dd")" required />
+                    <label for="plannedend" class="form-label small mb-0">Planned end</label>
+                    <input name="PlannedEnd" id="plannedend" type="date" class="form-control form-control-sm" value="@Model.NewPhase.PlannedEnd.ToString("yyyy-MM-dd")" required />
                 </div>
                 <div class="col-md-1"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
@@ -280,40 +280,40 @@ else
         {
             <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
                 <div class="col-md-3">
-                    <label class="form-label small mb-0">Phase</label>
-                    <select name="PhaseId" asp-items="Model.Phases" class="form-select form-select-sm"></select>
+                    <label for="phaseid" class="form-label small mb-0">Phase</label>
+                    <select name="PhaseId" id="phaseid" asp-items="Model.Phases" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small mb-0">Resource type</label>
-                    <select name="ResourceTypeId" asp-items="Model.ResourceTypes" class="form-select form-select-sm"></select>
+                    <label for="resourcetypeid" class="form-label small mb-0">Resource type</label>
+                    <select name="ResourceTypeId" id="resourcetypeid" asp-items="Model.ResourceTypes" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small mb-0">Seniority</label>
-                    <select name="Seniority" asp-items="seniorities" class="form-select form-select-sm"></select>
+                    <label for="seniority" class="form-label small mb-0">Seniority</label>
+                    <select name="Seniority" id="seniority" asp-items="seniorities" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small mb-0">Location</label>
-                    <input name="Location" class="form-control form-control-sm" value="Onshore" required />
+                    <label for="location" class="form-label small mb-0">Location</label>
+                    <input name="Location" id="location" class="form-control form-control-sm" value="Onshore" required />
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small mb-0">Class</label>
-                    <select name="ResourcingClass" asp-items="classes" class="form-select form-select-sm"></select>
+                    <label for="resourcingclass" class="form-label small mb-0">Class</label>
+                    <select name="ResourcingClass" id="resourcingclass" asp-items="classes" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small mb-0">Quantity</label>
-                    <input name="Quantity" type="number" min="1" class="form-control form-control-sm" value="1" required />
+                    <label for="quantity" class="form-label small mb-0">Quantity</label>
+                    <input name="Quantity" id="quantity" type="number" min="1" class="form-control form-control-sm" value="1" required />
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small mb-0">Hours (each)</label>
-                    <input name="EstimatedHours" type="number" min="0.25" step="0.25" class="form-control form-control-sm" required />
+                    <label for="estimatedhours" class="form-label small mb-0">Hours (each)</label>
+                    <input name="EstimatedHours" id="estimatedhours" type="number" min="0.25" step="0.25" class="form-control form-control-sm" required />
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small mb-0">Contract ref</label>
-                    <input name="ContractReference" class="form-control form-control-sm" />
+                    <label for="contractreference" class="form-label small mb-0">Contract ref</label>
+                    <input name="ContractReference" id="contractreference" class="form-control form-control-sm" />
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small mb-0">Cost center</label>
-                    <input name="CostCenter" class="form-control form-control-sm" />
+                    <label for="costcenter" class="form-label small mb-0">Cost center</label>
+                    <input name="CostCenter" id="costcenter" class="form-control form-control-sm" />
                 </div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
@@ -339,26 +339,26 @@ else
             <p class="small text-muted mb-2">Converts a size to hours (admin conversion table) and splits them per the matching allocation template, creating any missing phases.</p>
             <form asp-action="ApplySize" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
                 <div class="col-5">
-                    <label class="form-label small mb-0">Method</label>
-                    <select name="Method" class="form-select form-select-sm">
+                    <label for="method" class="form-label small mb-0">Method</label>
+                    <select name="Method" id="method" class="form-select form-select-sm">
                         <option value="@SizingMethod.TShirt" selected="@(Model.ApplySize.Method == SizingMethod.TShirt)">T-shirt</option>
                         <option value="@SizingMethod.StoryPoints" selected="@(Model.ApplySize.Method == SizingMethod.StoryPoints)">Story points</option>
                     </select>
                 </div>
                 <div class="col-3">
-                    <label class="form-label small mb-0">Size</label>
-                    <input name="SizeKey" class="form-control form-control-sm" value="@Model.ApplySize.SizeKey" list="size-keys" required />
+                    <label for="sizekey" class="form-label small mb-0">Size</label>
+                    <input name="SizeKey" id="sizekey" class="form-control form-control-sm" value="@Model.ApplySize.SizeKey" list="size-keys" required />
                     <datalist id="size-keys">
                         @foreach (var c in Model.Conversions) { <option value="@c.Key">@c.Method @c.Key = @c.Hours h</option> }
                     </datalist>
                 </div>
                 <div class="col-4">
-                    <label class="form-label small mb-0">Location</label>
-                    <input name="Location" class="form-control form-control-sm" value="@Model.ApplySize.Location" required />
+                    <label for="location-2" class="form-label small mb-0">Location</label>
+                    <input name="Location" id="location-2" class="form-control form-control-sm" value="@Model.ApplySize.Location" required />
                 </div>
                 <div class="col-5">
-                    <label class="form-label small mb-0">Class</label>
-                    <select name="ResourcingClass" asp-items="classes" class="form-select form-select-sm"></select>
+                    <label for="resourcingclass-2" class="form-label small mb-0">Class</label>
+                    <select name="ResourcingClass" id="resourcingclass-2" asp-items="classes" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-4 form-check ms-2 mb-1">
                     <input name="Replace" type="checkbox" value="true" class="form-check-input" id="replace" checked />
@@ -394,12 +394,12 @@ else
         {
             <form asp-action="AddMember" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
                 <div class="col-6">
-                    <label class="form-label small mb-0">User id</label>
-                    <input name="UserId" class="form-control form-control-sm" placeholder="user id / object id" required />
+                    <label for="userid" class="form-label small mb-0">User id</label>
+                    <input name="UserId" id="userid" class="form-control form-control-sm" placeholder="user id / object id" required />
                 </div>
                 <div class="col-4">
-                    <label class="form-label small mb-0">Role</label>
-                    <select name="Role" asp-items="roles" class="form-select form-select-sm"></select>
+                    <label for="role" class="form-label small mb-0">Role</label>
+                    <select name="Role" id="role" asp-items="roles" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add</button></div>
             </form>
@@ -415,6 +415,12 @@ else
                 <th>Variance</th>
                 <td class="text-end">@((v.HoursVariance >= 0 ? "+" : "") + v.HoursVariance.ToString("N1")) h</td>
                 <td class="text-end">@((v.CostVariance >= 0 ? "+" : "") + v.CostVariance.ToString("C0")) @(v.CostVariancePct is null ? "" : $"({(v.CostVariancePct >= 0 ? "+" : "")}{v.CostVariancePct}%)")</td>
+            </tr>
+            <tr><th>Estimate at completion <span class="text-muted fw-normal small">(actual + ETC @v.EtcCost.ToString("C0"))</span></th><td class="text-end">@v.EacHours.ToString("N1") h</td><td class="text-end">@v.EacCost.ToString("C0")</td></tr>
+            <tr class="@(v.EacExceedsThreshold ? "table-danger" : "")">
+                <th>Projected variance</th>
+                <td class="text-end">@((v.EacHours - v.BaselineHours >= 0 ? "+" : "") + (v.EacHours - v.BaselineHours).ToString("N1")) h</td>
+                <td class="text-end">@((v.EacCostVariance >= 0 ? "+" : "") + v.EacCostVariance.ToString("C0")) @(v.EacCostVariancePct is null ? "" : $"({(v.EacCostVariancePct >= 0 ? "+" : "")}{v.EacCostVariancePct}%)")</td>
             </tr>
             </tbody>
         </table>
@@ -450,14 +456,14 @@ else
         {
             <form asp-action="AddSourceMapping" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
                 <div class="col-4">
-                    <label class="form-label small mb-0">Source</label>
-                    <select name="source" class="form-select form-select-sm">
+                    <label for="source" class="form-label small mb-0">Source</label>
+                    <select name="source" id="source" class="form-select form-select-sm">
                         @foreach (var s in ActualsSources.All) { <option value="@s">@s</option> }
                     </select>
                 </div>
                 <div class="col-6">
-                    <label class="form-label small mb-0">External project id</label>
-                    <input name="externalProjectId" class="form-control form-control-sm" placeholder="e.g. PV-PROJ-100" required maxlength="200" />
+                    <label for="externalprojectid" class="form-label small mb-0">External project id</label>
+                    <input name="externalProjectId" id="externalprojectid" class="form-control form-control-sm" placeholder="e.g. PV-PROJ-100" required maxlength="200" />
                 </div>
                 <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add</button></div>
             </form>

@@ -94,7 +94,7 @@ else
     <table class="table table-sm align-middle">
         <thead>
         <tr>
-            <th>Initiative</th><th>Business unit</th><th>Status</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th style="min-width: 110px">Burn</th><th>Flags</th>
+            <th>Initiative</th><th>Business unit</th><th>Status</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th style="min-width: 110px">Burn</th><th>Flags</th>
         </tr>
         </thead>
         <tbody>
@@ -113,6 +113,10 @@ else
                 <td class="text-end">@r.ActualCost.ToString("C0")<div class="small text-muted">@r.ActualHours.ToString("N0") h</div></td>
                 <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)">@(r.HasBaseline ? Signed(r.CostVariance, "C0") : "—")</td>
                 <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)">@(r.CostVariancePct is null ? "—" : Signed(r.CostVariancePct.Value, "N1") + "%")</td>
+                <td class="text-end" title="Actual + estimate to complete (schedule-based)">
+                    @if (r.HasBaseline) { @r.EacCost.ToString("C0") <div class="small @VarianceClass(r.Variance.EacCostVariancePct, r.Variance.EacExceedsThreshold)">@(r.Variance.EacCostVariancePct is null ? "" : Signed(r.Variance.EacCostVariancePct.Value, "N1") + "%")</div> }
+                    else { <span class="text-muted">—</span> }
+                </td>
                 <td>
                     <div class="progress" style="height: 8px" title="@r.BurnPct% of @(r.HasBaseline ? "baseline" : "forecast") spent">
                         <div class="progress-bar @(r.ExceedsThreshold ? "bg-danger" : r.BurnPct >= 90 ? "bg-warning" : "bg-success")" style="width: @r.BurnPct.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div>
@@ -135,6 +139,7 @@ else
             <td class="text-end">@p.ActualCost.ToString("C0")</td>
             <td class="text-end @VarianceClass(p.CostVariancePct, false)">@Signed(p.CostVariance, "C0")</td>
             <td class="text-end @VarianceClass(p.CostVariancePct, false)">@(p.CostVariancePct is null ? "—" : Signed(p.CostVariancePct.Value, "N1") + "%")</td>
+            <td class="text-end">@p.EacCost.ToString("C0")</td>
             <td colspan="2"></td>
         </tr>
         </tfoot>

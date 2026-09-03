@@ -32,12 +32,18 @@
     <div class="col-md-3"><div class="card @(v.ExceedsThreshold ? "border-danger" : "")"><div class="card-body"><div class="text-muted small">Cost variance</div><div class="fs-4 @VarClass(v.CostVariance)">@Signed(v.CostVariance, "C0")</div><div class="small text-muted">@(v.CostVariancePct is null ? "n/a" : Signed(v.CostVariancePct.Value, "0.0") + "%") @(v.ThresholdPct is null ? "" : $"· threshold {v.ThresholdPct}%")</div></div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Hours variance</div><div class="fs-4 @VarClass(v.HoursVariance)">@Signed(v.HoursVariance, "N1") h</div><div class="small text-muted">Sourced @v.SourcedHours.ToString("N1") h · adjustments @Signed(v.AdjustmentHours, "N1") h</div></div></div></div>
 </div>
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Estimate to complete (ETC)</div><div class="fs-4">@v.EtcCost.ToString("C0")</div><div class="small text-muted">@v.EtcHours.ToString("N1") h · baseline for work after @v.AsOf.ToString("yyyy-MM-dd")</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Estimate at completion (EAC)</div><div class="fs-4">@v.EacCost.ToString("C0")</div><div class="small text-muted">@v.EacHours.ToString("N1") h · actual + ETC</div></div></div></div>
+    <div class="col-md-3"><div class="card @(v.EacExceedsThreshold ? "border-danger" : "")"><div class="card-body"><div class="text-muted small">Projected variance (EAC − baseline)</div><div class="fs-4 @VarClass(v.EacCostVariance)">@Signed(v.EacCostVariance, "C0")</div><div class="small text-muted">@(v.EacCostVariancePct is null ? "n/a" : Signed(v.EacCostVariancePct.Value, "0.0") + "%")</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body small text-muted">ETC is schedule-based: future phases count in full, the in-progress phase pro-rata by remaining days, finished phases zero. Spending ahead of plan raises EAC one-for-one.</div></div></div>
+</div>
 
 <div class="row g-4">
     <div class="col-lg-6">
         <h2 class="h5">By phase <span class="text-muted small fw-normal">(actuals assigned by work date)</span></h2>
         <table class="table table-sm">
-            <thead><tr><th>Phase</th><th class="text-end">Baseline h</th><th class="text-end">Actual h</th><th class="text-end">Baseline $</th><th class="text-end">Actual $</th><th class="text-end">Variance</th></tr></thead>
+            <thead><tr><th>Phase</th><th class="text-end">Baseline h</th><th class="text-end">Actual h</th><th class="text-end">Baseline $</th><th class="text-end">Actual $</th><th class="text-end">Variance</th><th class="text-end">EAC $</th><th class="text-end">Projected</th></tr></thead>
             <tbody>
             @foreach (var r in v.ByPhase)
             {
@@ -48,16 +54,18 @@
                     <td class="text-end">@r.BaselineCost.ToString("C0")</td>
                     <td class="text-end">@r.ActualCost.ToString("C0")</td>
                     <td class="text-end @VarClass(r.CostVariance)">@Signed(r.CostVariance, "C0") @(r.CostVariancePct is null ? "" : $"({Signed(r.CostVariancePct.Value, "0.0")}%)")</td>
+                    <td class="text-end">@r.EacCost.ToString("C0")</td>
+                    <td class="text-end @VarClass(r.EacCostVariance)">@Signed(r.EacCostVariance, "C0") @(r.EacCostVariancePct is null ? "" : $"({Signed(r.EacCostVariancePct.Value, "0.0")}%)")</td>
                 </tr>
             }
-            @if (v.ByPhase.Count == 0) { <tr><td colspan="6" class="text-muted">Nothing yet.</td></tr> }
+            @if (v.ByPhase.Count == 0) { <tr><td colspan="8" class="text-muted">Nothing yet.</td></tr> }
             </tbody>
         </table>
     </div>
     <div class="col-lg-6">
         <h2 class="h5">By resource type <span class="text-muted small fw-normal">(from the person roster)</span></h2>
         <table class="table table-sm">
-            <thead><tr><th>Resource type</th><th class="text-end">Baseline h</th><th class="text-end">Actual h</th><th class="text-end">Baseline $</th><th class="text-end">Actual $</th><th class="text-end">Variance</th></tr></thead>
+            <thead><tr><th>Resource type</th><th class="text-end">Baseline h</th><th class="text-end">Actual h</th><th class="text-end">Baseline $</th><th class="text-end">Actual $</th><th class="text-end">Variance</th><th class="text-end">EAC $</th><th class="text-end">Projected</th></tr></thead>
             <tbody>
             @foreach (var r in v.ByResourceType)
             {
@@ -68,9 +76,11 @@
                     <td class="text-end">@r.BaselineCost.ToString("C0")</td>
                     <td class="text-end">@r.ActualCost.ToString("C0")</td>
                     <td class="text-end @VarClass(r.CostVariance)">@Signed(r.CostVariance, "C0") @(r.CostVariancePct is null ? "" : $"({Signed(r.CostVariancePct.Value, "0.0")}%)")</td>
+                    <td class="text-end">@r.EacCost.ToString("C0")</td>
+                    <td class="text-end @VarClass(r.EacCostVariance)">@Signed(r.EacCostVariance, "C0") @(r.EacCostVariancePct is null ? "" : $"({Signed(r.EacCostVariancePct.Value, "0.0")}%)")</td>
                 </tr>
             }
-            @if (v.ByResourceType.Count == 0) { <tr><td colspan="6" class="text-muted">Nothing yet.</td></tr> }
+            @if (v.ByResourceType.Count == 0) { <tr><td colspan="8" class="text-muted">Nothing yet.</td></tr> }
             </tbody>
         </table>
     </div>
@@ -106,16 +116,16 @@
 {
     <form asp-action="AddAdjustment" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
         <div class="col-md-2">
-            <label class="form-label small mb-0">Hours (&plusmn;)</label>
-            <input name="Hours" type="number" step="0.5" value="0" class="form-control form-control-sm" required />
+            <label for="hours" class="form-label small mb-0">Hours (&plusmn;)</label>
+            <input name="Hours" id="hours" type="number" step="0.5" value="0" class="form-control form-control-sm" required />
         </div>
         <div class="col-md-2">
-            <label class="form-label small mb-0">Cost (&plusmn;)</label>
-            <input name="Cost" type="number" step="0.01" value="0" class="form-control form-control-sm" required />
+            <label for="cost" class="form-label small mb-0">Cost (&plusmn;)</label>
+            <input name="Cost" id="cost" type="number" step="0.01" value="0" class="form-control form-control-sm" required />
         </div>
         <div class="col-md-6">
-            <label class="form-label small mb-0">Reason</label>
-            <input name="Reason" class="form-control form-control-sm" placeholder="e.g. Vendor invoice INV-2231 for March" required maxlength="1000" />
+            <label for="reason" class="form-label small mb-0">Reason</label>
+            <input name="Reason" id="reason" class="form-control form-control-sm" placeholder="e.g. Vendor invoice INV-2231 for March" required maxlength="1000" />
         </div>
         <div class="col-md-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add adjustment</button></div>
     </form>

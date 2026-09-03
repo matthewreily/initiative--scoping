@@ -1,4 +1,7 @@
+using System.Text;
 using InitiativeScoping.Application.Abstractions;
+using InitiativeScoping.Application.People;
+using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Services;
 using InitiativeScoping.Infrastructure.Persistence;
@@ -11,6 +14,8 @@ namespace InitiativeScoping.Web.Areas.Admin.Controllers;
 
 public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControllerBase
 {
+    private const long MaxImportBytes = 5 * 1024 * 1024;
+
     public async Task<IActionResult> Index(string? search, CancellationToken ct)
     {
         var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).AsQueryable();
@@ -135,6 +140,143 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Person '{person.DisplayName}' deleted.");
     }
+
+    public async Task<IActionResult> Export(CancellationToken ct)
+    {
+        var people = await db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit)
+            .OrderBy(p => p.DisplayName).ToListAsync(ct);
+        var rows = people.Select(p => new PeopleCsvRow(p.DisplayName, SplitIds(p.ExternalIds), p.ResourceType!.Name, p.BusinessUnit!.Name,
+            p.Seniority, p.Location, p.ResourcingClass, p.IsActive));
+        return Csv(rows, "people.csv");
+    }
+
+    public IActionResult Template() =>
+        Csv(
+        [
+            new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, true),
+            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", Seniority.Mid, "Offshore", ResourcingClass.Vendor, true)
+        ], "people-template.csv");
+
+    /// <summary>
+    /// Upserts people from CSV. A row matches an existing person by any shared external ID, otherwise by display name
+    /// (case-insensitive). The whole file is rejected if any row is invalid or references unknown reference data.
+    /// </summary>
+    [HttpPost]
+    [RequestSizeLimit(MaxImportBytes)]
+    public async Task<IActionResult> Import(PeopleImportModel model, CancellationToken ct)
+    {
+        if (model.File is null || model.File.Length == 0)
+        {
+            return RedirectWithError("Choose a CSV file to import.");
+        }
+
+        PeopleCsvResult parsed;
+        using (var reader = new StreamReader(model.File.OpenReadStream()))
+        {
+            parsed = PeopleCsv.Parse(reader);
+        }
+
+        var resourceTypes = await db.ResourceTypes.ToDictionaryAsync(t => t.Name, t => t.Id, StringComparer.OrdinalIgnoreCase, ct);
+        var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name, b => b.Id, StringComparer.OrdinalIgnoreCase, ct);
+
+        var errors = parsed.Errors.Select(e => e.Line > 0 ? $"Line {e.Line}: {e.Message}" : e.Message).ToList();
+        var unknownTypes = parsed.Rows.Select(r => r.ResourceType).Where(n => !resourceTypes.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var unknownUnits = parsed.Rows.Select(r => r.BusinessUnit).Where(n => !businessUnits.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (unknownTypes.Count > 0)
+        {
+            errors.Add("Unknown resource type(s): " + string.Join(", ", unknownTypes));
+        }
+        if (unknownUnits.Count > 0)
+        {
+            errors.Add("Unknown business unit(s): " + string.Join(", ", unknownUnits));
+        }
+
+        var people = await db.People.ToListAsync(ct);
+        var matches = new Dictionary<PeopleCsvRow, Person?>();
+        foreach (var row in parsed.Rows)
+        {
+            var byId = people.Where(p => row.ExternalIds.Any(id => ActualsCosting.MatchesExternalId(p, id))).Distinct().ToList();
+            if (byId.Count > 1)
+            {
+                errors.Add($"'{row.DisplayName}': external IDs match more than one existing person ({string.Join(", ", byId.Select(p => p.DisplayName))}).");
+                continue;
+            }
+
+            var byName = people.FirstOrDefault(p => string.Equals(p.DisplayName, row.DisplayName, StringComparison.OrdinalIgnoreCase));
+            var match = byId.SingleOrDefault() ?? byName;
+            if (byId.Count == 1 && byName is not null && byName != byId[0])
+            {
+                errors.Add($"'{row.DisplayName}': external IDs belong to '{byId[0].DisplayName}' but the name matches another person.");
+                continue;
+            }
+
+            if (match is not null && matches.ContainsValue(match))
+            {
+                errors.Add($"'{row.DisplayName}': more than one row resolves to existing person '{match.DisplayName}'.");
+                continue;
+            }
+
+            matches[row] = match;
+        }
+
+        if (errors.Count > 0)
+        {
+            return RedirectWithError("Import rejected; no changes made. " + string.Join(" | ", errors.Take(10)) + (errors.Count > 10 ? $" (+{errors.Count - 10} more)" : string.Empty));
+        }
+
+        var added = 0;
+        var updated = 0;
+        foreach (var (row, existing) in matches)
+        {
+            var ids = row.ExternalIds.Count == 0 ? null : string.Join(";", row.ExternalIds);
+            if (existing is null)
+            {
+                var person = new Person
+                {
+                    DisplayName = row.DisplayName, ExternalIds = ids, ResourceTypeId = resourceTypes[row.ResourceType], BusinessUnitId = businessUnits[row.BusinessUnit],
+                    Seniority = row.Seniority, Location = row.Location, ResourcingClass = row.ResourcingClass, IsActive = row.IsActive
+                };
+                db.People.Add(person);
+                people.Add(person);
+                added++;
+                continue;
+            }
+
+            var before = Snapshot(existing);
+            existing.DisplayName = row.DisplayName;
+            existing.ExternalIds = ids;
+            existing.ResourceTypeId = resourceTypes[row.ResourceType];
+            existing.BusinessUnitId = businessUnits[row.BusinessUnit];
+            existing.Seniority = row.Seniority;
+            existing.Location = row.Location;
+            existing.ResourcingClass = row.ResourcingClass;
+            existing.IsActive = row.IsActive;
+            if (db.Entry(existing).State == EntityState.Modified)
+            {
+                audit.Record(nameof(Person), existing.Id, AuditActions.Update, new { Before = before, After = Snapshot(existing) });
+                updated++;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated });
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.");
+    }
+
+    private FileContentResult Csv(IEnumerable<PeopleCsvRow> rows, string fileName)
+    {
+        var sb = new StringBuilder();
+        using (var writer = new StringWriter(sb))
+        {
+            PeopleCsv.Write(writer, rows);
+        }
+
+        return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", fileName);
+    }
+
+    private static IReadOnlyList<string> SplitIds(string? ids) =>
+        (ids ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private async Task Validate(PersonEditModel model, CancellationToken ct)
     {

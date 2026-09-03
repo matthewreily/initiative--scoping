@@ -5,26 +5,26 @@
 <h1 class="h3">Audit log</h1>
 <form method="get" class="row g-2 align-items-end mb-3">
     <div class="col-md-2">
-        <label class="form-label small mb-0">Entity</label>
-        <select name="entity" class="form-select form-select-sm">
+        <label for="entity" class="form-label small mb-0">Entity</label>
+        <select name="entity" id="entity" class="form-select form-select-sm">
             <option value="">All</option>
             @foreach (var e in Model.Entities) { <option value="@e" selected="@(e == Model.Entity)">@e</option> }
         </select>
     </div>
     <div class="col-md-2">
-        <label class="form-label small mb-0">Entity id</label>
-        <input name="entityId" class="form-control form-control-sm" value="@Model.EntityId" />
+        <label for="entityid" class="form-label small mb-0">Entity id</label>
+        <input name="entityId" id="entityid" class="form-control form-control-sm" value="@Model.EntityId" />
     </div>
     <div class="col-md-2">
-        <label class="form-label small mb-0">Action</label>
-        <select name="act" class="form-select form-select-sm">
+        <label for="act" class="form-label small mb-0">Action</label>
+        <select name="act" id="act" class="form-select form-select-sm">
             <option value="">All</option>
             @foreach (var a in Model.Actions) { <option value="@a" selected="@(a == Model.Action)">@a</option> }
         </select>
     </div>
     <div class="col-md-3">
-        <label class="form-label small mb-0">User</label>
-        <input name="userId" class="form-control form-control-sm" value="@Model.UserId" />
+        <label for="userid" class="form-label small mb-0">User</label>
+        <input name="userId" id="userid" class="form-control form-control-sm" value="@Model.UserId" />
     </div>
     <div class="col-md-3">
         <button type="submit" class="btn btn-primary btn-sm">Filter</button>

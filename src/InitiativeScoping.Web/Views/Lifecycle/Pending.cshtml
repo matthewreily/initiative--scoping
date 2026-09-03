@@ -22,7 +22,7 @@ else
                 <td class="text-end">
                     <form asp-action="DecideRebaseline" asp-route-id="@r.InitiativeId" method="post" class="d-flex gap-2 justify-content-end">
                         <input type="hidden" name="requestId" value="@r.Id" />
-                        <input name="note" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 12rem" />
+                        <input name="note" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 12rem" />
                         <button type="submit" name="approve" value="true" class="btn btn-success btn-sm">Approve</button>
                         <button type="submit" name="approve" value="false" class="btn btn-outline-danger btn-sm">Reject</button>
                     </form>
