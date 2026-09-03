@@ -144,6 +144,11 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
             return RedirectToIndex(error: "Choose a CSV file to import.");
         }
 
+        if (model.File.Length > MaxImportBytes)
+        {
+            return RedirectToIndex(error: $"File exceeds the {MaxImportBytes / (1024 * 1024)} MB import limit; no changes made.");
+        }
+
         ActualsCsvResult parsed;
         using (var reader = new StreamReader(model.File.OpenReadStream()))
         {

@@ -45,6 +45,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<RateCard>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200);
+            e.HasIndex(x => new { x.Status, x.EffectiveStart });
             e.HasMany(x => x.Entries).WithOne(x => x.RateCard).HasForeignKey(x => x.RateCardId);
         });
 
@@ -86,6 +87,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.SizeKey).HasMaxLength(50);
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.Property(x => x.VarianceThresholdPct).HasPrecision(5, 2);
+            e.HasIndex(x => x.Status);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.Phases).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Allocations).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
@@ -121,6 +123,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.TotalHours).HasPrecision(18, 2);
             e.Property(x => x.TotalCost).HasPrecision(18, 2);
             e.HasIndex(x => new { x.InitiativeId, x.Version }).IsUnique();
+            e.HasIndex(x => new { x.InitiativeId, x.IsCurrent });
             e.HasMany(x => x.Lines).WithOne(x => x.ForecastBaseline).HasForeignKey(x => x.ForecastBaselineId);
         });
 
@@ -130,6 +133,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.RequestedBy).HasMaxLength(200);
             e.Property(x => x.DecidedBy).HasMaxLength(200);
             e.Property(x => x.DecisionNote).HasMaxLength(1000);
+            e.HasIndex(x => new { x.InitiativeId, x.Status });
             e.HasOne(x => x.Initiative).WithMany(i => i.RebaselineRequests).HasForeignKey(x => x.InitiativeId);
             e.HasOne(x => x.ResultingBaseline).WithMany().HasForeignKey(x => x.ResultingBaselineId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -177,6 +181,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.SourcedCost).HasPrecision(18, 2);
             e.Property(x => x.CalculatedCost).HasPrecision(18, 2);
             e.HasIndex(x => x.SourceReference);
+            e.HasIndex(x => new { x.InitiativeId, x.IsUnmapped, x.WorkDate });
+            e.HasIndex(x => x.IsUnmapped);
             e.HasOne(x => x.Initiative).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Person).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
@@ -196,6 +202,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Action).HasMaxLength(50);
             e.Property(x => x.UserId).HasMaxLength(200);
             e.HasIndex(x => new { x.Entity, x.EntityId });
+            e.HasIndex(x => x.At);
+            e.HasIndex(x => x.Action);
         });
     }
 }
