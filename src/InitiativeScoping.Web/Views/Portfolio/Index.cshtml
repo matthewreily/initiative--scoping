@@ -1,0 +1,185 @@
+@model PortfolioModel
+@{
+    ViewData["Title"] = "Portfolio";
+    var p = Model.Portfolio;
+    var maxCost = p.Rows.Count == 0 ? 0m : p.Rows.Max(r => Math.Max(Math.Max(r.ForecastCost, r.BaselineCost), r.ActualCost));
+    string Pct(decimal value) => maxCost <= 0 ? "0" : Math.Round(value / maxCost * 100m, 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    string Signed(decimal v, string fmt) => (v > 0 ? "+" : "") + v.ToString(fmt);
+    string VarianceClass(decimal? pct, bool over) => over ? "text-danger fw-semibold" : pct is null ? "text-muted" : pct > 0 ? "text-warning-emphasis" : "text-success";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Portfolio</h1>
+    @if (Model.CanExport && p.Count > 0)
+    {
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                @foreach (var f in Model.Formats.OrderBy(f => f == "xlsx" ? 0 : 1))
+                {
+                    <li><a class="dropdown-item" asp-action="Export" asp-route-format="@f" asp-route-status="@Model.Status" asp-route-businessUnitId="@Model.BusinessUnitId" asp-route-includeClosed="@Model.IncludeClosed">@(f == "xlsx" ? "Excel (.xlsx)" : "CSV")</a></li>
+                }
+            </ul>
+        </div>
+    }
+</div>
+
+<form method="get" class="row g-2 align-items-center mb-3">
+    <div class="col-md-3">
+        <select name="status" class="form-select form-select-sm" asp-for="Status" asp-items="Html.GetEnumSelectList<InitiativeStatus>()">
+            <option value="">All open statuses</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select name="businessUnitId" class="form-select form-select-sm" asp-for="BusinessUnitId" asp-items="Model.BusinessUnits">
+            <option value="">All business units</option>
+        </select>
+    </div>
+    <div class="col-md-3 form-check ms-2">
+        <input type="checkbox" class="form-check-input" id="includeClosed" name="includeClosed" value="true" checked="@Model.IncludeClosed" />
+        <label class="form-check-label small" for="includeClosed">Include Complete / Cancelled</label>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
+        <a asp-action="Index" class="btn btn-link btn-sm">Clear</a>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Initiatives</div><div class="fs-3">@p.Count</div><div class="small text-muted">@p.Baselined baselined</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3">@p.ForecastCost.ToString("C0")</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor</div><div class="fs-5">@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0")</div>
+        @if (p.ForecastCost > 0)
+        {
+            var internalPct = Math.Round(p.InternalForecastCost / p.ForecastCost * 100m);
+            <div class="progress mt-1" style="height: 6px" title="Internal @internalPct%"><div class="progress-bar bg-primary" style="width: @internalPct%"></div><div class="progress-bar bg-info" style="width: @(100 - internalPct)%"></div></div>
+        }
+    </div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Baseline cost</div><div class="fs-3">@p.BaselineCost.ToString("C0")</div><div class="small text-muted">@p.BaselineHours.ToString("N0") h</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Actual cost to date</div><div class="fs-3">@p.ActualCost.ToString("C0")</div><div class="small text-muted">@p.ActualHours.ToString("N0") h</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100 @(p.OverThreshold > 0 ? "border-danger" : "")"><div class="card-body"><div class="text-muted small">Variance vs. baseline</div>
+        <div class="fs-3 @VarianceClass(p.CostVariancePct, false)">@Signed(p.CostVariance, "C0")</div>
+        <div class="small">@(p.CostVariancePct is null ? "n/a" : Signed(p.CostVariancePct.Value, "N1") + "%")
+            @if (p.OverThreshold > 0) { <span class="badge bg-danger ms-1">@p.OverThreshold over threshold</span> }
+            @if (p.Unpriced > 0) { <span class="badge bg-warning text-dark ms-1">@p.Unpriced unpriced</span> }
+        </div></div></div></div>
+</div>
+
+@if (p.Count == 0)
+{
+    <div class="alert alert-light border">No initiatives match the current filter.</div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between">
+            <span>Forecast vs. baseline vs. actual</span>
+            <span class="small text-muted"><span class="badge bg-secondary">&nbsp;</span> forecast &nbsp; <span class="badge bg-primary">&nbsp;</span> baseline &nbsp; <span class="badge bg-success">&nbsp;</span> actual</span>
+        </div>
+        <div class="card-body">
+            @foreach (var r in p.Rows)
+            {
+                <div class="row align-items-center mb-2">
+                    <div class="col-md-3 text-truncate"><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@r.Initiative.Id">@r.Initiative.Name</a> <span class="text-muted small">@r.Initiative.BusinessUnit?.Name</span></div>
+                    <div class="col-md-9">
+                        <div class="progress mb-1" style="height: 6px" title="Forecast @r.ForecastCost.ToString("C0")"><div class="progress-bar bg-secondary" style="width: @Pct(r.ForecastCost)%"></div></div>
+                        <div class="progress mb-1" style="height: 6px" title="Baseline @r.BaselineCost.ToString("C0")"><div class="progress-bar bg-primary" style="width: @Pct(r.BaselineCost)%"></div></div>
+                        <div class="progress" style="height: 6px" title="Actual @r.ActualCost.ToString("C0")"><div class="progress-bar @(r.ExceedsThreshold ? "bg-danger" : "bg-success")" style="width: @Pct(r.ActualCost)%"></div></div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <table class="table table-sm align-middle">
+        <thead>
+        <tr>
+            <th>Initiative</th><th>Business unit</th><th>Status</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th style="min-width: 110px">Burn</th><th>Flags</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in p.Rows)
+        {
+            var i = r.Initiative;
+            <tr class="@(r.ExceedsThreshold ? "table-danger" : "")">
+                <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@i.Id">@i.Name</a></td>
+                <td>@i.BusinessUnit?.Name</td>
+                <td><partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="i.Status" /></td>
+                <td class="text-end">@r.ForecastCost.ToString("C0")<div class="small text-muted">@r.ForecastHours.ToString("N0") h</div></td>
+                <td class="text-end">
+                    @if (r.HasBaseline) { @r.BaselineCost.ToString("C0") <div class="small text-muted">v@(r.BaselineVersion) &middot; @r.BaselineHours.ToString("N0") h</div> }
+                    else { <span class="text-muted">—</span> }
+                </td>
+                <td class="text-end">@r.ActualCost.ToString("C0")<div class="small text-muted">@r.ActualHours.ToString("N0") h</div></td>
+                <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)">@(r.HasBaseline ? Signed(r.CostVariance, "C0") : "—")</td>
+                <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)">@(r.CostVariancePct is null ? "—" : Signed(r.CostVariancePct.Value, "N1") + "%")</td>
+                <td>
+                    <div class="progress" style="height: 8px" title="@r.BurnPct% of @(r.HasBaseline ? "baseline" : "forecast") spent">
+                        <div class="progress-bar @(r.ExceedsThreshold ? "bg-danger" : r.BurnPct >= 90 ? "bg-warning" : "bg-success")" style="width: @r.BurnPct.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                    </div>
+                </td>
+                <td>
+                    @if (r.ExceedsThreshold) { <span class="badge bg-danger" title="Cost variance exceeds @r.Variance.ThresholdPct%">Over threshold</span> }
+                    @if (r.HasUnpricedForecast) { <span class="badge bg-warning text-dark" title="One or more allocations have no matching rate">Unpriced forecast</span> }
+                    @if (r.HasUnpricedActuals) { <span class="badge bg-warning text-dark" title="@r.Variance.UnpricedEntries actual rows without a rate">Unpriced actuals</span> }
+                    @if (i.OpenRebaseline is not null) { <span class="badge bg-info text-dark">Re-baseline @i.OpenRebaseline.Status.ToString().ToLower()</span> }
+                </td>
+            </tr>
+        }
+        </tbody>
+        <tfoot class="fw-semibold">
+        <tr>
+            <td colspan="3" class="text-end">Total (@p.Count)</td>
+            <td class="text-end">@p.ForecastCost.ToString("C0")</td>
+            <td class="text-end">@p.BaselineCost.ToString("C0")</td>
+            <td class="text-end">@p.ActualCost.ToString("C0")</td>
+            <td class="text-end @VarianceClass(p.CostVariancePct, false)">@Signed(p.CostVariance, "C0")</td>
+            <td class="text-end @VarianceClass(p.CostVariancePct, false)">@(p.CostVariancePct is null ? "—" : Signed(p.CostVariancePct.Value, "N1") + "%")</td>
+            <td colspan="2"></td>
+        </tr>
+        </tfoot>
+    </table>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card"><div class="card-header">By business unit</div>
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Business unit</th><th class="text-end">#</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Var %</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in p.ByBusinessUnit)
+                    {
+                        <tr>
+                            <td>@g.Label @if (g.OverThreshold > 0) { <span class="badge bg-danger ms-1">@g.OverThreshold</span> }</td>
+                            <td class="text-end">@g.Count</td>
+                            <td class="text-end">@g.ForecastCost.ToString("C0")</td>
+                            <td class="text-end">@g.BaselineCost.ToString("C0")</td>
+                            <td class="text-end">@g.ActualCost.ToString("C0")</td>
+                            <td class="text-end @VarianceClass(g.CostVariancePct, false)">@(g.CostVariancePct is null ? "—" : Signed(g.CostVariancePct.Value, "N1") + "%")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card"><div class="card-header">By status</div>
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Status</th><th class="text-end">#</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Var %</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in p.ByStatus)
+                    {
+                        <tr>
+                            <td>@g.Label @if (g.OverThreshold > 0) { <span class="badge bg-danger ms-1">@g.OverThreshold</span> }</td>
+                            <td class="text-end">@g.Count</td>
+                            <td class="text-end">@g.ForecastCost.ToString("C0")</td>
+                            <td class="text-end">@g.BaselineCost.ToString("C0")</td>
+                            <td class="text-end">@g.ActualCost.ToString("C0")</td>
+                            <td class="text-end @VarianceClass(g.CostVariancePct, false)">@(g.CostVariancePct is null ? "—" : Signed(g.CostVariancePct.Value, "N1") + "%")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

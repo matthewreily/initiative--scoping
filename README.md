@@ -66,6 +66,11 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 - **Variance** (`/Initiatives/{id}/Actuals` and the summary on the initiative page) – mapped actuals + adjustments vs. the **current** baseline, in total and by phase (actuals bucketed by work date) and by resource type (from the person's roster record). Cost variance % is compared with the initiative's `VarianceThresholdPct` (default `Variance:DefaultThresholdPct`). Historical baselines are never touched by imports, rate changes or roster edits.
 - `IActualsSource` is the connector seam: the CSV upload and future Planview/Jira connectors feed the same `IActualsImporter`.
 
+### Portfolio dashboard and exports
+
+- **Portfolio** (`/Portfolio`, any signed-in role) – one row per initiative with live forecast (internal/vendor split), current baseline, actuals + adjustments, cost variance and %, burn bar, and badges for threshold breaches, unpriced forecast/actuals and open re-baseline requests; rollups by business unit and by status. Filter by status / business unit; Complete and Cancelled initiatives are hidden unless *Include Complete/Cancelled* is checked. All numbers come from `PortfolioCalculator`, which reuses `ForecastCalculator` and `VarianceCalculator`, so the dashboard always agrees with the initiative pages.
+- **Exports** (Administrator or Finance/PMO) – `/Portfolio/Export?format=csv|xlsx` (respects the current filters) and `/Initiatives/{id}/Export?format=csv|xlsx` (summary, forecast lines, current baseline lines, variance by phase / resource type, actual entries, adjustments). XLSX uses one worksheet per table; CSV concatenates tables separated by a blank line and a `# <table>` marker. Unknown formats return 400. Every export writes an `Export` audit event.
+
 ### SQL Server
 
 ```bash
