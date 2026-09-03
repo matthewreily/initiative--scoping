@@ -25,7 +25,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     public async Task<IActionResult> Index(InitiativeStatus? status, int? businessUnitId, string? search, CancellationToken ct)
     {
-        var query = db.Initiatives.Include(i => i.BusinessUnit).Include(i => i.Phases).Include(i => i.Allocations).AsQueryable();
+        var query = db.Initiatives.Include(i => i.BusinessUnit).Include(i => i.Phases).Include(i => i.Allocations).AsSplitQuery().AsQueryable();
         if (status is not null)
         {
             query = query.Where(i => i.Status == status);

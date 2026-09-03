@@ -21,6 +21,8 @@ namespace InitiativeScoping.Web.Controllers;
 public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, IActualsImporter importer, TimeProvider clock, IConfiguration config) : Controller
 {
     private const long MaxImportBytes = 10 * 1024 * 1024;
+    // Transport cap sits above the import limit so oversize files reach the friendly redirect instead of a connection reset.
+    private const long MaxImportRequestBytes = MaxImportBytes + 2 * 1024 * 1024;
     private const int PageSize = 100;
 
     // ----- Per-initiative -----
@@ -136,7 +138,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
 
     [HttpPost("Actuals/Import")]
     [Authorize(Policy = AppPolicies.CanManageActuals)]
-    [RequestSizeLimit(MaxImportBytes)]
+    [RequestSizeLimit(MaxImportRequestBytes)]
     public async Task<IActionResult> Import(ActualsImportModel model, CancellationToken ct)
     {
         if (model.File is null || model.File.Length == 0)
@@ -272,6 +274,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
             .Include(i => i.RebaselineRequests)
             .Include(i => i.SourceMappings)
             .AsNoTracking()
+            .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
     private async Task<EntriesModel> BuildEntriesModel(IQueryable<ActualEntry> query, int page, CancellationToken ct)
