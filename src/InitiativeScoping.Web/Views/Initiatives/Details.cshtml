@@ -192,12 +192,9 @@ else
                     <td class="text-end">@((roll?.Hours ?? 0).ToString("N1"))</td>
                     <td class="text-end">@((roll?.Cost ?? 0).ToString("C0")) @if (roll?.HasUnpriced == true) { <span class="text-warning" title="Unpriced lines">&#9888;</span> }</td>
                     <td class="text-end text-nowrap">
-                        @if (Model.CanEdit)
-                        {
-                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditPhase" asp-route-id="@p.Id">Edit</a>
-                        }
                         @if (Model.ScopeWritable)
                         {
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditPhase" asp-route-id="@p.Id">Edit</a>
                             <form asp-action="DeletePhase" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Delete phase @p.Name?');">
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
                             </form>
