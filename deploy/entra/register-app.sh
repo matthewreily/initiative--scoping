@@ -15,6 +15,7 @@ set -euo pipefail
 
 ENV="${1:?usage: register-app.sh <dev|prod> [app-base-url | --add-url url]}"
 shift
+[[ "$ENV" == dev || "$ENV" == prod ]] || { echo "env must be dev or prod, got '$ENV'" >&2; exit 1; }
 APP_NAME="Initiative Scoping (${ENV})"
 ROLES=(Administrator InitiativeOwner Contributor Viewer FinancePmo)
 
@@ -28,21 +29,39 @@ redirect_uris() { # $1 = base url
 }
 logout_uri() { echo "$1/signout-callback-oidc"; }
 
+# Only https origins (no path/query) become trusted redirect targets.
+check_base_url() {
+  [[ "$1" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] \
+    || { echo "app-base-url must be https://host[:port] with no path, got '$1'" >&2; exit 1; }
+}
+
+# Resolve the registration by display name; refuse to guess if the name is ambiguous.
+find_app() {
+  local ids
+  ids=$(az ad app list --display-name "$APP_NAME" --query '[].appId' -o tsv)
+  if [[ $(wc -l <<<"${ids:-}") -gt 1 && -n "$ids" ]]; then
+    echo "Multiple registrations named '$APP_NAME'; remove or rename the extras first." >&2; exit 1
+  fi
+  echo "$ids"
+}
+
 # --- --add-url: append a redirect URI to an existing registration and exit ---
 if [[ "${1:-}" == "--add-url" ]]; then
   BASE="${2:?missing url}"
-  APP_ID=$(az ad app list --display-name "$APP_NAME" --query '[0].appId' -o tsv)
+  check_base_url "$BASE"
+  APP_ID=$(find_app)
   [[ -n "$APP_ID" ]] || { echo "App '$APP_NAME' not found" >&2; exit 1; }
   EXISTING=$(az ad app show --id "$APP_ID" --query 'web.redirectUris' -o json)
-  NEW=$(echo "$EXISTING" | jq -c --arg u "$(redirect_uris "$BASE")" '. + [$u] | unique')
-  az ad app update --id "$APP_ID" \
-    --set "web.redirectUris=$NEW" \
-    --set "web.logoutUrl=$(logout_uri "$BASE")" >/dev/null
+  BODY=$(echo "$EXISTING" | jq -c --arg u "$(redirect_uris "$BASE")" --arg l "$(logout_uri "$BASE")" \
+    '{web: {redirectUris: (. + [$u] | unique), logoutUrl: $l}}')
+  OBJ_ID=$(az ad app show --id "$APP_ID" --query id -o tsv)
+  az rest --method PATCH --url "https://graph.microsoft.com/v1.0/applications/$OBJ_ID" --body "$BODY"
   echo "Added $(redirect_uris "$BASE") to '$APP_NAME'."
   exit 0
 fi
 
 BASE_URL="${1:-}"
+[[ -z "$BASE_URL" ]] || check_base_url "$BASE_URL"
 
 # --- app roles manifest ---
 # Fixed ids so re-running the script updates roles in place instead of duplicating them.
@@ -59,7 +78,7 @@ ROLES_JSON=$(i=0; for r in "${ROLES[@]}"; do
 done | jq -s '.')
 
 # --- create or reuse the registration ---
-APP_ID=$(az ad app list --display-name "$APP_NAME" --query '[0].appId' -o tsv)
+APP_ID=$(find_app)
 if [[ -z "$APP_ID" ]]; then
   ARGS=(--display-name "$APP_NAME" --sign-in-audience AzureADMyOrg --enable-id-token-issuance true)
   [[ -n "$BASE_URL" ]] && ARGS+=(--web-redirect-uris "$(redirect_uris "$BASE_URL")")
@@ -70,7 +89,11 @@ else
 fi
 
 az ad app update --id "$APP_ID" --app-roles "$ROLES_JSON" >/dev/null
-[[ -n "$BASE_URL" ]] && az ad app update --id "$APP_ID" --set "web.logoutUrl=$(logout_uri "$BASE_URL")" >/dev/null
+if [[ -n "$BASE_URL" ]]; then
+  az rest --method PATCH \
+    --url "https://graph.microsoft.com/v1.0/applications/$(az ad app show --id "$APP_ID" --query id -o tsv)" \
+    --body "$(jq -n --arg l "$(logout_uri "$BASE_URL")" '{web: {logoutUrl: $l}}')"
+fi
 
 # Service principal (Enterprise application) so users/groups can be assigned to roles;
 # require assignment so only assigned users can sign in.
@@ -105,7 +128,8 @@ entra_tenant_id = "${TENANT_ID}"
 entra_client_id = "${APP_ID}"
 
 ==== Client secret (store in Secret Manager; not shown again) ====
-printf '%s' '${SECRET}' | gcloud secrets versions add \$(terraform output -raw oidc_client_secret_id) --data-file=-
+printf '%s' '${SECRET}' | gcloud secrets versions add \$(terraform -chdir=deploy/gcp output -raw oidc_client_secret_id) --data-file=-
+Then roll a new Cloud Run revision so running instances pick it up (see deploy/gcp/README.md).
 
 Assign more users/groups to roles:
   Entra admin center -> Enterprise applications -> "${APP_NAME}" -> Users and groups
@@ -113,5 +137,5 @@ EOF
 if [[ -z "$BASE_URL" ]]; then
   echo
   echo "No redirect URI set yet. After 'terraform apply' run:"
-  echo "  deploy/entra/register-app.sh ${ENV} --add-url \$(terraform output -raw service_url)"
+  echo "  deploy/entra/register-app.sh ${ENV} --add-url \$(terraform -chdir=deploy/gcp output -raw service_url)"
 fi

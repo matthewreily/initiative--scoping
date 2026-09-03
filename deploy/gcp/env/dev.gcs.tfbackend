@@ -1,2 +1,2 @@
-bucket = "REPLACE-tfstate-bucket"
+bucket = "initiative-scoping-dev-tfstate"
 prefix = "initiative-scoping/dev"
