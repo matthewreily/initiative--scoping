@@ -1,0 +1,9 @@
+@model StatusViewModel
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<h1 class="text-danger">@Model.Code – @Model.Title</h1>
+<p>@Model.Detail</p>
+<p><a asp-controller="Home" asp-action="Index">Return to home</a></p>
+<p class="text-muted small">Request ID: <code>@Model.RequestId</code></p>

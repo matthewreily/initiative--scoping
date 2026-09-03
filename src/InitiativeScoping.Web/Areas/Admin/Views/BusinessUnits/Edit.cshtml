@@ -1,0 +1,23 @@
+@model BusinessUnitEditModel
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "New Business Unit" : "Edit Business Unit";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<h2 class="h5">@ViewData["Title"]</h2>
+<form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label">Active</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

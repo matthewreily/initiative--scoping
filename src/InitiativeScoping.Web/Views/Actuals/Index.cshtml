@@ -1,0 +1,60 @@
+@model ActualsIndexModel
+@{
+    ViewData["Title"] = "Actuals imports";
+}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h1 class="h3 mb-0">Actuals imports</h1>
+    <a class="btn btn-outline-warning btn-sm" asp-action="Unmapped">Unmapped entries (@Model.UnmappedCount)</a>
+</div>
+<partial name="~/Views/Initiatives/_Alerts.cshtml" />
+<div class="row g-4">
+    <div class="col-lg-8">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>#</th><th>Source</th><th>File</th><th>Started</th><th>By</th><th>Status</th><th class="text-end">Records</th><th class="text-end">Unmapped</th><th class="text-end">Skipped</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var i in Model.Imports)
+            {
+                <tr>
+                    <td>@i.Id</td>
+                    <td>@i.Source</td>
+                    <td class="small">@i.FileName</td>
+                    <td class="small">@i.StartedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td class="small">@i.StartedBy</td>
+                    <td>
+                        @if (i.Status == ActualsImportStatus.Completed) { <span class="badge bg-success">Completed</span> }
+                        else if (i.Status == ActualsImportStatus.CompletedWithUnmapped) { <span class="badge bg-warning text-dark">Unmapped rows</span> }
+                        else { <span class="badge bg-danger">@i.Status</span> }
+                    </td>
+                    <td class="text-end">@i.RecordCount</td>
+                    <td class="text-end">@i.UnmappedCount</td>
+                    <td class="text-end">@i.SkippedCount</td>
+                    <td class="text-end"><a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@i.Id">Details</a></td>
+                </tr>
+            }
+            @if (Model.Imports.Count == 0)
+            {
+                <tr><td colspan="10" class="text-muted">No imports yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header py-2">Import actuals CSV</div>
+            <div class="card-body">
+                <form asp-action="Import" method="post" enctype="multipart/form-data">
+                    <div class="mb-2">
+                        <input type="file" name="File" accept=".csv,text/csv" class="form-control form-control-sm" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Import</button>
+                    <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
+                </form>
+                <p class="text-muted small mt-2 mb-0">
+                    Columns: ExternalProjectId, ExternalPersonId, WorkDate (yyyy-MM-dd), Hours, Cost (optional; blank = price from roster), Reference (optional; used to skip re-imported rows).
+                    Projects map to initiatives via each initiative's source mappings (source <code>Csv</code>); people via the roster's external IDs.
+                    Rows that cannot be mapped are kept for review and excluded from variance until assigned. The whole file is rejected if any row is invalid.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

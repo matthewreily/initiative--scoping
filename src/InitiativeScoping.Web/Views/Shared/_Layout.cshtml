@@ -22,6 +22,30 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Initiatives" asp-action="Index">Initiatives</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Portfolio" asp-action="Index">Portfolio</a>
+                        </li>
+                        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator) || User.IsInRole(InitiativeScoping.Application.AppRoles.FinancePmo))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Actuals" asp-action="Index">Actuals</a>
+                            </li>
+                        }
+                        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="Admin" asp-controller="BusinessUnits" asp-action="Index">Admin</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Lifecycle" asp-action="Pending">Re-baselines</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Audit" asp-action="Index">Audit</a>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>

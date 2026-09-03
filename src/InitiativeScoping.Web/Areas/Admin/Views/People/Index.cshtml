@@ -1,0 +1,55 @@
+@model IReadOnlyList<PersonListItem>
+@{
+    ViewData["Title"] = "People";
+    var search = ViewBag.Search as string;
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">People roster</h2>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <input name="search" value="@search" class="form-control form-control-sm" placeholder="Name or external ID" />
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Search</button>
+        </form>
+        <a class="btn btn-primary btn-sm" asp-action="Create">New person</a>
+    </div>
+</div>
+<p class="text-muted small">Imported actuals are matched to people by external ID and priced from the person's resource type, seniority, location, class and business unit.</p>
+<table class="table table-sm align-middle">
+    <thead><tr><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Status</th><th>Actuals</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var item in Model)
+    {
+        var p = item.Person;
+        <tr>
+            <td>@p.DisplayName</td>
+            <td class="small text-muted">@p.ExternalIds</td>
+            <td>@p.ResourceType?.Name</td>
+            <td>@p.BusinessUnit?.Name</td>
+            <td>@p.Seniority</td>
+            <td>@p.Location</td>
+            <td>@(p.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
+            <td>@(p.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
+            <td>@item.EntryCount</td>
+            <td class="text-end text-nowrap">
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@p.Id">Edit</a>
+                @if (item.EntryCount == 0)
+                {
+                    <form asp-action="Delete" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @p.DisplayName?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                    </form>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled title="Has actuals; deactivate instead">Delete</button>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Count == 0)
+    {
+        <tr><td colspan="10" class="text-muted">No people yet.</td></tr>
+    }
+    </tbody>
+</table>

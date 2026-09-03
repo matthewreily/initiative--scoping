@@ -1,0 +1,19 @@
+@{
+    var current = ViewContext.RouteData.Values["controller"]?.ToString();
+    string Cls(string c) => c == current ? "nav-link active" : "nav-link";
+}
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="@Cls("BusinessUnits")" asp-area="Admin" asp-controller="BusinessUnits" asp-action="Index">Business Units</a></li>
+    <li class="nav-item"><a class="@Cls("ResourceTypes")" asp-area="Admin" asp-controller="ResourceTypes" asp-action="Index">Resource Types</a></li>
+    <li class="nav-item"><a class="@Cls("RateCards")" asp-area="Admin" asp-controller="RateCards" asp-action="Index">Rate Cards</a></li>
+    <li class="nav-item"><a class="@Cls("Sizing")" asp-area="Admin" asp-controller="Sizing" asp-action="Index">Sizing</a></li>
+    <li class="nav-item"><a class="@Cls("People")" asp-area="Admin" asp-controller="People" asp-action="Index">People</a></li>
+</ul>
+@if (TempData["Success"] is string ok)
+{
+    <div class="alert alert-success">@ok</div>
+}
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}

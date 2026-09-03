@@ -38,6 +38,15 @@ public enum SizingMethod
     StoryPoints = 3
 }
 
+public enum RebaselineStatus
+{
+    Pending = 1,
+    Approved = 2,
+    Rejected = 3,
+    Completed = 4,
+    Withdrawn = 5
+}
+
 public enum InitiativeMemberRole
 {
     Owner = 1,

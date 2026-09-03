@@ -1,0 +1,65 @@
+@model PhaseEditModel
+@{
+    var initiative = (Initiative)ViewBag.Initiative;
+    var history = (List<PhaseDateHistory>)ViewBag.History;
+    ViewData["Title"] = $"Edit Phase – {Model.Name}";
+    var locked = initiative.Status != InitiativeStatus.Draft;
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+    <li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>
+    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@initiative.Id">@initiative.Name</a></li>
+    <li class="breadcrumb-item active">Edit phase</li>
+</ol></nav>
+<h1 class="h3">Edit phase</h1>
+@if (locked)
+{
+    <div class="alert alert-secondary py-2">Scope is locked while the initiative is @initiative.Status.</div>
+}
+<form asp-action="EditPhase" asp-route-id="@Model.Id" method="post" class="col-lg-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <fieldset disabled="@locked">
+        <div class="mb-3">
+            <label asp-for="Name" class="form-label"></label>
+            <input asp-for="Name" class="form-control" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label asp-for="PlannedStart" class="form-label"></label>
+                <input asp-for="PlannedStart" class="form-control" />
+                <span asp-validation-for="PlannedStart" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="PlannedEnd" class="form-label"></label>
+                <input asp-for="PlannedEnd" class="form-control" />
+                <span asp-validation-for="PlannedEnd" class="text-danger"></span>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label asp-for="Reason" class="form-label"></label>
+            <input asp-for="Reason" class="form-control" placeholder="Recorded in date history when dates change" />
+            <span asp-validation-for="Reason" class="text-danger"></span>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </fieldset>
+    <a asp-action="Details" asp-route-id="@initiative.Id" class="btn btn-link">Back</a>
+</form>
+
+<h2 class="h5 mt-4">Date history</h2>
+<table class="table table-sm col-lg-8">
+    <thead><tr><th>When</th><th>By</th><th>From</th><th>To</th><th>Reason</th></tr></thead>
+    <tbody>
+    @foreach (var h in history)
+    {
+        <tr>
+            <td>@h.ChangedAt.ToString("yyyy-MM-dd HH:mm")</td>
+            <td>@h.ChangedBy</td>
+            <td>@h.OldStart.ToString("yyyy-MM-dd") → @h.OldEnd.ToString("yyyy-MM-dd")</td>
+            <td>@h.NewStart.ToString("yyyy-MM-dd") → @h.NewEnd.ToString("yyyy-MM-dd")</td>
+            <td>@h.Reason</td>
+        </tr>
+    }
+    @if (history.Count == 0) { <tr><td colspan="5" class="text-muted">No date changes recorded.</td></tr> }
+    </tbody>
+</table>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

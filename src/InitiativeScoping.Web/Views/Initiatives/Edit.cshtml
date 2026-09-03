@@ -1,0 +1,79 @@
+@model InitiativeEditModel
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "New Initiative" : "Edit Initiative";
+    var businessUnits = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.BusinessUnits;
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li><li class="breadcrumb-item active">@ViewData["Title"]</li></ol></nav>
+<h1 class="h3">@ViewData["Title"]</h1>
+<form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-lg-8">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Description" class="form-label"></label>
+        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="Description" class="text-danger"></span>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label asp-for="BusinessUnitId" class="form-label"></label>
+            <select asp-for="BusinessUnitId" asp-items="businessUnits" class="form-select"><option value="">Select…</option></select>
+            <span asp-validation-for="BusinessUnitId" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="SponsoringTeam" class="form-label"></label>
+            <input asp-for="SponsoringTeam" class="form-control" />
+            <span asp-validation-for="SponsoringTeam" class="text-danger"></span>
+        </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label asp-for="SizingMethod" class="form-label"></label>
+            <select asp-for="SizingMethod" class="form-select" id="sizing-method">
+                <option value="@SizingMethod.Direct">Direct hours</option>
+                <option value="@SizingMethod.TShirt">T-shirt</option>
+                <option value="@SizingMethod.StoryPoints">Story points</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label asp-for="SizeKey" class="form-label"></label>
+            <input asp-for="SizeKey" class="form-control" placeholder="e.g. L" id="size-key" />
+            <span asp-validation-for="SizeKey" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="TargetStart" class="form-label"></label>
+            <input asp-for="TargetStart" class="form-control" />
+            <span asp-validation-for="TargetStart" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="VarianceThresholdPct" class="form-label"></label>
+            <input asp-for="VarianceThresholdPct" class="form-control" type="number" step="0.5" min="0" />
+            <span asp-validation-for="VarianceThresholdPct" class="text-danger"></span>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    @if (isNew)
+    {
+        <a asp-action="Index" class="btn btn-link">Cancel</a>
+    }
+    else
+    {
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-link">Cancel</a>
+    }
+</form>
+@section Scripts {
+    <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
+    <script>
+        (function () {
+            const method = document.getElementById('sizing-method');
+            const key = document.getElementById('size-key');
+            function sync() { key.disabled = method.value === '@((int)SizingMethod.Direct)'; if (key.disabled) key.value = ''; }
+            method.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
+}

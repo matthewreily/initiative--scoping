@@ -1,0 +1,34 @@
+@model IReadOnlyList<RebaselineRequest>
+@{
+    ViewData["Title"] = "Pending re-baseline requests";
+}
+<h1 class="h3">Pending re-baseline requests</h1>
+<partial name="~/Views/Initiatives/_Alerts.cshtml" />
+@if (Model.Count == 0)
+{
+    <p class="text-muted">No requests awaiting approval.</p>
+}
+else
+{
+    <table class="table table-sm align-middle">
+        <thead><tr><th>Initiative</th><th>Requested</th><th>Reason</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model)
+        {
+            <tr>
+                <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@r.InitiativeId">@r.Initiative?.Name</a></td>
+                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @r.RequestedBy</td>
+                <td>@r.Reason</td>
+                <td class="text-end">
+                    <form asp-action="DecideRebaseline" asp-route-id="@r.InitiativeId" method="post" class="d-flex gap-2 justify-content-end">
+                        <input type="hidden" name="requestId" value="@r.Id" />
+                        <input name="note" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 12rem" />
+                        <button type="submit" name="approve" value="true" class="btn btn-success btn-sm">Approve</button>
+                        <button type="submit" name="approve" value="false" class="btn btn-outline-danger btn-sm">Reject</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

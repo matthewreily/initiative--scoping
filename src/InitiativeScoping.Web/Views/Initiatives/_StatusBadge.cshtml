@@ -1,0 +1,12 @@
+@model InitiativeStatus
+@{
+    var cls = Model switch
+    {
+        InitiativeStatus.Active => "bg-success",
+        InitiativeStatus.OnHold => "bg-warning text-dark",
+        InitiativeStatus.Complete => "bg-primary",
+        InitiativeStatus.Cancelled => "bg-secondary",
+        _ => "bg-light text-dark border"
+    };
+}
+<span class="badge @cls">@Model</span>

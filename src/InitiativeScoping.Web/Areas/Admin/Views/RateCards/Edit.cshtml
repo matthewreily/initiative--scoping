@@ -1,0 +1,24 @@
+@model RateCardEditModel
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "New Rate Card" : "Edit Rate Card";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<h2 class="h5">@ViewData["Title"]</h2>
+<form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" placeholder="e.g. FY2027 Standard Rates" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="EffectiveStart" class="form-label"></label>
+        <input asp-for="EffectiveStart" class="form-control" type="date" />
+        <span asp-validation-for="EffectiveStart" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="@(isNew ? "Index" : "Details")" asp-route-id="@(isNew ? null : Model.Id)" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

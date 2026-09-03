@@ -21,6 +21,31 @@ public class Initiative
     public List<InitiativeAllocation> Allocations { get; set; } = [];
     public List<InitiativeMember> Members { get; set; } = [];
     public List<ForecastBaseline> Baselines { get; set; } = [];
+    public List<RebaselineRequest> RebaselineRequests { get; set; } = [];
+    public List<InitiativeSourceMapping> SourceMappings { get; set; } = [];
+
+    public ForecastBaseline? CurrentBaseline => Baselines.FirstOrDefault(b => b.IsCurrent);
+
+    /// <summary>An approved re-baseline that has not yet been finalised into a new baseline version.</summary>
+    public RebaselineRequest? OpenRebaseline =>
+        RebaselineRequests.FirstOrDefault(r => r.Status is RebaselineStatus.Pending or RebaselineStatus.Approved);
+}
+
+/// <summary>Owner-initiated, Admin-approved request to unlock scope on an Active initiative and cut a new baseline.</summary>
+public class RebaselineRequest
+{
+    public int Id { get; set; }
+    public int InitiativeId { get; set; }
+    public Initiative? Initiative { get; set; }
+    public RebaselineStatus Status { get; set; } = RebaselineStatus.Pending;
+    public required string Reason { get; set; }
+    public required string RequestedBy { get; set; }
+    public DateTimeOffset RequestedAt { get; set; }
+    public string? DecidedBy { get; set; }
+    public DateTimeOffset? DecidedAt { get; set; }
+    public string? DecisionNote { get; set; }
+    public int? ResultingBaselineId { get; set; }
+    public ForecastBaseline? ResultingBaseline { get; set; }
 }
 
 public class InitiativeMember
