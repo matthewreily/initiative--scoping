@@ -28,6 +28,16 @@
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit</a>
+        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator) || User.IsInRole(InitiativeScoping.Application.AppRoles.FinancePmo))
+        {
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="xlsx">Excel (.xlsx)</a></li>
+                    <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="csv">CSV</a></li>
+                </ul>
+            </div>
+        }
         @if (Model.CanEdit)
         {
             <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@i.Id">Edit</a>

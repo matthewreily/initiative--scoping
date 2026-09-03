@@ -184,3 +184,14 @@ public sealed record BaselineLineRow(
     decimal Cost,
     decimal? HoursDelta,
     decimal? CostDelta);
+
+public class PortfolioModel
+{
+    public required PortfolioResult Portfolio { get; init; }
+    public InitiativeStatus? Status { get; init; }
+    public int? BusinessUnitId { get; init; }
+    public bool IncludeClosed { get; init; }
+    public required SelectList BusinessUnits { get; init; }
+    public bool CanExport { get; init; }
+    public required IReadOnlyList<string> Formats { get; init; }
+}

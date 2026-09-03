@@ -20,4 +20,5 @@ public static class AuditActions
     public const string RebaselineDecision = "RebaselineDecision";
     public const string Remap = "Remap";
     public const string Adjustment = "Adjustment";
+    public const string Export = "Export";
 }

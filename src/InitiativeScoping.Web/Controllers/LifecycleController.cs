@@ -5,6 +5,7 @@ using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Domain.Services;
 using InitiativeScoping.Infrastructure.Persistence;
+using InitiativeScoping.Web.Services;
 using InitiativeScoping.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -293,10 +294,10 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.Allocations)
             .Include(i => i.Baselines)
             .Include(i => i.RebaselineRequests)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
-    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) =>
-        db.RateCards.Include(c => c.Entries).Where(c => c.Status == RateCardStatus.Published).AsNoTracking().ToListAsync(ct);
+    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) => db.PublishedRateCardsAsync(ct);
 
     private static object BaselineDiff(ForecastBaseline b, int? requestId = null) =>
         new { b.Version, b.TotalHours, b.TotalCost, LineCount = b.Lines.Count, b.Reason, RequestId = requestId };
