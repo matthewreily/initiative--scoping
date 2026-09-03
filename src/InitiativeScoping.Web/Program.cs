@@ -23,7 +23,10 @@ builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    // Behind a managed proxy (Cloud Run / load balancer) the peer is not a known IP.
+    // Only for deployments where every request arrives via a trusted front end (Cloud Run)
+    // that overwrites X-Forwarded-Proto and appends the true client IP; the peer has no fixed
+    // address, and ForwardLimit=1 reads only that appended entry so client-supplied ones are ignored.
+    o.ForwardLimit = 1;
     o.KnownNetworks.Clear();
     o.KnownProxies.Clear();
 });

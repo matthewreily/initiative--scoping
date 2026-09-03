@@ -114,13 +114,23 @@ resource "google_secret_manager_secret_version" "conn" {
   secret_data = local.db_conn_string
 }
 
-# Entra ID client secret is created empty here and populated out-of-band (never in Terraform state).
+# Entra ID client secret: Terraform creates a placeholder version so Cloud Run can resolve
+# "latest" on first apply; the real value is added out-of-band as a newer version and never
+# enters Terraform state.
 resource "google_secret_manager_secret" "oidc_client_secret" {
   secret_id = "${local.name}-oidc-client-secret"
   replication {
     auto {}
   }
   depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "oidc_client_secret_placeholder" {
+  secret      = google_secret_manager_secret.oidc_client_secret.id
+  secret_data = "PLACEHOLDER-set-with-gcloud-secrets-versions-add"
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 # ---------- Runtime identity ----------
@@ -244,6 +254,7 @@ resource "google_cloud_run_v2_service" "web" {
 
   depends_on = [
     google_secret_manager_secret_version.conn,
+    google_secret_manager_secret_version.oidc_client_secret_placeholder,
     google_secret_manager_secret_iam_member.run_conn,
     google_secret_manager_secret_iam_member.run_oidc,
   ]

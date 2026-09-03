@@ -27,17 +27,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ActualAdjustment> ActualAdjustments => Set<ActualAdjustment>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
+    private const string CaseInsensitive = "case_insensitive";
+
     protected override void OnModelCreating(ModelBuilder b)
     {
+        // Business keys compare case-insensitively on every provider (SQL Server's default);
+        // PostgreSQL needs an explicit non-deterministic ICU collation, SQLite has NOCASE.
+        var ciCollation = Database.IsSqlite() ? "NOCASE" : CaseInsensitive;
+        if (Database.IsNpgsql())
+        {
+            b.HasCollation(CaseInsensitive, locale: "und-u-ks-level2", provider: "icu", deterministic: false);
+        }
+
         b.Entity<BusinessUnit>(e =>
         {
-            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
             e.HasIndex(x => x.Name).IsUnique();
         });
 
         b.Entity<ResourceType>(e =>
         {
-            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
             e.Property(x => x.Discipline).HasMaxLength(100);
             e.HasIndex(x => x.Name).IsUnique();
         });
@@ -51,7 +61,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<RateCardEntry>(e =>
         {
-            e.Property(x => x.Location).HasMaxLength(100);
+            e.Property(x => x.Location).HasMaxLength(100).UseCollation(ciCollation);
             e.Property(x => x.HourlyRate).HasPrecision(18, 2);
             e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.BusinessUnitId, x.Seniority, x.Location, x.ResourcingClass })
                 .IsUnique();
@@ -174,7 +184,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<ActualEntry>(e =>
         {
-            e.Property(x => x.SourceReference).HasMaxLength(200);
+            e.Property(x => x.SourceReference).HasMaxLength(200).UseCollation(ciCollation);
             e.Property(x => x.ExternalProjectId).HasMaxLength(200);
             e.Property(x => x.ExternalPersonId).HasMaxLength(200);
             e.Property(x => x.Hours).HasPrecision(18, 2);
