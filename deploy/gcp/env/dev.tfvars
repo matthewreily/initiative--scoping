@@ -5,5 +5,5 @@ db_tier             = "db-f1-micro"
 min_instances       = 0
 max_instances       = 2
 seed_reference_data = true
-entra_tenant_id     = "REPLACE-tenant-guid"
-entra_client_id     = "REPLACE-app-registration-client-id"
+entra_tenant_id     = "f0f37d2f-1252-4242-8058-8b307b86b0b5"
+entra_client_id     = "488767c9-e55d-441f-962c-816cbc1f40fc"
