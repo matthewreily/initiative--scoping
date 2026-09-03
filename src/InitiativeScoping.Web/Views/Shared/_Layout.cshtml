@@ -25,6 +25,12 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Initiatives" asp-action="Index">Initiatives</a>
                         </li>
+                        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator) || User.IsInRole(InitiativeScoping.Application.AppRoles.FinancePmo))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Actuals" asp-action="Index">Actuals</a>
+                            </li>
+                        }
                         @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
                         {
                             <li class="nav-item">

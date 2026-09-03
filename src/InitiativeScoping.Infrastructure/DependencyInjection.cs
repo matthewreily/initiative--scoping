@@ -1,4 +1,5 @@
 using InitiativeScoping.Application.Abstractions;
+using InitiativeScoping.Infrastructure.Actuals;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +30,7 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuditLog, DbAuditLog>();
+        services.AddScoped<IActualsImporter, ActualsImporter>();
 
         return services;
     }

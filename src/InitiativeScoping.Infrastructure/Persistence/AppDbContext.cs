@@ -145,6 +145,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Person>(e =>
         {
             e.Property(x => x.DisplayName).HasMaxLength(200);
+            e.Property(x => x.ExternalIds).HasMaxLength(1000);
             e.Property(x => x.Location).HasMaxLength(100);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
@@ -155,18 +156,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Source).HasMaxLength(50);
             e.Property(x => x.ExternalProjectId).HasMaxLength(200);
             e.HasIndex(x => new { x.Source, x.ExternalProjectId }).IsUnique();
+            e.HasOne(x => x.Initiative).WithMany(i => i.SourceMappings).HasForeignKey(x => x.InitiativeId);
         });
 
         b.Entity<ActualsImport>(e =>
         {
             e.Property(x => x.Source).HasMaxLength(50);
             e.Property(x => x.Status).HasMaxLength(50);
+            e.Property(x => x.StartedBy).HasMaxLength(200);
+            e.Property(x => x.FileName).HasMaxLength(260);
             e.HasMany(x => x.Entries).WithOne(x => x.ActualsImport).HasForeignKey(x => x.ActualsImportId);
         });
 
         b.Entity<ActualEntry>(e =>
         {
             e.Property(x => x.SourceReference).HasMaxLength(200);
+            e.Property(x => x.ExternalProjectId).HasMaxLength(200);
+            e.Property(x => x.ExternalPersonId).HasMaxLength(200);
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.Property(x => x.SourcedCost).HasPrecision(18, 2);
             e.Property(x => x.CalculatedCost).HasPrecision(18, 2);
@@ -179,6 +185,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);
+            e.Property(x => x.Reason).HasMaxLength(1000);
             e.Property(x => x.CreatedBy).HasMaxLength(200);
         });
 
