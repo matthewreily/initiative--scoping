@@ -751,7 +751,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
             .Include(i => i.RebaselineRequests)
-            .Include(i => i.SourceMappings);
+            .Include(i => i.SourceMappings)
+            .AsSplitQuery();
         if (includeHistory)
         {
             query = query.Include(i => i.Phases).ThenInclude(p => p.DateHistory);
@@ -760,8 +761,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return query.FirstOrDefaultAsync(i => i.Id == id, ct);
     }
 
-    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) =>
-        db.RateCards.Include(c => c.Entries).Where(c => c.Status == RateCardStatus.Published).AsNoTracking().ToListAsync(ct);
+    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) => db.PublishedRateCardsAsync(ct);
 
     private async Task PopulateBusinessUnits(CancellationToken ct) => ViewBag.BusinessUnits = await BusinessUnitListAsync(ct, includeInactive: false);
 

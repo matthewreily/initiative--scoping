@@ -27,4 +27,11 @@ public class HomeController(AppDbContext db, ICurrentUser currentUser) : Control
     {
         return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
+
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult Status(int code)
+    {
+        Response.StatusCode = code;
+        return View(new StatusViewModel(code, Activity.Current?.Id ?? HttpContext.TraceIdentifier));
+    }
 }
