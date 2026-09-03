@@ -1,0 +1,80 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  APP_NAME: initiative-scoping
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore
+      - run: dotnet build --no-restore --configuration Release -warnaserror
+      - run: dotnet test --no-build --configuration Release
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    # Pushes to main deploy to dev; prod requires a manual dispatch and the GitHub environment's protection rules.
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    concurrency: deploy-${{ github.event.inputs.environment || 'dev' }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve names
+        run: |
+          echo "IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/${APP_NAME}/${APP_NAME}:${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "SERVICE=${APP_NAME}-${ENVIRONMENT}" >> "$GITHUB_ENV"
+          echo "MIGRATE_JOB=${APP_NAME}-${ENVIRONMENT}-migrate" >> "$GITHUB_ENV"
+
+      - name: Build and push image
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Run database migrations
+        run: |
+          gcloud run jobs update "$MIGRATE_JOB" --region "$REGION" --image "$IMAGE" --quiet
+          gcloud run jobs execute "$MIGRATE_JOB" --region "$REGION" --wait --quiet
+
+      - name: Deploy Cloud Run service
+        run: |
+          gcloud run deploy "$SERVICE" --region "$REGION" --image "$IMAGE" --quiet
+
+      - name: Smoke test
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')
+          echo "Service URL: $URL"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 "$URL/health"

@@ -1,0 +1,9 @@
+project_id          = "REPLACE-gcp-project-id"
+region              = "us-central1"
+environment         = "dev"
+db_tier             = "db-f1-micro"
+min_instances       = 0
+max_instances       = 2
+seed_reference_data = true
+entra_tenant_id     = "REPLACE-tenant-guid"
+entra_client_id     = "REPLACE-app-registration-client-id"

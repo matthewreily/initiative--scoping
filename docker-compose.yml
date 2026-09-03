@@ -1,13 +1,27 @@
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+  postgres:
+    image: postgres:16-alpine
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-Dev_Passw0rd!}"
+      POSTGRES_DB: initiative_scoping
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-devpass}"
     ports:
-      - "1433:1433"
+      - "5432:5432"
     volumes:
-      - mssql-data:/var/opt/mssql
+      - pg-data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=initiative_scoping;Username=postgres;Password=${POSTGRES_PASSWORD:-devpass}"
+      Database__MigrateOnStartup: "true"
+      Database__SeedOnStartup: "true"
+      Auth__UseDevelopmentAuth: "true"
 
 volumes:
-  mssql-data:
+  pg-data:

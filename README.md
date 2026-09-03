@@ -8,7 +8,7 @@ ASP.NET Core 8 MVC application for scoping engineering initiatives, pricing them
 src/
   InitiativeScoping.Domain          entities, enums, pure domain rules (RateResolver, ForecastCalculator)
   InitiativeScoping.Application     use-case abstractions (IActualsSource, ICurrentUser), roles/policies
-  InitiativeScoping.Infrastructure  EF Core AppDbContext, migrations (SQL Server), seeding, connectors
+  InitiativeScoping.Infrastructure  EF Core AppDbContext, migrations (PostgreSQL), seeding, connectors
   InitiativeScoping.Web             MVC controllers/views, API controllers, auth wiring
 tests/
   InitiativeScoping.Domain.Tests        xUnit unit tests for domain rules
@@ -71,21 +71,29 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 - **Portfolio** (`/Portfolio`, any signed-in role) – one row per initiative with live forecast (internal/vendor split), current baseline, actuals + adjustments, cost variance and %, burn bar, and badges for threshold breaches, unpriced forecast/actuals and open re-baseline requests; rollups by business unit and by status. Filter by status / business unit; Complete and Cancelled initiatives are hidden unless *Include Complete/Cancelled* is checked. All numbers come from `PortfolioCalculator`, which reuses `ForecastCalculator` and `VarianceCalculator`, so the dashboard always agrees with the initiative pages.
 - **Exports** (Administrator or Finance/PMO) – `/Portfolio/Export?format=csv|xlsx` (respects the current filters) and `/Initiatives/{id}/Export?format=csv|xlsx` (summary, forecast lines, current baseline lines, variance by phase / resource type, actual entries, adjustments). XLSX uses one worksheet per table; CSV concatenates tables separated by a blank line and a `# <table>` marker. Unknown formats return 400. Every export writes an `Export` audit event.
 
-### SQL Server
+### PostgreSQL
 
 ```bash
-docker compose up -d sqlserver
-export ASPNETCORE_ENVIRONMENT=Production
-export ConnectionStrings__Default="Server=localhost,1433;Database=InitiativeScoping;User Id=sa;Password=Dev_Passw0rd!;TrustServerCertificate=True"
-export Database__MigrateOnStartup=true Database__SeedOnStartup=true
+docker compose up -d postgres
+export ASPNETCORE_ENVIRONMENT=Staging          # Production disables Auth:UseDevelopmentAuth
+export ConnectionStrings__Default="Host=localhost;Port=5432;Database=initiative_scoping;Username=postgres;Password=devpass"
+export Database__MigrateOnStartup=true Database__SeedOnStartup=true Auth__UseDevelopmentAuth=true
 dotnet run --project src/InitiativeScoping.Web
 ```
 
-Migrations live in `InitiativeScoping.Infrastructure` and target SQL Server:
+Or run the whole stack as containers: `docker compose up --build` (web on http://localhost:8080, dev auth, migrated + seeded).
+
+Migrations live in `InitiativeScoping.Infrastructure` and target PostgreSQL (Npgsql). `DateTimeOffset` columns map to `timestamp with time zone`, so all timestamps must be UTC (the app uses `TimeProvider.GetUtcNow()` throughout):
 
 ```bash
-dotnet ef migrations add <Name> -p src/InitiativeScoping.Infrastructure -s src/InitiativeScoping.Web
+dotnet ef migrations add <Name> -p src/InitiativeScoping.Infrastructure -s src/InitiativeScoping.Web -o Persistence/Migrations -- --Database:Provider=PostgreSql
 ```
+
+To apply migrations without starting the web server (used by the Cloud Run migrate job): `dotnet InitiativeScoping.Web.dll --migrate`.
+
+## Deployment (GCP)
+
+See [`deploy/gcp/README.md`](deploy/gcp/README.md): Terraform for Cloud Run + Cloud SQL (PostgreSQL 16) + Secret Manager + Artifact Registry + Workload Identity Federation, and `.github/workflows/deploy.yml` which builds the image, runs the migrate job, deploys and smoke-tests `/health`.
 
 ## Authentication (non-development)
 
@@ -95,8 +103,9 @@ Microsoft Entra ID via OpenID Connect (`Microsoft.Identity.Web`). Configure `Azu
 
 | Key | Purpose |
 |-----|---------|
-| `Database:Provider` | `SqlServer` (default) or `Sqlite` |
-| `Database:MigrateOnStartup` | Apply migrations (SQL Server) / create schema (SQLite) at startup |
+| `Database:Provider` | `PostgreSql` (default) or `Sqlite` |
+| `Database:MigrateOnStartup` | Apply migrations (PostgreSQL) / create schema (SQLite) at startup |
+| `ForwardedHeaders:Enabled` | Honour `X-Forwarded-For/Proto` from a TLS-terminating proxy (set in the container image; required for correct OIDC redirect URIs behind Cloud Run) |
 | `Database:SeedOnStartup` | Seed a sample BU, resource types, sizing conversions, and a published rate card |
 | `Auth:UseDevelopmentAuth` | Bypass Entra ID with a fixed dev identity (ignored in Production) |
 | `Variance:DefaultThresholdPct` | Cost-variance % that flags an initiative when it has no threshold of its own (default 10) |
