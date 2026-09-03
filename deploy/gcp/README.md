@@ -36,6 +36,8 @@ GitHub Actions ──(WIF, no keys)──► Artifact Registry ──► Cloud R
 
    ```bash
    printf '%s' "$CLIENT_SECRET" | gcloud secrets versions add "$(terraform output -raw oidc_client_secret_id)" --data-file=-
+   # Instances started before this (with the placeholder) keep their env; roll a new revision:
+   gcloud run services update "$(terraform output -raw cloud_run_service)" --region us-central1 --update-labels oidc-secret-rolled="$(date +%s)"
    ```
 
 6. Run the first migration (seeds reference data when `seed_reference_data = true`):

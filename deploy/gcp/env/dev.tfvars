@@ -1,4 +1,4 @@
-project_id          = "REPLACE-gcp-project-id"
+project_id          = "initiative-scoping-dev"
 region              = "us-central1"
 environment         = "dev"
 db_tier             = "db-f1-micro"

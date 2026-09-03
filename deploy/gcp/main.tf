@@ -64,6 +64,7 @@ resource "google_sql_database_instance" "db" {
   deletion_protection = var.environment == "prod"
 
   settings {
+    edition           = "ENTERPRISE"
     tier              = var.db_tier
     availability_type = var.environment == "prod" ? "REGIONAL" : "ZONAL"
     disk_autoresize   = true
@@ -319,7 +320,7 @@ resource "google_cloud_run_v2_job" "migrate" {
 
 # ---------- GitHub Actions deploy identity (Workload Identity Federation, no SA keys) ----------
 resource "google_service_account" "deployer" {
-  account_id   = "${local.name}-deployer"
+  account_id   = "${local.name}-deploy"
   display_name = "${local.name} GitHub Actions deployer"
 }
 
