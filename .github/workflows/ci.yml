@@ -15,9 +15,17 @@ jobs:
           dotnet-version: 8.0.x
       - run: dotnet restore
       - run: dotnet build --no-restore --configuration Release -warnaserror
-      - run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=results.trx"
+      - run: >
+          dotnet test --no-build --configuration Release
+          --logger "trx;LogFileName=results.trx"
+          --collect:"XPlat Code Coverage" --settings tests/coverage.runsettings
+          --results-directory TestResults
+      - name: Enforce line coverage threshold
+        run: python3 tests/coverage-check.py TestResults 80
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: '**/TestResults/*.trx'
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.cobertura.xml

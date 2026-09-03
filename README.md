@@ -27,6 +27,13 @@ dotnet run --project src/InitiativeScoping.Web
 
 The `Development` environment uses SQLite (`initiative-scoping.dev.db`, created and seeded on startup) and a development auth scheme that signs every request in as `Dev User` with all roles (`appsettings.Development.json` → `Auth:Dev`). No Entra ID setup is needed locally.
 
+CI enforces **≥ 80 % line coverage** (EF migrations excluded). Reproduce locally with:
+
+```bash
+dotnet test --collect:"XPlat Code Coverage" --settings tests/coverage.runsettings --results-directory TestResults
+python3 tests/coverage-check.py TestResults 80
+```
+
 The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes delete `src/InitiativeScoping.Web/initiative-scoping.dev.db*` and restart to rebuild and reseed it.
 
 ### Administration
