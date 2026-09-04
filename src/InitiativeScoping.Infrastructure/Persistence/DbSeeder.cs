@@ -6,10 +6,19 @@ namespace InitiativeScoping.Infrastructure.Persistence;
 
 public static class DbSeeder
 {
+    private static readonly (string Key, string Name)[] TShirtTemplates =
+    [
+        ("S", "Small feature - standard squad"),
+        ("M", "Medium feature - standard squad"),
+        ("L", "Large feature - standard squad"),
+        ("XL", "Extra-large feature - standard squad")
+    ];
+
     public static async Task SeedAsync(AppDbContext db, CancellationToken ct = default)
     {
         if (await db.ResourceTypes.AnyAsync(ct))
         {
+            await BackfillTemplatesAsync(db, ct);
             return;
         }
 
@@ -39,21 +48,9 @@ public static class DbSeeder
             new SizingConversion { Method = SizingMethod.TShirt, Key = "L", Hours = 480 },
             new SizingConversion { Method = SizingMethod.TShirt, Key = "XL", Hours = 960 });
 
-        foreach (var (key, name) in new[] { ("M", "Medium feature - standard squad"), ("L", "Large feature - standard squad") })
+        foreach (var (key, name) in TShirtTemplates)
         {
-            db.AllocationTemplates.Add(new AllocationTemplate
-            {
-                Method = SizingMethod.TShirt, SizeKey = key, Name = name,
-                Lines =
-                [
-                    new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = types[2], Seniority = Seniority.Senior, Percent = 10 },
-                    new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = types[4], Seniority = Seniority.Mid, Percent = 10 },
-                    new AllocationTemplateLine { PhaseName = "Build", ResourceType = types[0], Seniority = Seniority.Senior, Percent = 45 },
-                    new AllocationTemplateLine { PhaseName = "Build", ResourceType = types[1], Seniority = Seniority.Mid, Percent = 15 },
-                    new AllocationTemplateLine { PhaseName = "Build", ResourceType = types[3], Seniority = Seniority.Mid, Percent = 10 },
-                    new AllocationTemplateLine { PhaseName = "Launch", ResourceType = types[0], Seniority = Seniority.Senior, Percent = 10 }
-                ]
-            });
+            db.AllocationTemplates.Add(StandardSquadTemplate(key, name, types[0], types[1], types[2], types[3], types[4]));
         }
 
         var card = new RateCard
@@ -82,4 +79,56 @@ public static class DbSeeder
 
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>
+    /// Databases seeded before S/XL templates existed only have M/L. Add the missing seeded sizes
+    /// when the seeded resource types are still present, so every seeded conversion is selectable.
+    /// </summary>
+    private static async Task BackfillTemplatesAsync(AppDbContext db, CancellationToken ct)
+    {
+        var existing = await db.AllocationTemplates
+            .Where(t => t.Method == SizingMethod.TShirt)
+            .Select(t => t.SizeKey)
+            .ToListAsync(ct);
+        var missing = TShirtTemplates.Where(t => !existing.Contains(t.Key, StringComparer.OrdinalIgnoreCase)).ToArray();
+        if (missing.Length == 0)
+        {
+            return;
+        }
+
+        var types = await db.ResourceTypes.ToDictionaryAsync(t => t.Name, StringComparer.OrdinalIgnoreCase, ct);
+        if (!types.TryGetValue("Software Engineer", out var eng) || !types.TryGetValue("QA Analyst", out var qa)
+            || !types.TryGetValue("Product Manager", out var product) || !types.TryGetValue("Project Manager", out var pm)
+            || !types.TryGetValue("UX Designer", out var ux))
+        {
+            return;
+        }
+
+        foreach (var (key, name) in missing)
+        {
+            if (!await db.SizingConversions.AnyAsync(c => c.Method == SizingMethod.TShirt && c.Key == key, ct))
+            {
+                continue;
+            }
+
+            db.AllocationTemplates.Add(StandardSquadTemplate(key, name, eng, qa, product, pm, ux));
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static AllocationTemplate StandardSquadTemplate(
+        string key, string name, ResourceType eng, ResourceType qa, ResourceType product, ResourceType pm, ResourceType ux) => new()
+    {
+        Method = SizingMethod.TShirt, SizeKey = key, Name = name,
+        Lines =
+        [
+            new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = product, Seniority = Seniority.Senior, Percent = 10 },
+            new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = ux, Seniority = Seniority.Mid, Percent = 10 },
+            new AllocationTemplateLine { PhaseName = "Build", ResourceType = eng, Seniority = Seniority.Senior, Percent = 45 },
+            new AllocationTemplateLine { PhaseName = "Build", ResourceType = qa, Seniority = Seniority.Mid, Percent = 15 },
+            new AllocationTemplateLine { PhaseName = "Build", ResourceType = pm, Seniority = Seniority.Mid, Percent = 10 },
+            new AllocationTemplateLine { PhaseName = "Launch", ResourceType = eng, Seniority = Seniority.Senior, Percent = 10 }
+        ]
+    };
 }
