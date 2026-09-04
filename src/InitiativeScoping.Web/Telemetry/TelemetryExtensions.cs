@@ -11,6 +11,8 @@ public static class TelemetryExtensions
     /// Registers OpenTelemetry tracing and metrics. Signals are exported over OTLP only when
     /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> (or <c>OpenTelemetry:Otlp:Endpoint</c>) is configured,
     /// so local development produces no network traffic unless a collector is running.
+    /// Sampling is always-on: Cloud Run's front end forwards a <c>traceparent</c> with the sampled
+    /// flag cleared, and a parent-based sampler would drop every server span.
     /// </summary>
     public static IServiceCollection AddAppTelemetry(
         this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -39,7 +41,8 @@ public static class TelemetryExtensions
                 .AddEnvironmentVariableDetector())
             .WithTracing(t =>
             {
-                t.AddSource(AppTelemetry.ActivitySourceName)
+                t.SetSampler(new AlwaysOnSampler())
+                    .AddSource(AppTelemetry.ActivitySourceName)
                     .AddSource("Npgsql")
                     .AddAspNetCoreInstrumentation(o =>
                     {
