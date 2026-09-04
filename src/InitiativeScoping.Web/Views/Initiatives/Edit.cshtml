@@ -3,6 +3,7 @@
     var isNew = Model.Id == 0;
     ViewData["Title"] = isNew ? "New Initiative" : "Edit Initiative";
     var businessUnits = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.BusinessUnits;
+    var sizeOptions = (IReadOnlyList<SizeOption>)ViewBag.SizeOptions;
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li><li class="breadcrumb-item active">@ViewData["Title"]</li></ol></nav>
 <h1 class="h3">@ViewData["Title"]</h1>
@@ -41,8 +42,15 @@
         </div>
         <div class="col-md-2">
             <label asp-for="SizeKey" class="form-label"></label>
-            <input asp-for="SizeKey" class="form-control" placeholder="e.g. L" id="size-key" />
+            <select asp-for="SizeKey" class="form-select" id="size-key">
+                <option value="">Select…</option>
+                @foreach (var o in sizeOptions)
+                {
+                    <option value="@o.Key" data-method="@o.Method" selected="@(o.Method == Model.SizingMethod && o.Key == Model.SizeKey)">@o.Label</option>
+                }
+            </select>
             <span asp-validation-for="SizeKey" class="text-danger"></span>
+            <div class="form-text" id="size-key-empty" hidden>No sizes are defined for this method. Ask an administrator to add an allocation template.</div>
         </div>
         <div class="col-md-3">
             <label asp-for="TargetStart" class="form-label"></label>
@@ -71,7 +79,24 @@
         (function () {
             const method = document.getElementById('sizing-method');
             const key = document.getElementById('size-key');
-            function sync() { key.disabled = method.value === '@((int)SizingMethod.Direct)'; if (key.disabled) key.value = ''; }
+            const empty = document.getElementById('size-key-empty');
+            const names = { '@((int)SizingMethod.Direct)': '@SizingMethod.Direct', '@((int)SizingMethod.TShirt)': '@SizingMethod.TShirt', '@((int)SizingMethod.StoryPoints)': '@SizingMethod.StoryPoints' };
+            function sync() {
+                const current = names[method.value] || method.value;
+                const direct = current === '@SizingMethod.Direct';
+                let visible = 0;
+                for (const opt of key.options) {
+                    if (!opt.value) continue;
+                    const show = !direct && opt.dataset.method === current;
+                    opt.hidden = !show;
+                    opt.disabled = !show;
+                    if (show) visible++;
+                    if (!show && opt.selected) key.value = '';
+                }
+                key.disabled = direct;
+                if (direct) key.value = '';
+                empty.hidden = direct || visible > 0;
+            }
             method.addEventListener('change', sync);
             sync();
         })();
