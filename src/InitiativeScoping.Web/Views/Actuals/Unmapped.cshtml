@@ -3,7 +3,7 @@
     ViewData["Title"] = "Unmapped actuals";
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Actuals imports</a></li><li class="breadcrumb-item active">Unmapped</li></ol></nav>
-<div class="d-flex justify-content-between align-items-center mb-2">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
     <h1 class="h3 mb-0">Unmapped actuals</h1>
     <form asp-action="ApplyMappings" method="post">
         <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />

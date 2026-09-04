@@ -8,7 +8,7 @@
     string VarianceClass(decimal? pct, bool over) => over ? "text-danger fw-semibold" : pct is null ? "text-muted" : pct > 0 ? "text-warning-emphasis" : "text-success";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h3 mb-0">Portfolio</h1>
     @if (Model.CanExport && p.Count > 0)
     {
@@ -91,10 +91,11 @@ else
         </div>
     </div>
 
+    <div class="table-responsive">
     <table class="table table-sm align-middle">
         <thead>
         <tr>
-            <th>Initiative</th><th>Business unit</th><th>Status</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th style="min-width: 110px">Burn</th><th>Flags</th>
+            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th style="min-width: 110px">Burn</th><th>Flags</th>
         </tr>
         </thead>
         <tbody>
@@ -103,9 +104,9 @@ else
             var i = r.Initiative;
             <tr class="@(r.ExceedsThreshold ? "table-danger" : "")">
                 <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@i.Id">@i.Name</a></td>
-                <td>@i.BusinessUnit?.Name</td>
-                <td><partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="i.Status" /></td>
-                <td class="text-end">@r.ForecastCost.ToString("C0")<div class="small text-muted">@r.ForecastHours.ToString("N0") h</div></td>
+                <td class="d-none d-md-table-cell">@i.BusinessUnit?.Name</td>
+                <td class="d-none d-md-table-cell"><partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="i.Status" /></td>
+                <td class="text-end d-none d-lg-table-cell">@r.ForecastCost.ToString("C0")<div class="small text-muted">@r.ForecastHours.ToString("N0") h</div></td>
                 <td class="text-end">
                     @if (r.HasBaseline) { @r.BaselineCost.ToString("C0") <div class="small text-muted">v@(r.BaselineVersion) &middot; @r.BaselineHours.ToString("N0") h</div> }
                     else { <span class="text-muted">—</span> }
@@ -133,8 +134,10 @@ else
         </tbody>
         <tfoot class="fw-semibold">
         <tr>
-            <td colspan="3" class="text-end">Total (@p.Count)</td>
-            <td class="text-end">@p.ForecastCost.ToString("C0")</td>
+            <td>Total (@p.Count)</td>
+            <td class="d-none d-md-table-cell"></td>
+            <td class="d-none d-md-table-cell"></td>
+            <td class="text-end d-none d-lg-table-cell">@p.ForecastCost.ToString("C0")</td>
             <td class="text-end">@p.BaselineCost.ToString("C0")</td>
             <td class="text-end">@p.ActualCost.ToString("C0")</td>
             <td class="text-end @VarianceClass(p.CostVariancePct, false)">@Signed(p.CostVariance, "C0")</td>
@@ -144,10 +147,12 @@ else
         </tr>
         </tfoot>
     </table>
+    </div>
 
     <div class="row g-3">
         <div class="col-md-6">
             <div class="card"><div class="card-header">By business unit</div>
+                <div class="table-responsive">
                 <table class="table table-sm mb-0">
                     <thead><tr><th>Business unit</th><th class="text-end">#</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Var %</th></tr></thead>
                     <tbody>
@@ -164,10 +169,12 @@ else
                     }
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
         <div class="col-md-6">
             <div class="card"><div class="card-header">By status</div>
+                <div class="table-responsive">
                 <table class="table table-sm mb-0">
                     <thead><tr><th>Status</th><th class="text-end">#</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Var %</th></tr></thead>
                     <tbody>
@@ -184,6 +191,7 @@ else
                     }
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </div>

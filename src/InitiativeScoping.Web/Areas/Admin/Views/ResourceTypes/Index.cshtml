@@ -4,11 +4,12 @@
 }
 <h1 class="h3">Administration</h1>
 <partial name="_AdminNav" />
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h2 class="h5 mb-0">Resource Types</h2>
     <a class="btn btn-primary btn-sm" asp-action="Create">New resource type</a>
 </div>
 <p class="text-muted small">Seniority is chosen per initiative allocation, not per resource type.</p>
+<div class="table-responsive">
 <table class="table table-sm align-middle">
     <thead><tr><th>Name</th><th>Discipline</th><th>Status</th><th>References</th><th></th></tr></thead>
     <tbody>
@@ -40,3 +41,4 @@
     }
     </tbody>
 </table>
+</div>

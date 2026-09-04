@@ -3,6 +3,7 @@
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }
 <p class="small text-muted">@Model.Total entr@(Model.Total == 1 ? "y" : "ies") &middot; page @Model.Page of @Model.PageCount</p>
+<div class="table-responsive">
 <table class="table table-sm align-middle">
     <thead><tr><th>Reference</th><th>Import</th><th>Project</th><th>Person</th><th>Date</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th>Initiative</th><th style="min-width: 24rem"></th></tr></thead>
     <tbody>
@@ -42,3 +43,4 @@
     }
     </tbody>
 </table>
+</div>

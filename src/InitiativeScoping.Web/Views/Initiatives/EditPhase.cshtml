@@ -46,6 +46,7 @@
 </form>
 
 <h2 class="h5 mt-4">Date history</h2>
+<div class="table-responsive">
 <table class="table table-sm col-lg-8">
     <thead><tr><th>When</th><th>By</th><th>From</th><th>To</th><th>Reason</th></tr></thead>
     <tbody>
@@ -62,4 +63,5 @@
     @if (history.Count == 0) { <tr><td colspan="5" class="text-muted">No date changes recorded.</td></tr> }
     </tbody>
 </table>
+</div>
 @section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }
