@@ -4,10 +4,11 @@
 }
 <h1 class="h3">Administration</h1>
 <partial name="_AdminNav" />
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h2 class="h5 mb-0">Business Units</h2>
     <a class="btn btn-primary btn-sm" asp-action="Create">New business unit</a>
 </div>
+<div class="table-responsive">
 <table class="table table-sm align-middle">
     <thead><tr><th>Name</th><th>Status</th><th>References</th><th></th></tr></thead>
     <tbody>
@@ -38,3 +39,4 @@
     }
     </tbody>
 </table>
+</div>

@@ -32,6 +32,7 @@
     </div>
 </form>
 <p class="small text-muted">@Model.Total event(s) &middot; page @Model.Page of @Model.PageCount</p>
+<div class="table-responsive">
 <table class="table table-sm align-middle">
     <thead><tr><th>When (UTC)</th><th>Entity</th><th>Id</th><th>Action</th><th>User</th><th>Details</th></tr></thead>
     <tbody>
@@ -61,6 +62,7 @@
     }
     </tbody>
 </table>
+</div>
 @if (Model.PageCount > 1)
 {
     <nav><ul class="pagination pagination-sm">

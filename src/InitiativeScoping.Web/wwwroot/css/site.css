@@ -20,3 +20,31 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+.gantt-label {
+  width: 9rem;
+}
+
+@media (max-width: 575.98px) {
+  .gantt-label {
+    width: 5rem;
+  }
+
+  .inline-form {
+    flex-wrap: wrap;
+  }
+
+  .inline-form .form-control,
+  .inline-form .form-select {
+    width: 100% !important;
+    flex: 1 1 100%;
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.6rem;
+  }
+
+  .table-responsive > .table {
+    white-space: nowrap;
+  }
+}

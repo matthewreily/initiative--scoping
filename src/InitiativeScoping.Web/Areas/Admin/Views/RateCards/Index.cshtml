@@ -4,11 +4,12 @@
 }
 <h1 class="h3">Administration</h1>
 <partial name="_AdminNav" />
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h2 class="h5 mb-0">Rate Cards</h2>
     <a class="btn btn-primary btn-sm" asp-action="Create">New rate card</a>
 </div>
 <p class="text-muted small">Forecasts use the latest <em>published</em> card whose effective start is on or before the phase start date.</p>
+<div class="table-responsive">
 <table class="table table-sm align-middle">
     <thead><tr><th>Name</th><th>Effective start</th><th>Status</th><th>Entries</th><th></th></tr></thead>
     <tbody>
@@ -37,3 +38,4 @@
     }
     </tbody>
 </table>
+</div>

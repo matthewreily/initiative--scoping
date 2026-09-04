@@ -13,7 +13,7 @@
         .ThenBy(a => a.Seniority).ToList();
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li><li class="breadcrumb-item active">@i.Name</li></ol></nav>
-<div class="d-flex justify-content-between align-items-start mb-2">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
     <div>
         <h1 class="h3 mb-1">@i.Name <partial name="_StatusBadge" model="i.Status" /></h1>
         <div class="text-muted small">
@@ -24,7 +24,7 @@
             @if (i.VarianceThresholdPct is not null) { <span> &middot; Variance threshold @i.VarianceThresholdPct%</span> }
         </div>
     </div>
-    <div class="text-nowrap">
+    <div class="d-flex flex-wrap gap-1">
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit</a>
@@ -61,7 +61,7 @@
 }
 @if (i.Status == InitiativeStatus.Draft)
 {
-    <div class="alert @(Model.ActivationBlockers.Count == 0 ? "alert-info" : "alert-warning") py-2 d-flex justify-content-between align-items-center">
+    <div class="alert @(Model.ActivationBlockers.Count == 0 ? "alert-info" : "alert-warning") py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
             @if (Model.ActivationBlockers.Count == 0)
             {
@@ -74,7 +74,7 @@
         </div>
         @if (Model.CanManage)
         {
-            <form asp-controller="Lifecycle" asp-action="Activate" asp-route-id="@i.Id" method="post" class="d-flex gap-2 ms-3" onsubmit="return confirm('Activate and capture baseline v1? Scope will be locked.');">
+            <form asp-controller="Lifecycle" asp-action="Activate" asp-route-id="@i.Id" method="post" class="d-flex gap-2 inline-form" onsubmit="return confirm('Activate and capture baseline v1? Scope will be locked.');">
                 <input name="reason" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
                 <button type="submit" class="btn btn-success btn-sm text-nowrap" disabled="@(Model.ActivationBlockers.Count > 0)">Activate</button>
             </form>
@@ -116,14 +116,14 @@ else
             <div class="d-flex flex-wrap gap-2 mt-2">
                 @if (Model.CanManage && i.Status == InitiativeStatus.Active && open is null)
                 {
-                    <form asp-controller="Lifecycle" asp-action="RequestRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2">
+                    <form asp-controller="Lifecycle" asp-action="RequestRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2 inline-form">
                         <input name="reason" aria-label="Reason for re-baseline" class="form-control form-control-sm" placeholder="Reason for re-baseline" style="width: 18rem" required />
                         <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Request re-baseline</button>
                     </form>
                 }
                 @if (Model.CanApproveRebaseline && open?.Status == RebaselineStatus.Pending)
                 {
-                    <form asp-controller="Lifecycle" asp-action="DecideRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2">
+                    <form asp-controller="Lifecycle" asp-action="DecideRebaseline" asp-route-id="@i.Id" method="post" class="d-flex gap-2 inline-form">
                         <input type="hidden" name="requestId" value="@open.Id" />
                         <input name="note" aria-label="Decision note (optional)" class="form-control form-control-sm" placeholder="Decision note (optional)" style="width: 14rem" />
                         <button type="submit" name="approve" value="true" class="btn btn-success btn-sm">Approve</button>
@@ -148,7 +148,7 @@ else
 }
 @if (Model.CanManage && Model.StatusTransitions.Count > 0)
 {
-    <form asp-controller="Lifecycle" asp-action="ChangeStatus" asp-route-id="@i.Id" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3 small" onsubmit="return confirm('Change status to ' + this.to.value + '?');">
+    <form asp-controller="Lifecycle" asp-action="ChangeStatus" asp-route-id="@i.Id" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3 small inline-form" onsubmit="return confirm('Change status to ' + this.to.value + '?');">
         <span class="text-muted">Change status:</span>
         <select name="to" aria-label="New status" class="form-select form-select-sm w-auto">
             @foreach (var s in Model.StatusTransitions) { <option value="@s">@s</option> }
@@ -177,7 +177,7 @@ else
                 @foreach (var bar in Model.Gantt)
                 {
                     <div class="d-flex align-items-center small mb-1">
-                        <div class="text-truncate" style="width: 9rem" title="@bar.Phase.Name">@bar.Phase.Name</div>
+                        <div class="text-truncate gantt-label" title="@bar.Phase.Name">@bar.Phase.Name</div>
                         <div class="flex-grow-1 position-relative" style="height: 1.25rem">
                             <div class="position-absolute bg-primary rounded text-white text-nowrap overflow-hidden px-1"
                                  style="left: @bar.LeftPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; width: @bar.WidthPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; height: 100%; font-size: .7rem; line-height: 1.25rem"
@@ -189,6 +189,7 @@ else
                 }
             </div>
         }
+        <div class="table-responsive">
         <table class="table table-sm align-middle">
             <thead><tr><th>#</th><th>Phase</th><th>Start</th><th>End</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th></th></tr></thead>
             <tbody>
@@ -219,6 +220,7 @@ else
             }
             </tbody>
         </table>
+        </div>
         @if (Model.ScopeWritable)
         {
             <form asp-action="AddPhase" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
@@ -239,6 +241,7 @@ else
         }
 
         <h2 class="h5">Allocations</h2>
+        <div class="table-responsive">
         <table class="table table-sm align-middle">
             <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th><th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th></th></tr></thead>
             <tbody>
@@ -276,6 +279,7 @@ else
                 <tfoot class="fw-semibold"><tr><td colspan="6" class="text-end">Total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.TotalCost.ToString("C0")</td><td></td></tr></tfoot>
             }
         </table>
+        </div>
         @if (Model.ScopeWritable && i.Phases.Count > 0)
         {
             <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
@@ -322,6 +326,7 @@ else
 
     <div class="col-lg-5">
         <h2 class="h5">Rollup by resource type</h2>
+        <div class="table-responsive">
         <table class="table table-sm">
             <thead><tr><th>Resource type</th><th class="text-end">Hours</th><th class="text-end">Cost</th></tr></thead>
             <tbody>
@@ -332,6 +337,7 @@ else
             @if (Model.ByResourceType.Count == 0) { <tr><td colspan="3" class="text-muted">Nothing allocated.</td></tr> }
             </tbody>
         </table>
+        </div>
 
         @if (Model.ScopeWritable)
         {
@@ -369,6 +375,7 @@ else
         }
 
         <h2 class="h5 mt-4">Members</h2>
+        <div class="table-responsive">
         <table class="table table-sm">
             <thead><tr><th>User</th><th>Role</th><th></th></tr></thead>
             <tbody>
@@ -390,6 +397,7 @@ else
             }
             </tbody>
         </table>
+        </div>
         @if (Model.CanManage)
         {
             <form asp-action="AddMember" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
@@ -407,6 +415,7 @@ else
 
         <h2 class="h5 mt-4">Actuals <a class="small fw-normal ms-2" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">details</a></h2>
         @{ var v = Model.Variance; }
+        <div class="table-responsive">
         <table class="table table-sm">
             <tbody>
             <tr><th>Baseline @(v.Baseline is null ? "" : $"v{v.Baseline.Version}")</th><td class="text-end">@v.BaselineHours.ToString("N1") h</td><td class="text-end">@v.BaselineCost.ToString("C0")</td></tr>
@@ -424,12 +433,14 @@ else
             </tr>
             </tbody>
         </table>
+        </div>
         @if (v.ExceedsThreshold) { <div class="alert alert-danger py-1 small">Cost variance exceeds the @v.ThresholdPct% threshold.</div> }
         @if (v.UnpricedEntries > 0) { <div class="alert alert-warning py-1 small">@v.UnpricedEntries actual entr@(v.UnpricedEntries == 1 ? "y is" : "ies are") unpriced (no matching rate).</div> }
         @if (Model.UnmappedForMappedProjects > 0) { <div class="alert alert-warning py-1 small">@Model.UnmappedForMappedProjects imported entr@(Model.UnmappedForMappedProjects == 1 ? "y" : "ies") for this initiative's projects await person mapping and are excluded above.</div> }
 
         <h2 class="h5 mt-4">Source mappings</h2>
         <p class="small text-muted">External project identifiers whose actuals belong to this initiative.</p>
+        <div class="table-responsive">
         <table class="table table-sm">
             <thead><tr><th>Source</th><th>External project id</th><th></th></tr></thead>
             <tbody>
@@ -452,6 +463,7 @@ else
             @if (i.SourceMappings.Count == 0) { <tr><td colspan="3" class="text-muted">No mappings; imported actuals for this initiative will land in the unmapped queue.</td></tr> }
             </tbody>
         </table>
+        </div>
         @if (Model.CanManage)
         {
             <form asp-action="AddSourceMapping" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">

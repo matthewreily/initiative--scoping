@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Initiatives";
 }
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h3 mb-0">Initiatives</h1>
     @if (Model.CanCreate)
     {
@@ -31,11 +31,12 @@
     </div>
 </form>
 
+<div class="table-responsive">
 <table class="table table-sm align-middle">
     <thead>
     <tr>
-        <th>Name</th><th>Business unit</th><th>Status</th><th>Sizing</th><th>Target start</th>
-        <th class="text-end">Phases</th><th class="text-end">Hours</th><th class="text-end">Forecast cost</th>
+        <th>Name</th><th class="d-none d-md-table-cell">Business unit</th><th>Status</th><th class="d-none d-lg-table-cell">Sizing</th><th class="d-none d-md-table-cell">Target start</th>
+        <th class="text-end d-none d-lg-table-cell">Phases</th><th class="text-end d-none d-md-table-cell">Hours</th><th class="text-end">Forecast cost</th>
     </tr>
     </thead>
     <tbody>
@@ -44,12 +45,12 @@
         var i = item.Initiative;
         <tr>
             <td><a asp-action="Details" asp-route-id="@i.Id">@i.Name</a></td>
-            <td>@i.BusinessUnit?.Name</td>
+            <td class="d-none d-md-table-cell">@i.BusinessUnit?.Name</td>
             <td><partial name="_StatusBadge" model="i.Status" /></td>
-            <td>@(i.SizingMethod == SizingMethod.Direct ? "Direct" : $"{i.SizingMethod} {i.SizeKey}")</td>
-            <td>@i.TargetStart.ToString("yyyy-MM-dd")</td>
-            <td class="text-end">@item.PhaseCount</td>
-            <td class="text-end">@item.TotalHours.ToString("N1")</td>
+            <td class="d-none d-lg-table-cell">@(i.SizingMethod == SizingMethod.Direct ? "Direct" : $"{i.SizingMethod} {i.SizeKey}")</td>
+            <td class="d-none d-md-table-cell">@i.TargetStart.ToString("yyyy-MM-dd")</td>
+            <td class="text-end d-none d-lg-table-cell">@item.PhaseCount</td>
+            <td class="text-end d-none d-md-table-cell">@item.TotalHours.ToString("N1")</td>
             <td class="text-end">
                 @item.TotalCost.ToString("C0")
                 @if (!item.IsComplete)
@@ -65,3 +66,4 @@
     }
     </tbody>
 </table>
+</div>

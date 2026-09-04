@@ -2,13 +2,14 @@
 @{
     ViewData["Title"] = "Actuals imports";
 }
-<div class="d-flex justify-content-between align-items-center mb-2">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
     <h1 class="h3 mb-0">Actuals imports</h1>
     <a class="btn btn-outline-warning btn-sm" asp-action="Unmapped">Unmapped entries (@Model.UnmappedCount)</a>
 </div>
 <partial name="~/Views/Initiatives/_Alerts.cshtml" />
 <div class="row g-4">
     <div class="col-lg-8">
+        <div class="table-responsive">
         <table class="table table-sm align-middle">
             <thead><tr><th>#</th><th>Source</th><th>File</th><th>Started</th><th>By</th><th>Status</th><th class="text-end">Records</th><th class="text-end">Unmapped</th><th class="text-end">Skipped</th><th></th></tr></thead>
             <tbody>
@@ -37,6 +38,7 @@
             }
             </tbody>
         </table>
+        </div>
     </div>
     <div class="col-lg-4">
         <div class="card">
