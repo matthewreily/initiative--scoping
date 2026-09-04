@@ -65,7 +65,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     [Authorize(Policy = AppPolicies.CanEditInitiatives)]
     public async Task<IActionResult> Create(CancellationToken ct)
     {
-        await PopulateBusinessUnits(ct);
+        await PopulateEditLists(ct);
         return View("Edit", new InitiativeEditModel());
     }
 
@@ -75,7 +75,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await ValidateInitiative(model, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateBusinessUnits(ct);
+            await PopulateEditLists(ct);
             return View("Edit", model);
         }
 
@@ -113,7 +113,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return Forbid();
         }
 
-        await PopulateBusinessUnits(ct);
+        await PopulateEditLists(ct);
         return View(new InitiativeEditModel
         {
             Id = initiative.Id, Name = initiative.Name, Description = initiative.Description, BusinessUnitId = initiative.BusinessUnitId,
@@ -140,7 +140,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await ValidateInitiative(model, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateBusinessUnits(ct);
+            await PopulateEditLists(ct);
             return View(model);
         }
 
@@ -230,7 +230,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             },
             Phases = new SelectList(orderedPhases, "Id", "Name"),
             ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name"),
-            Conversions = (await db.SizingConversions.ToListAsync(ct)).OrderBy(c => c.Method).ThenBy(c => c.Hours).ToList(),
+            SizeOptions = await SizeOptionsAsync(ct),
             CanEdit = InitiativeAccess.CanEdit(currentUser, initiative),
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
             ScopeEditable = InitiativeAccess.IsScopeEditable(initiative),
@@ -763,7 +763,23 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) => db.PublishedRateCardsAsync(ct);
 
-    private async Task PopulateBusinessUnits(CancellationToken ct) => ViewBag.BusinessUnits = await BusinessUnitListAsync(ct, includeInactive: false);
+    private async Task PopulateEditLists(CancellationToken ct)
+    {
+        ViewBag.BusinessUnits = await BusinessUnitListAsync(ct, includeInactive: false);
+        ViewBag.SizeOptions = await SizeOptionsAsync(ct);
+    }
+
+    // Only sizes backed by an allocation template are selectable; conversions just annotate them with hours.
+    private async Task<IReadOnlyList<SizeOption>> SizeOptionsAsync(CancellationToken ct)
+    {
+        var templates = await db.AllocationTemplates.Select(t => new { t.Method, t.SizeKey }).Distinct().ToListAsync(ct);
+        var conversions = await db.SizingConversions.ToListAsync(ct);
+        return templates
+            .Select(t => new SizeOption(t.Method, t.SizeKey,
+                conversions.FirstOrDefault(c => c.Method == t.Method && c.Key == t.SizeKey)?.Hours))
+            .OrderBy(o => o.Method).ThenBy(o => o.Hours ?? decimal.MaxValue).ThenBy(o => o.Key)
+            .ToList();
+    }
 
     private async Task<SelectList> BusinessUnitListAsync(CancellationToken ct, bool includeInactive)
     {
@@ -785,9 +801,19 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ModelState.AddModelError(nameof(model.BusinessUnitId), "Select an active business unit.");
         }
 
-        if (model.SizingMethod != SizingMethod.Direct && string.IsNullOrWhiteSpace(model.SizeKey))
+        if (model.SizingMethod == SizingMethod.Direct)
+        {
+            return;
+        }
+
+        var key = model.SizeKey?.Trim();
+        if (string.IsNullOrEmpty(key))
         {
             ModelState.AddModelError(nameof(model.SizeKey), "Size is required for relative sizing.");
+        }
+        else if (!await db.AllocationTemplates.AnyAsync(t => t.Method == model.SizingMethod && t.SizeKey == key, ct))
+        {
+            ModelState.AddModelError(nameof(model.SizeKey), $"'{key}' is not a defined {model.SizingMethod} size. Choose a size that has an allocation template.");
         }
     }
 

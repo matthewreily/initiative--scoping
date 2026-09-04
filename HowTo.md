@@ -27,7 +27,7 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 
 ## 2. Scope an initiative (Owner / Contributor)
 
-1. `Initiatives → New`: name, business unit, target start, sizing method (`Direct` hours or a relative size).
+1. `Initiatives → New`: name, business unit, target start, sizing method (`Direct` hours or a relative size). The size dropdown only offers sizes that have an allocation template for the chosen method; add templates under `Admin → Sizing` first.
 2. Add **phases** with planned start/end dates (`Add phase`). Dates can be edited later; every change is kept in the phase's date history.
 3. Add **allocations**: phase, resource type, seniority, location, class (Internal FTE / Vendor), quantity and hours. For relative sizing choose a size and *Apply size* to generate allocations from the template, then adjust.
 4. Watch the **Forecast** panel. Each line is priced from the published rate card in effect on the phase start date. A line marked **Unpriced** has no exact rate-card match – add the missing rate (or change the allocation) before activation.

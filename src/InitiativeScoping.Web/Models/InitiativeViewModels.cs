@@ -25,6 +25,12 @@ public class InitiativeIndexModel
     public bool CanCreate { get; init; }
 }
 
+/// <summary>A size an initiative may pick: one that has an allocation template (and, when configured, a conversion to hours).</summary>
+public record SizeOption(SizingMethod Method, string Key, decimal? Hours)
+{
+    public string Label => Hours is null ? Key : $"{Key} ({Hours:0.#} h)";
+}
+
 public class InitiativeEditModel
 {
     public int Id { get; set; }
@@ -127,7 +133,7 @@ public class InitiativeDetailsModel
     public required ApplySizeModel ApplySize { get; init; }
     public required SelectList Phases { get; init; }
     public required SelectList ResourceTypes { get; init; }
-    public required IReadOnlyList<SizingConversion> Conversions { get; init; }
+    public required IReadOnlyList<SizeOption> SizeOptions { get; init; }
     public bool CanEdit { get; init; }
     public bool CanManage { get; init; }
     public bool ScopeEditable { get; init; }

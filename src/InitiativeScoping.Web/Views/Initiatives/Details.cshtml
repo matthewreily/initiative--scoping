@@ -353,10 +353,13 @@ else
                 </div>
                 <div class="col-3">
                     <label for="sizekey" class="form-label small mb-0">Size</label>
-                    <input name="SizeKey" id="sizekey" class="form-control form-control-sm" value="@Model.ApplySize.SizeKey" list="size-keys" required />
-                    <datalist id="size-keys">
-                        @foreach (var c in Model.Conversions) { <option value="@c.Key">@c.Method @c.Key = @c.Hours h</option> }
-                    </datalist>
+                    <select name="SizeKey" id="sizekey" class="form-select form-select-sm" required>
+                        <option value="">Select…</option>
+                        @foreach (var o in Model.SizeOptions)
+                        {
+                            <option value="@o.Key" data-method="@o.Method" selected="@(o.Method == Model.ApplySize.Method && o.Key == Model.ApplySize.SizeKey)">@o.Label</option>
+                        }
+                    </select>
                 </div>
                 <div class="col-4">
                     <label for="location-2" class="form-label small mb-0">Location</label>
@@ -372,6 +375,23 @@ else
                 </div>
                 <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Apply</button></div>
             </form>
+            <script>
+                (function () {
+                    const method = document.getElementById('method');
+                    const key = document.getElementById('sizekey');
+                    function sync() {
+                        for (const opt of key.options) {
+                            if (!opt.value) continue;
+                            const show = opt.dataset.method === method.value;
+                            opt.hidden = !show;
+                            opt.disabled = !show;
+                            if (!show && opt.selected) key.value = '';
+                        }
+                    }
+                    method.addEventListener('change', sync);
+                    sync();
+                })();
+            </script>
         }
 
         <h2 class="h5 mt-4">Members</h2>
