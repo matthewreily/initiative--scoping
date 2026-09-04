@@ -71,7 +71,8 @@ jobs:
 
       - name: Deploy Cloud Run service
         run: |
-          gcloud run deploy "$SERVICE" --region "$REGION" --container app --image "$IMAGE" --quiet
+          # flags after --container apply to that container only
+          gcloud run deploy "$SERVICE" --region "$REGION" --quiet --container app --image "$IMAGE"
 
       - name: Smoke test
         run: |
