@@ -19,25 +19,35 @@ public class TelemetryTests
     [Fact]
     public async Task Requests_produce_server_spans_and_health_is_filtered()
     {
-        var exported = new List<Activity>();
+        var exported = new SynchronizedActivities();
         await using var factory = new WebAppFactory().WithWebHostBuilder(b => b.ConfigureTestServices(services =>
             services.ConfigureOpenTelemetryTracerProvider((_, tracing) => tracing.AddInMemoryExporter(exported))));
         var client = factory.CreateClient();
 
-        (await client.GetAsync("/health")).EnsureSuccessStatusCode();
-        (await client.GetAsync("/Initiatives")).EnsureSuccessStatusCode();
+        // Activity listeners are process-wide, so the exporter also sees spans from other test
+        // factories running in parallel; correlate by trace id via an inbound traceparent header.
+        var healthTrace = ActivityTraceId.CreateRandom();
+        var pageTrace = ActivityTraceId.CreateRandom();
+        (await client.SendAsync(WithTrace(HttpMethod.Get, "/health", healthTrace))).EnsureSuccessStatusCode();
+        (await client.SendAsync(WithTrace(HttpMethod.Get, "/Initiatives", pageTrace))).EnsureSuccessStatusCode();
         factory.Services.GetRequiredService<TracerProvider>().ForceFlush();
 
-        var server = exported.Where(a => a.Kind == ActivityKind.Server).ToList();
-        Assert.Contains(server, a => a.DisplayName.Contains("Initiatives", StringComparison.OrdinalIgnoreCase)
-                                     || a.GetTagItem("url.path")?.ToString() == "/Initiatives");
-        Assert.DoesNotContain(server, a => a.GetTagItem("url.path")?.ToString() == "/health");
+        var server = exported.Snapshot().Where(a => a.Kind == ActivityKind.Server).ToList();
+        Assert.Contains(server, a => a.TraceId == pageTrace);
+        Assert.DoesNotContain(server, a => a.TraceId == healthTrace);
+    }
+
+    private static HttpRequestMessage WithTrace(HttpMethod method, string path, ActivityTraceId traceId)
+    {
+        var request = new HttpRequestMessage(method, path);
+        request.Headers.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
+        return request;
     }
 
     [Fact]
     public async Task Actuals_import_emits_application_span_with_counts()
     {
-        var exported = new List<Activity>();
+        var exported = new SynchronizedActivities();
         await using var factory = new WebAppFactory().WithWebHostBuilder(b => b.ConfigureTestServices(services =>
             services.ConfigureOpenTelemetryTracerProvider((_, tracing) => tracing.AddInMemoryExporter(exported))));
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -46,11 +56,15 @@ public class TelemetryTests
         var file = new StringContent("ExternalProjectId,ExternalPersonId,WorkDate,Hours\nPRJ-OTEL,PV-OTEL,2026-03-10,8\n");
         file.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
         using var form = new MultipartFormDataContent { { new StringContent(token), "__RequestVerificationToken" }, { file, "File", "otel.csv" } };
-        var response = await client.PostAsync("/Actuals/Import", form);
+        var importTrace = ActivityTraceId.CreateRandom();
+        var request = WithTrace(HttpMethod.Post, "/Actuals/Import", importTrace);
+        request.Content = form;
+        var response = await client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         factory.Services.GetRequiredService<TracerProvider>().ForceFlush();
 
-        var import = Assert.Single(exported, a => a.Source.Name == AppTelemetry.ActivitySourceName && a.DisplayName == "actuals.import");
+        var import = Assert.Single(exported.Snapshot(), a => a.TraceId == importTrace
+            && a.Source.Name == AppTelemetry.ActivitySourceName && a.DisplayName == "actuals.import");
         Assert.Equal("Csv", import.GetTagItem("actuals.source"));
         Assert.Equal(1, import.GetTagItem("actuals.records"));
         Assert.Equal(1, import.GetTagItem("actuals.unmapped"));
@@ -66,5 +80,30 @@ public class TelemetryTests
 
         (await client.GetAsync("/health")).EnsureSuccessStatusCode();
         Assert.Null(factory.Services.GetService<TracerProvider>());
+    }
+
+    // The in-memory exporter appends from request threads; List<T> is not safe for that.
+    private sealed class SynchronizedActivities : ICollection<Activity>
+    {
+        private readonly List<Activity> _items = new();
+
+        public List<Activity> Snapshot()
+        {
+            lock (_items) return _items.ToList();
+        }
+
+        public void Add(Activity item)
+        {
+            lock (_items) _items.Add(item);
+        }
+
+        public int Count { get { lock (_items) return _items.Count; } }
+        public bool IsReadOnly => false;
+        public void Clear() { lock (_items) _items.Clear(); }
+        public bool Contains(Activity item) { lock (_items) return _items.Contains(item); }
+        public void CopyTo(Activity[] array, int arrayIndex) { lock (_items) _items.CopyTo(array, arrayIndex); }
+        public bool Remove(Activity item) { lock (_items) return _items.Remove(item); }
+        public IEnumerator<Activity> GetEnumerator() => Snapshot().GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
