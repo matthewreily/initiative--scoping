@@ -90,7 +90,7 @@ public static class DbSeeder
             .Where(t => t.Method == SizingMethod.TShirt)
             .Select(t => t.SizeKey)
             .ToListAsync(ct);
-        var missing = TShirtTemplates.Where(t => !existing.Contains(t.Key, StringComparer.OrdinalIgnoreCase)).ToArray();
+        var missing = TShirtTemplates.Where(t => !existing.Contains(t.Key, StringComparer.Ordinal)).ToArray();
         if (missing.Length == 0)
         {
             return;
