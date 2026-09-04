@@ -68,6 +68,34 @@ variable "enable_telemetry" {
   default     = true
 }
 
+variable "alert_emails" {
+  type        = list(string)
+  description = "Email addresses notified by the Cloud Monitoring alert policies. Empty disables alerting (policies without a channel are silent)."
+  default     = []
+}
+
+variable "alert_5xx_per_minute" {
+  type        = number
+  description = "Sustained 5xx responses per minute that trigger the server-error alert."
+  default     = 1
+}
+
+variable "alert_latency_p95_ms" {
+  type        = number
+  description = "p95 request latency (ms) that triggers the latency alert after 10 minutes."
+  default     = 3000
+}
+
+variable "alert_sql_cpu_utilization" {
+  type    = number
+  default = 0.8
+}
+
+variable "alert_sql_disk_utilization" {
+  type    = number
+  default = 0.85
+}
+
 variable "otel_collector_image" {
   type        = string
   description = "Google-Built OpenTelemetry Collector image for the sidecar."
