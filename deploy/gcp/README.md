@@ -81,6 +81,10 @@ Where to look:
 
 Changing `otel-collector.yaml` requires `terraform apply` (new secret version) and a new revision (the next deploy). Set `enable_telemetry = false` in the tfvars to drop the sidecar; the app then keeps in-process instrumentation but exports nothing. The deploy workflow targets the app container explicitly (`gcloud run deploy --container app --image ...`) so the sidecar definition managed by Terraform is preserved.
 
+## Cookie key encryption (Cloud KMS)
+
+ASP.NET Core Data Protection keys live in the `DataProtectionKeys` table so all Cloud Run instances/revisions share them. Terraform creates a KMS key ring `<app>-<env>` with a symmetric key `data-protection` (90-day automatic rotation, `prevent_destroy`), grants the runtime service account `roles/cloudkms.cryptoKeyEncrypterDecrypter`, and passes the key as `DataProtection__KmsKeyName` so the app wraps every key before storing it. KMS rotation is transparent: ciphertext records the key version, and old versions remain decryptable until you disable them. The migrate job does not need the key.
+
 ## Costs (rough, us-central1)
 
 - dev: Cloud Run scale-to-zero (≈ $0 idle) + `db-f1-micro` Cloud SQL (≈ $10/mo) + Artifact Registry storage.

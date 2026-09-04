@@ -47,6 +47,7 @@ resource "google_project_service" "apis" {
     "monitoring.googleapis.com",
     "logging.googleapis.com",
     "telemetry.googleapis.com",
+    "cloudkms.googleapis.com",
   ])
   service            = each.value
   disable_on_destroy = false
@@ -186,6 +187,31 @@ resource "google_secret_manager_secret_iam_member" "run_otel_config" {
   member    = "serviceAccount:${google_service_account.run.email}"
 }
 
+# ASP.NET Core Data Protection keys (cookie/antiforgery/TempData encryption) are stored in the DB
+# wrapped with this KMS key. Key rings cannot be deleted; the key rotates automatically.
+resource "google_kms_key_ring" "app" {
+  name       = local.name
+  location   = var.region
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_kms_crypto_key" "data_protection" {
+  name            = "data-protection"
+  key_ring        = google_kms_key_ring.app.id
+  purpose         = "ENCRYPT_DECRYPT"
+  rotation_period = "7776000s" # 90 days
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_kms_crypto_key_iam_member" "run_data_protection" {
+  crypto_key_id = google_kms_crypto_key.data_protection.id
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:${google_service_account.run.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "run_conn" {
   secret_id = google_secret_manager_secret.conn.id
   role      = "roles/secretmanager.secretAccessor"
@@ -273,6 +299,10 @@ resource "google_cloud_run_v2_service" "web" {
       env {
         name  = "Database__MigrateOnStartup"
         value = "false"
+      }
+      env {
+        name  = "DataProtection__KmsKeyName"
+        value = google_kms_crypto_key.data_protection.id
       }
       env {
         name  = "AzureAd__TenantId"
@@ -368,6 +398,7 @@ resource "google_cloud_run_v2_service" "web" {
     google_secret_manager_secret_version.otel_config,
     google_secret_manager_secret_iam_member.run_otel_config,
     google_project_iam_member.run_telemetry,
+    google_kms_crypto_key_iam_member.run_data_protection,
   ]
 }
 
