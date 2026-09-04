@@ -34,7 +34,7 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     public async Task Admin_pages_render_for_administrator()
     {
         var client = factory.CreateClient(NoRedirect);
-        foreach (var path in new[] { "/Admin/BusinessUnits", "/Admin/ResourceTypes", "/Admin/RateCards", "/Admin/Sizing" })
+        foreach (var path in new[] { "/Admin/BusinessUnits", "/Admin/Disciplines", "/Admin/ResourceTypes", "/Admin/RateCards", "/Admin/Sizing" })
         {
             var response = await client.GetAsync(path);
             Assert.True(response.IsSuccessStatusCode, $"{path} returned {(int)response.StatusCode}");
@@ -71,15 +71,147 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     public async Task Resource_type_names_are_unique_case_insensitively()
     {
         var client = factory.CreateClient(NoRedirect);
+        var disciplineId = await SeededDisciplineIdAsync();
         var name = $"Type-{Guid.NewGuid():N}"[..14];
         var first = await PostFormAsync(client, "/Admin/ResourceTypes/Create", "/Admin/ResourceTypes/Create",
-            new() { ["Name"] = name, ["Discipline"] = "Data", ["IsActive"] = "true" });
+            new() { ["Name"] = name, ["DisciplineId"] = disciplineId.ToString(), ["IsActive"] = "true" });
         Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
 
         var second = await PostFormAsync(client, "/Admin/ResourceTypes/Create", "/Admin/ResourceTypes/Create",
-            new() { ["Name"] = name.ToUpperInvariant(), ["Discipline"] = "Data", ["IsActive"] = "true" });
+            new() { ["Name"] = name.ToUpperInvariant(), ["DisciplineId"] = disciplineId.ToString(), ["IsActive"] = "true" });
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         Assert.Contains("already exists", await second.Content.ReadAsStringAsync());
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var created = await db.ResourceTypes.SingleAsync(t => t.Name == name);
+        Assert.Equal(disciplineId, created.DisciplineId);
+    }
+
+    [Fact]
+    public async Task Resource_type_requires_an_existing_active_discipline()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var name = $"Type-{Guid.NewGuid():N}"[..14];
+
+        var missing = await PostFormAsync(client, "/Admin/ResourceTypes/Create", "/Admin/ResourceTypes/Create",
+            new() { ["Name"] = name, ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.OK, missing.StatusCode);
+        Assert.Contains("Select a discipline", await missing.Content.ReadAsStringAsync());
+
+        var unknown = await PostFormAsync(client, "/Admin/ResourceTypes/Create", "/Admin/ResourceTypes/Create",
+            new() { ["Name"] = name, ["DisciplineId"] = "999999", ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.OK, unknown.StatusCode);
+        Assert.Contains("Select an active discipline", await unknown.Content.ReadAsStringAsync());
+
+        int inactiveId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var inactive = new Discipline { Name = $"Inactive-{Guid.NewGuid():N}"[..20], IsActive = false };
+            db.Disciplines.Add(inactive);
+            await db.SaveChangesAsync();
+            inactiveId = inactive.Id;
+        }
+
+        var inactiveResponse = await PostFormAsync(client, "/Admin/ResourceTypes/Create", "/Admin/ResourceTypes/Create",
+            new() { ["Name"] = name, ["DisciplineId"] = inactiveId.ToString(), ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.OK, inactiveResponse.StatusCode);
+        Assert.Contains("Select an active discipline", await inactiveResponse.Content.ReadAsStringAsync());
+
+        using var verify = factory.Services.CreateScope();
+        Assert.False(await verify.ServiceProvider.GetRequiredService<AppDbContext>().ResourceTypes.AnyAsync(t => t.Name == name));
+    }
+
+    [Fact]
+    public async Task Resource_type_assigned_to_inactive_discipline_stays_editable()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        int typeId, disciplineId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var discipline = new Discipline { Name = $"Legacy-{Guid.NewGuid():N}"[..20] };
+            var type = new ResourceType { Name = $"Type-{Guid.NewGuid():N}"[..14], Discipline = discipline };
+            db.ResourceTypes.Add(type);
+            await db.SaveChangesAsync();
+            discipline.IsActive = false;
+            await db.SaveChangesAsync();
+            typeId = type.Id;
+            disciplineId = discipline.Id;
+        }
+
+        var page = await client.GetAsync($"/Admin/ResourceTypes/Edit/{typeId}");
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("(inactive)", html);
+        Assert.Contains($"value=\"{disciplineId}\"", html);
+
+        var renamed = $"Renamed-{Guid.NewGuid():N}"[..14];
+        var save = await PostFormAsync(client, $"/Admin/ResourceTypes/Edit/{typeId}", $"/Admin/ResourceTypes/Edit/{typeId}",
+            new() { ["Name"] = renamed, ["DisciplineId"] = disciplineId.ToString(), ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.Redirect, save.StatusCode);
+
+        using var verify = factory.Services.CreateScope();
+        var saved = await verify.ServiceProvider.GetRequiredService<AppDbContext>().ResourceTypes.SingleAsync(t => t.Id == typeId);
+        Assert.Equal(renamed, saved.Name);
+        Assert.Equal(disciplineId, saved.DisciplineId);
+    }
+
+    [Fact]
+    public async Task Discipline_crud_is_audited_and_names_are_unique()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var name = $"Disc-{Guid.NewGuid():N}"[..14];
+        var create = await PostFormAsync(client, "/Admin/Disciplines/Create", "/Admin/Disciplines/Create",
+            new() { ["Name"] = $" {name} ", ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+
+        var duplicate = await PostFormAsync(client, "/Admin/Disciplines/Create", "/Admin/Disciplines/Create",
+            new() { ["Name"] = name.ToUpperInvariant(), ["IsActive"] = "true" });
+        Assert.Equal(HttpStatusCode.OK, duplicate.StatusCode);
+        Assert.Contains("already exists", await duplicate.Content.ReadAsStringAsync());
+
+        int id;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var discipline = await db.Disciplines.SingleAsync(d => d.Name == name);
+            id = discipline.Id;
+            Assert.True(await db.AuditEvents.AnyAsync(a => a.Entity == nameof(Discipline) && a.EntityId == id.ToString() && a.Action == "Create"));
+        }
+
+        var edit = await PostFormAsync(client, $"/Admin/Disciplines/Edit/{id}", $"/Admin/Disciplines/Edit/{id}",
+            new() { ["Name"] = name, ["IsActive"] = "false" });
+        Assert.Equal(HttpStatusCode.Redirect, edit.StatusCode);
+
+        var delete = await PostFormAsync(client, "/Admin/Disciplines", $"/Admin/Disciplines/Delete/{id}", new());
+        Assert.Equal(HttpStatusCode.Redirect, delete.StatusCode);
+
+        using var verify = factory.Services.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Null(await verifyDb.Disciplines.FindAsync(id));
+        var actions = await verifyDb.AuditEvents.Where(a => a.Entity == nameof(Discipline) && a.EntityId == id.ToString()).Select(a => a.Action).ToListAsync();
+        Assert.Equal(["Create", "Delete", "Update"], actions.Order());
+    }
+
+    [Fact]
+    public async Task Referenced_discipline_cannot_be_deleted()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var disciplineId = await SeededDisciplineIdAsync();
+
+        var response = await PostFormAsync(client, "/Admin/Disciplines", $"/Admin/Disciplines/Delete/{disciplineId}", new());
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var verify = factory.Services.CreateScope();
+        Assert.NotNull(await verify.ServiceProvider.GetRequiredService<AppDbContext>().Disciplines.FindAsync(disciplineId));
+    }
+
+    private async Task<int> SeededDisciplineIdAsync()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.ResourceTypes.Select(t => t.DisciplineId).FirstAsync();
     }
 
     [Fact]

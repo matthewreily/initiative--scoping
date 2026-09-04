@@ -1,7 +1,7 @@
-@model ResourceTypeEditModel
+@model DisciplineEditModel
 @{
     var isNew = Model.Id == 0;
-    ViewData["Title"] = isNew ? "New Resource Type" : "Edit Resource Type";
+    ViewData["Title"] = isNew ? "New Discipline" : "Edit Discipline";
 }
 <h1 class="h3">Administration</h1>
 <partial name="_AdminNav" />
@@ -12,13 +12,6 @@
         <label asp-for="Name" class="form-label"></label>
         <input asp-for="Name" class="form-control" />
         <span asp-validation-for="Name" class="text-danger"></span>
-    </div>
-    <div class="mb-3">
-        <label asp-for="DisciplineId" class="form-label">Discipline</label>
-        <select asp-for="DisciplineId" asp-items="Model.Disciplines" class="form-select">
-            <option value="">Select a discipline…</option>
-        </select>
-        <span asp-validation-for="DisciplineId" class="text-danger"></span>
     </div>
     <div class="form-check mb-3">
         <input asp-for="IsActive" class="form-check-input" />

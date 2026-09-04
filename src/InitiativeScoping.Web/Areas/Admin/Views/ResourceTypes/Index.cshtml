@@ -17,7 +17,7 @@
     {
         <tr>
             <td>@item.Type.Name</td>
-            <td>@item.Type.Discipline</td>
+            <td>@item.Type.Discipline!.Name</td>
             <td>@(item.Type.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
             <td>@item.ReferenceCount</td>
             <td class="text-end">
