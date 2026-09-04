@@ -365,6 +365,9 @@ resource "google_cloud_run_v2_service" "web" {
     google_secret_manager_secret_version.oidc_client_secret_placeholder,
     google_secret_manager_secret_iam_member.run_conn,
     google_secret_manager_secret_iam_member.run_oidc,
+    google_secret_manager_secret_version.otel_config,
+    google_secret_manager_secret_iam_member.run_otel_config,
+    google_project_iam_member.run_telemetry,
   ]
 }
 
