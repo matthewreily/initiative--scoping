@@ -1,13 +1,17 @@
+using Google.Cloud.Kms.V1;
 using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Application.Exports;
 using InitiativeScoping.Infrastructure.Actuals;
+using InitiativeScoping.Infrastructure.DataProtection;
 using InitiativeScoping.Infrastructure.Exports;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace InitiativeScoping.Infrastructure;
 
@@ -35,6 +39,18 @@ public static class DependencyInjection
         services.AddDataProtection()
             .SetApplicationName("InitiativeScoping")
             .PersistKeysToDbContext<AppDbContext>();
+
+        // Keys at rest are wrapped with a Cloud KMS key when one is configured (production);
+        // local/dev runs without KMS store them unwrapped.
+        var kmsKeyName = configuration["DataProtection:KmsKeyName"];
+        if (!string.IsNullOrWhiteSpace(kmsKeyName))
+        {
+            var keyName = CryptoKeyName.Parse(kmsKeyName);
+            services.TryAddSingleton(_ => KeyManagementServiceClient.Create());
+            services.AddSingleton<IConfigureOptions<KeyManagementOptions>>(sp =>
+                new ConfigureOptions<KeyManagementOptions>(o =>
+                    o.XmlEncryptor = new KmsXmlEncryptor(sp.GetRequiredService<KeyManagementServiceClient>(), keyName)));
+        }
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuditLog, DbAuditLog>();
