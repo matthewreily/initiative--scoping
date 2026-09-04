@@ -3,6 +3,7 @@ using InitiativeScoping.Application.Exports;
 using InitiativeScoping.Infrastructure.Actuals;
 using InitiativeScoping.Infrastructure.Exports;
 using InitiativeScoping.Infrastructure.Persistence;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,11 @@ public static class DependencyInjection
                 options.UseNpgsql(connectionString, x => x.MigrationsAssembly("InitiativeScoping.Infrastructure"));
             }
         });
+
+        // Cookies (auth, antiforgery, TempData) must decrypt on any instance/revision, so keys live in the DB, not the container FS.
+        services.AddDataProtection()
+            .SetApplicationName("InitiativeScoping")
+            .PersistKeysToDbContext<AppDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuditLog, DbAuditLog>();
