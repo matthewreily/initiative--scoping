@@ -54,6 +54,8 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         audit.Record(Entity, id, AuditActions.StatusChange, new { From = InitiativeStatus.Draft, To = InitiativeStatus.Active });
         audit.Record(Entity, id, AuditActions.Baseline, BaselineDiff(baseline));
         await db.SaveChangesAsync(ct);
+        AppTelemetry.StatusChanges.Add(1, new KeyValuePair<string, object?>("to", nameof(InitiativeStatus.Active)));
+        AppTelemetry.BaselinesCaptured.Add(1, new KeyValuePair<string, object?>("kind", "activation"));
         return RedirectWithSuccess($"Initiative activated. Forecast baseline v{baseline.Version} captured ({baseline.TotalHours:N1} h, {baseline.TotalCost:C0}).", id);
     }
 
@@ -99,6 +101,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         initiative.Status = to;
         audit.Record(Entity, id, AuditActions.StatusChange, new { From = from, To = to, Note = note });
         await db.SaveChangesAsync(ct);
+        AppTelemetry.StatusChanges.Add(1, new KeyValuePair<string, object?>("to", to.ToString()));
         return RedirectWithSuccess($"Status changed from {from} to {to}.", id);
     }
 
@@ -271,6 +274,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         open.ResultingBaseline = baseline;
         audit.Record(Entity, id, AuditActions.Baseline, BaselineDiff(baseline, open.Id));
         await db.SaveChangesAsync(ct);
+        AppTelemetry.BaselinesCaptured.Add(1, new KeyValuePair<string, object?>("kind", "rebaseline"));
         return RedirectWithSuccess($"Forecast baseline v{baseline.Version} captured ({baseline.TotalHours:N1} h, {baseline.TotalCost:C0}). Scope is locked.", id);
     }
 

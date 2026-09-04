@@ -61,3 +61,15 @@ variable "github_repository" {
   description = "owner/repo allowed to deploy via Workload Identity Federation."
   default     = "matthewreily/initiative--scoping"
 }
+
+variable "enable_telemetry" {
+  type        = bool
+  description = "Run the Google-Built OpenTelemetry Collector as a Cloud Run sidecar and export traces/metrics to Cloud Trace / Cloud Monitoring."
+  default     = true
+}
+
+variable "otel_collector_image" {
+  type        = string
+  description = "Google-Built OpenTelemetry Collector image for the sidecar."
+  default     = "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.159.0"
+}

@@ -1,3 +1,4 @@
+using InitiativeScoping.Application;
 using System.Text;
 using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Domain.Entities;
@@ -12,6 +13,10 @@ public class ActualsImporter(AppDbContext db, ICurrentUser currentUser, IAuditLo
 {
     public async Task<ActualsImport> ImportAsync(string source, IReadOnlyList<ExternalTimeEntry> entries, string? fileName, CancellationToken ct)
     {
+        using var activity = AppTelemetry.ActivitySource.StartActivity("actuals.import");
+        activity?.SetTag("actuals.source", source);
+        activity?.SetTag("actuals.entries", entries.Count);
+
         var import = new ActualsImport
         {
             Source = source,
@@ -92,6 +97,15 @@ public class ActualsImporter(AppDbContext db, ICurrentUser currentUser, IAuditLo
         audit.Record(nameof(ActualsImport), import.Id, AuditActions.Import,
             new { import.Source, import.FileName, import.RecordCount, import.UnmappedCount, import.SkippedCount });
         await db.SaveChangesAsync(ct);
+
+        var sourceTag = new KeyValuePair<string, object?>("actuals.source", source);
+        AppTelemetry.ActualsImports.Add(1, sourceTag, new("status", import.Status.ToString()));
+        AppTelemetry.ActualsRecords.Add(import.RecordCount - import.UnmappedCount, sourceTag, new("outcome", "mapped"));
+        AppTelemetry.ActualsRecords.Add(import.UnmappedCount, sourceTag, new("outcome", "unmapped"));
+        AppTelemetry.ActualsRecords.Add(import.SkippedCount, sourceTag, new("outcome", "skipped"));
+        activity?.SetTag("actuals.records", import.RecordCount);
+        activity?.SetTag("actuals.unmapped", import.UnmappedCount);
+        activity?.SetTag("actuals.skipped", import.SkippedCount);
         return import;
     }
 
