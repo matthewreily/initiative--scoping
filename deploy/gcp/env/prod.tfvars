@@ -7,3 +7,4 @@ max_instances       = 5
 seed_reference_data = false
 entra_tenant_id     = "REPLACE-tenant-guid"
 entra_client_id     = "REPLACE-app-registration-client-id"
+alert_emails        = ["REPLACE-oncall@example.com"]

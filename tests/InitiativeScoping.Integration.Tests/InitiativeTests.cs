@@ -86,6 +86,33 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
+    public async Task Relative_sizing_only_accepts_sizes_with_a_template()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var buId = (await SeededBusinessUnitIdAsync()).ToString();
+
+        var form = await client.GetStringAsync("/Initiatives/Create");
+        Assert.Contains("<select class=\"form-select\" id=\"size-key\"", form);
+        Assert.Contains("data-method=\"TShirt\"", form);
+        Assert.DoesNotContain("value=\"XXXL\"", form);
+
+        var undefined = await PostFormAsync(client, "/Initiatives/Create", "/Initiatives/Create", new()
+        {
+            ["Name"] = "Undefined size", ["BusinessUnitId"] = buId,
+            ["SizingMethod"] = nameof(SizingMethod.TShirt), ["SizeKey"] = "XXXL", ["TargetStart"] = "2026-01-05"
+        });
+        Assert.Equal(HttpStatusCode.OK, undefined.StatusCode);
+        Assert.Contains("not a defined TShirt size", await undefined.Content.ReadAsStringAsync());
+
+        var defined = await PostFormAsync(client, "/Initiatives/Create", "/Initiatives/Create", new()
+        {
+            ["Name"] = "Defined size", ["BusinessUnitId"] = buId,
+            ["SizingMethod"] = nameof(SizingMethod.TShirt), ["SizeKey"] = "L", ["TargetStart"] = "2026-01-05"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, defined.StatusCode);
+    }
+
+    [Fact]
     public async Task Phases_and_allocations_produce_priced_forecast()
     {
         var client = factory.CreateClient(NoRedirect);

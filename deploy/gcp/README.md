@@ -85,6 +85,21 @@ Changing `otel-collector.yaml` requires `terraform apply` (new secret version) a
 
 ASP.NET Core Data Protection keys live in the `DataProtectionKeys` table so all Cloud Run instances/revisions share them. Terraform creates a KMS key ring `<app>-<env>` with a symmetric key `data-protection` (90-day automatic rotation, `prevent_destroy`), grants the runtime service account `roles/cloudkms.cryptoKeyEncrypterDecrypter`, and passes the key as `DataProtection__KmsKeyName` so the app wraps every key before storing it. KMS rotation is transparent: ciphertext records the key version, and old versions remain decryptable until you disable them. The migrate job does not need the key.
 
+## Alerting (Cloud Monitoring)
+
+`monitoring.tf` provisions an email notification channel per address in `alert_emails` plus these policies (all created only when `alert_emails` is non-empty — a policy with no channel is silent):
+
+| Policy | Condition |
+|--------|-----------|
+| `/health` check failing | Uptime check (Oregon/Iowa/Europe, every 5 min) on `https://<service>/health` fails for 5 min |
+| 5xx responses | `run.googleapis.com/request_count` with `response_code_class=5xx` above `alert_5xx_per_minute` (default 1/min) |
+| p95 request latency | `run.googleapis.com/request_latencies` p95 above `alert_latency_p95_ms` (default 3000 ms) for 10 min |
+| Application error log | Any `severity >= ERROR` container log entry (log-match, ≤1 notification per 15 min) |
+| Cloud SQL unavailable | `database/up < 1` for 5 min |
+| Cloud SQL CPU / disk high | utilization above `alert_sql_cpu_utilization` / `alert_sql_disk_utilization` for 15 min |
+
+Each recipient must confirm the verification email Cloud Monitoring sends before notifications are delivered; policies are visible at https://console.cloud.google.com/monitoring/alerting. Pausing the database (`gcloud sql instances patch <instance> --activation-policy NEVER`) will fire the Cloud SQL and health policies — set `alert_emails = []` and apply first if you plan to leave dev off.
+
 ## Costs (rough, us-central1)
 
 - dev: Cloud Run scale-to-zero (≈ $0 idle) + `db-f1-micro` Cloud SQL (≈ $10/mo) + Artifact Registry storage.
@@ -94,4 +109,4 @@ ASP.NET Core Data Protection keys live in the `DataProtectionKeys` table so all 
 
 - Custom domain / Cloud Armor / IAP in front of Cloud Run (Entra ID enforces auth in-app; add IAP if you want a network-level gate as well).
 - Cloud Scheduler trigger for nightly actuals imports (Phase 5 Planview connector) — will reuse the Cloud Run Job pattern.
-- Alerting policies (recommend uptime check on `/health` + log-based alert on `Serilog` `ERR`, or an SLO on `http.server.request.duration` now that metrics flow to Cloud Monitoring).
+- SLO/burn-rate alerts on `http.server.request.duration` and a curated Cloud Monitoring dashboard (the alert policies above cover availability, errors and saturation).
