@@ -19,14 +19,29 @@ public class BusinessUnitListItem
     public int ReferenceCount { get; init; }
 }
 
+public class DisciplineEditModel
+{
+    public int Id { get; set; }
+    [Required, StringLength(100)]
+    public string Name { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+}
+
+public class DisciplineListItem
+{
+    public required Discipline Discipline { get; init; }
+    public int ReferenceCount { get; init; }
+}
+
 public class ResourceTypeEditModel
 {
     public int Id { get; set; }
     [Required, StringLength(200)]
     public string Name { get; set; } = string.Empty;
-    [Required, StringLength(100)]
-    public string Discipline { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Select a discipline."), Range(1, int.MaxValue, ErrorMessage = "Select a discipline.")]
+    public int? DisciplineId { get; set; }
     public bool IsActive { get; set; } = true;
+    public IReadOnlyList<SelectListItem> Disciplines { get; set; } = [];
 }
 
 public class ResourceTypeListItem

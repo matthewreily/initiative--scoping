@@ -9,11 +9,19 @@ public class BusinessUnit
     public bool IsActive { get; set; } = true;
 }
 
+public class Discipline
+{
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
 public class ResourceType
 {
     public int Id { get; set; }
     public required string Name { get; set; }
-    public required string Discipline { get; set; }
+    public int DisciplineId { get; set; }
+    public Discipline? Discipline { get; set; }
     public bool IsActive { get; set; } = true;
 }
 

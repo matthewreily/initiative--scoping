@@ -16,13 +16,20 @@ public static class DbSeeder
         var bu = new BusinessUnit { Name = "Boarding" };
         db.BusinessUnits.Add(bu);
 
+        var engineering = new Discipline { Name = "Engineering" };
+        var qa = new Discipline { Name = "QA" };
+        var product = new Discipline { Name = "Product" };
+        var pm = new Discipline { Name = "PM" };
+        var design = new Discipline { Name = "Design" };
+        db.Disciplines.AddRange(engineering, qa, product, pm, design);
+
         var types = new[]
         {
-            new ResourceType { Name = "Software Engineer", Discipline = "Engineering" },
-            new ResourceType { Name = "QA Analyst", Discipline = "QA" },
-            new ResourceType { Name = "Product Manager", Discipline = "Product" },
-            new ResourceType { Name = "Project Manager", Discipline = "PM" },
-            new ResourceType { Name = "UX Designer", Discipline = "Design" }
+            new ResourceType { Name = "Software Engineer", Discipline = engineering },
+            new ResourceType { Name = "QA Analyst", Discipline = qa },
+            new ResourceType { Name = "Product Manager", Discipline = product },
+            new ResourceType { Name = "Project Manager", Discipline = pm },
+            new ResourceType { Name = "UX Designer", Discipline = design }
         };
         db.ResourceTypes.AddRange(types);
 

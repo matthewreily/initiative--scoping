@@ -19,10 +19,11 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 ## 1. First-time setup (Administrator)
 
 1. **Business Units** – `Admin → Business Units`. Create one per cost centre/BU. Deactivate rather than delete once initiatives reference a BU.
-2. **Resource Types** – `Admin → Resource Types` (e.g. *Software Engineer*, *QA*, *Product Manager*), optionally grouped by discipline.
-3. **Rate Card** – `Admin → Rate Cards → New`. Give it a name and effective start date, then add entries: one row per *Resource type × Business unit × Seniority × Location × Internal/Vendor*. Use *Import CSV* for bulk entry (download the template from the card page). **Publish** when complete; rates are only used from published cards. To change rates later, create a new card with a later effective date and retire the old one – history is preserved and existing baselines are unaffected.
-4. **Sizing conversions** – `Admin → Sizing` maps T-shirt sizes / story points to total hours; **allocation templates** define how those hours split across phases and resource types.
-5. **People** (needed for actuals) – `Admin → People`. Each person carries an external id (Planview/Jira resource id), resource type, BU, seniority, location and class so imported hours can be priced.
+2. **Disciplines** – `Admin → Disciplines` (e.g. *Engineering*, *QA*, *Product*, *Design*). Every resource type must belong to exactly one discipline, so create these first. Deactivate a discipline to hide it from new resource types; it can only be deleted once no resource type references it.
+3. **Resource Types** – `Admin → Resource Types` (e.g. *Software Engineer*, *QA Analyst*, *Product Manager*), each assigned to a discipline from the list above.
+4. **Rate Card** – `Admin → Rate Cards → New`. Give it a name and effective start date, then add entries: one row per *Resource type × Business unit × Seniority × Location × Internal/Vendor*. Use *Import CSV* for bulk entry (download the template from the card page). **Publish** when complete; rates are only used from published cards. To change rates later, create a new card with a later effective date and retire the old one – history is preserved and existing baselines are unaffected.
+5. **Sizing conversions** – `Admin → Sizing` maps T-shirt sizes / story points to total hours; **allocation templates** define how those hours split across phases and resource types.
+6. **People** (needed for actuals) – `Admin → People`. Each person carries an external id (Planview/Jira resource id), resource type, BU, seniority, location and class so imported hours can be priced.
 
 ## 2. Scope an initiative (Owner / Contributor)
 

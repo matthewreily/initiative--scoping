@@ -6,6 +6,7 @@ namespace InitiativeScoping.Infrastructure.Persistence;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
+    public DbSet<Discipline> Disciplines => Set<Discipline>();
     public DbSet<ResourceType> ResourceTypes => Set<ResourceType>();
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<RateCardEntry> RateCardEntries => Set<RateCardEntry>();
@@ -45,11 +46,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Name).IsUnique();
         });
 
+        b.Entity<Discipline>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100).UseCollation(ciCollation);
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
         b.Entity<ResourceType>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
-            e.Property(x => x.Discipline).HasMaxLength(100);
             e.HasIndex(x => x.Name).IsUnique();
+            e.HasOne(x => x.Discipline).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<RateCard>(e =>
