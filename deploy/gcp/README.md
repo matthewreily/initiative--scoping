@@ -66,6 +66,21 @@ GitHub Actions ──(WIF, no keys)──► Artifact Registry ──► Cloud R
 
 Roll back by re-running the workflow from an older commit, or `gcloud run services update-traffic <service> --to-revisions <rev>=100` (migrations are additive, so the previous image keeps working).
 
+## Observability (OpenTelemetry)
+
+When `enable_telemetry = true` (default), the Cloud Run service runs two containers:
+
+- `app` — the application, with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317` so its OpenTelemetry SDK exports traces and metrics over OTLP/gRPC to the sidecar.
+- `otel-collector` — the [Google-Built OpenTelemetry Collector](https://cloud.google.com/stackdriver/docs/instrumentation/google-built-otel) (`otel_collector_image`), configured from `otel-collector.yaml` (stored as the Secret Manager secret `<app>-<env>-otel-collector-config` and mounted at `/etc/otelcol-google/config.yaml`). It forwards to the Telemetry API using the runtime service account (`roles/cloudtrace.agent`, `roles/monitoring.metricWriter`, `roles/telemetry.writer`). The app container starts only after the collector's health check (`:13133`) passes.
+
+Where to look:
+
+- **Traces** — Cloud Trace → Trace explorer, filter `service.name = initiative-scoping`. Server spans, Npgsql spans and the custom `actuals.import` span appear per request.
+- **Metrics** — Cloud Monitoring → Metrics explorer, `workload.googleapis.com/...` (e.g. `http.server.request.duration`, `initiative_scoping.actuals.records`).
+- **Logs** — Cloud Logging already collects the container's stdout; Serilog lines include `trace=<id> span=<id>` for correlation with Cloud Trace.
+
+Changing `otel-collector.yaml` requires `terraform apply` (new secret version) and a new revision (the next deploy). Set `enable_telemetry = false` in the tfvars to drop the sidecar; the app then keeps in-process instrumentation but exports nothing. The deploy workflow targets the app container explicitly (`gcloud run deploy --container app --image ...`) so the sidecar definition managed by Terraform is preserved.
+
 ## Costs (rough, us-central1)
 
 - dev: Cloud Run scale-to-zero (≈ $0 idle) + `db-f1-micro` Cloud SQL (≈ $10/mo) + Artifact Registry storage.
@@ -75,4 +90,4 @@ Roll back by re-running the workflow from an older commit, or `gcloud run servic
 
 - Custom domain / Cloud Armor / IAP in front of Cloud Run (Entra ID enforces auth in-app; add IAP if you want a network-level gate as well).
 - Cloud Scheduler trigger for nightly actuals imports (Phase 5 Planview connector) — will reuse the Cloud Run Job pattern.
-- Alerting policies (recommend uptime check on `/health` + log-based alert on `Serilog` `ERR`).
+- Alerting policies (recommend uptime check on `/health` + log-based alert on `Serilog` `ERR`, or an SLO on `http.server.request.duration` now that metrics flow to Cloud Monitoring).

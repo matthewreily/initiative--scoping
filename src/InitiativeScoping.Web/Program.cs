@@ -1,6 +1,7 @@
 using InitiativeScoping.Infrastructure;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Authorization;
+using InitiativeScoping.Web.Telemetry;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, lc) => lc
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.Console());
+    .Enrich.With<ActivityEnricher>()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} trace={TraceId} span={SpanId}{NewLine}{Exception}"));
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddAppAuth(builder.Configuration, builder.Environment);
+builder.Services.AddAppTelemetry(builder.Configuration, builder.Environment);
 builder.Services.AddControllersWithViews();
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = builder.Configuration.GetValue<long?>("Limits:MaxRequestBodyBytes") ?? 12 * 1024 * 1024);
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = builder.Configuration.GetValue<long?>("Limits:MaxRequestBodyBytes") ?? 12 * 1024 * 1024);

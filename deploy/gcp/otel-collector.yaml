@@ -1,0 +1,80 @@
+# Google-Built OpenTelemetry Collector config for the Cloud Run sidecar.
+# The app exports OTLP to localhost:4317; the collector forwards traces and metrics to
+# Google Cloud (Cloud Trace / Cloud Monitoring) via the Telemetry API using the runtime
+# service account. Logs are not routed here: the app writes structured logs to stdout,
+# which Cloud Run already ships to Cloud Logging with trace/span IDs attached.
+# Based on docs/examples/configuration/config-standard.yaml in
+# GoogleCloudPlatform/opentelemetry-operations-collector.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:4317
+      http:
+        endpoint: localhost:4318
+
+processors:
+  batch:
+    send_batch_max_size: 200
+    send_batch_size: 200
+    timeout: 5s
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 65
+    spike_limit_percentage: 20
+  resourcedetection:
+    detectors: [gcp]
+    timeout: 10s
+  resource/gcp_project_id:
+    attributes:
+      - action: insert
+        key: gcp.project_id
+        value: ${GOOGLE_CLOUD_PROJECT}
+  metricstarttime:
+    strategy: subtract_initial_point
+  transform/collision:
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(attributes["exported_location"], attributes["location"])
+          - delete_key(attributes, "location")
+          - set(attributes["exported_cluster"], attributes["cluster"])
+          - delete_key(attributes, "cluster")
+          - set(attributes["exported_namespace"], attributes["namespace"])
+          - delete_key(attributes, "namespace")
+          - set(attributes["exported_job"], attributes["job"])
+          - delete_key(attributes, "job")
+          - set(attributes["exported_instance"], attributes["instance"])
+          - delete_key(attributes, "instance")
+          - set(attributes["exported_project_id"], attributes["project_id"])
+          - delete_key(attributes, "project_id")
+
+exporters:
+  otlp_grpc:
+    endpoint: telemetry.googleapis.com:443
+    balancer_name: pick_first
+    auth:
+      authenticator: googleclientauth
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  googleclientauth:
+
+service:
+  extensions: [health_check, googleclientauth]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, resource/gcp_project_id, memory_limiter, batch]
+      exporters: [otlp_grpc]
+    metrics:
+      receivers: [otlp]
+      processors:
+        - resourcedetection
+        - resource/gcp_project_id
+        - transform/collision
+        - metricstarttime
+        - memory_limiter
+        - batch
+      exporters: [otlp_grpc]

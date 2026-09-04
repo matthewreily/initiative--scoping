@@ -43,6 +43,10 @@ resource "google_project_service" "apis" {
     "iamcredentials.googleapis.com",
     "cloudscheduler.googleapis.com",
     "sts.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "monitoring.googleapis.com",
+    "logging.googleapis.com",
+    "telemetry.googleapis.com",
   ])
   service            = each.value
   disable_on_destroy = false
@@ -146,6 +150,42 @@ resource "google_project_iam_member" "run_sql" {
   member  = "serviceAccount:${google_service_account.run.email}"
 }
 
+# The OpenTelemetry collector sidecar exports traces/metrics with the runtime identity.
+resource "google_project_iam_member" "run_telemetry" {
+  for_each = var.enable_telemetry ? toset([
+    "roles/cloudtrace.agent",
+    "roles/monitoring.metricWriter",
+    "roles/telemetry.writer",
+  ]) : toset([])
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.run.email}"
+}
+
+# Collector config is mounted into the sidecar as a file; Cloud Run only mounts files from
+# Secret Manager (or GCS), so the non-sensitive YAML lives in a secret.
+resource "google_secret_manager_secret" "otel_config" {
+  count     = var.enable_telemetry ? 1 : 0
+  secret_id = "${local.name}-otel-collector-config"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "otel_config" {
+  count       = var.enable_telemetry ? 1 : 0
+  secret      = google_secret_manager_secret.otel_config[0].id
+  secret_data = file("${path.module}/otel-collector.yaml")
+}
+
+resource "google_secret_manager_secret_iam_member" "run_otel_config" {
+  count     = var.enable_telemetry ? 1 : 0
+  secret_id = google_secret_manager_secret.otel_config[0].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "run_conn" {
   secret_id = google_secret_manager_secret.conn.id
   role      = "roles/secretmanager.secretAccessor"
@@ -176,10 +216,39 @@ resource "google_cloud_run_v2_service" "web" {
         instances = [local.sql_conn]
       }
     }
+    dynamic "volumes" {
+      for_each = var.enable_telemetry ? [1] : []
+      content {
+        name = "otel-config"
+        secret {
+          secret = google_secret_manager_secret.otel_config[0].secret_id
+          items {
+            version = "latest"
+            path    = "config.yaml"
+          }
+        }
+      }
+    }
     containers {
-      image = "${local.image_repo}:${var.image_tag}"
+      name       = "app"
+      image      = "${local.image_repo}:${var.image_tag}"
+      depends_on = var.enable_telemetry ? ["otel-collector"] : []
       ports {
         container_port = 8080
+      }
+      dynamic "env" {
+        for_each = var.enable_telemetry ? [1] : []
+        content {
+          name  = "OTEL_EXPORTER_OTLP_ENDPOINT"
+          value = "http://localhost:4317"
+        }
+      }
+      dynamic "env" {
+        for_each = var.enable_telemetry ? [1] : []
+        content {
+          name  = "OTEL_RESOURCE_ATTRIBUTES"
+          value = "deployment.environment=${var.environment},cloud.region=${var.region}"
+        }
       }
       resources {
         limits   = { cpu = "1", memory = "512Mi" }
@@ -244,6 +313,44 @@ resource "google_cloud_run_v2_service" "web" {
           path = "/health"
         }
         period_seconds = 30
+      }
+    }
+
+    # Google-built OpenTelemetry collector sidecar: receives OTLP from the app on localhost and
+    # forwards traces/metrics to Cloud Trace / Cloud Monitoring (config: otel-collector.yaml).
+    dynamic "containers" {
+      for_each = var.enable_telemetry ? [1] : []
+      content {
+        name  = "otel-collector"
+        image = var.otel_collector_image
+        args  = ["--config=/etc/otelcol-google/config.yaml"]
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
+        }
+        resources {
+          limits   = { cpu = "1", memory = "256Mi" }
+          cpu_idle = true
+        }
+        volume_mounts {
+          name       = "otel-config"
+          mount_path = "/etc/otelcol-google"
+        }
+        startup_probe {
+          http_get {
+            path = "/"
+            port = 13133
+          }
+          period_seconds    = 5
+          failure_threshold = 6
+        }
+        liveness_probe {
+          http_get {
+            path = "/"
+            port = 13133
+          }
+          period_seconds = 30
+        }
       }
     }
   }
