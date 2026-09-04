@@ -105,6 +105,8 @@ Each recipient must confirm the verification email Cloud Monitoring sends before
 - dev: Cloud Run scale-to-zero (≈ $0 idle) + `db-f1-micro` Cloud SQL (≈ $10/mo) + Artifact Registry storage.
 - prod: 1 always-on Cloud Run instance (≈ $15–25/mo) + `db-custom-1-3840` regional HA (≈ $90–120/mo). Drop `availability_type` to `ZONAL` in `main.tf` to halve the database cost if HA is not needed.
 
+Actual spend: the Cloud Billing API has no cost endpoint, so spend is read from the BigQuery billing export. One-time setup: create a dataset (`bq mk --dataset --location=US <project>:billing_export`), then in the console enable Billing → Billing export → Standard usage cost → that dataset (no API/Terraform for this toggle). Data appears within ~24h and is not backfilled. Then `deploy/gcp/spend.sh [project] [dataset] [YYYY-MM]` prints month-to-date cost, credits and net by service. dev is wired to `initiative-scoping-dev.billing_export`.
+
 ## Not included yet
 
 - Custom domain / Cloud Armor / IAP in front of Cloud Run (Entra ID enforces auth in-app; add IAP if you want a network-level gate as well).
