@@ -21,6 +21,7 @@ public sealed record PortfolioRow(
     public decimal ActualCost => Variance.ActualCost;
     public decimal CostVariance => Variance.CostVariance;
     public decimal? CostVariancePct => Variance.CostVariancePct;
+    public decimal EacCost => Variance.EacCost;
     public bool ExceedsThreshold => Variance.ExceedsThreshold;
     public bool HasUnpricedForecast => !Forecast.IsComplete;
     public bool HasUnpricedActuals => Variance.UnpricedEntries > 0;
@@ -52,6 +53,7 @@ public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
     public decimal BaselineHours => Rows.Sum(r => r.BaselineHours);
     public decimal BaselineCost => Rows.Sum(r => r.BaselineCost);
     public decimal ActualHours => Rows.Sum(r => r.ActualHours);
+    public decimal EacCost => Rows.Where(r => r.HasBaseline).Sum(r => r.EacCost);
     public decimal ActualCost => Rows.Sum(r => r.ActualCost);
     public decimal CostVariance => ActualCost - BaselineCost;
     public decimal? CostVariancePct => BaselineCost == 0 ? null : Math.Round(CostVariance / BaselineCost * 100m, 1);

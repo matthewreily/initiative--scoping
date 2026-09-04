@@ -211,4 +211,48 @@ public class VarianceCalculatorTests
         Assert.Null(v.CostVariancePct);
         Assert.False(v.ExceedsThreshold);
     }
+
+    [Fact]
+    public void Etc_is_schedule_based_and_eac_adds_actuals()
+    {
+        // Build: Mar 1-31 (31 days), Launch: Apr 1-30. As of Mar 21, 10 of 31 Build days remain.
+        var entries = new List<ActualEntry> { Entry(new DateOnly(2026, 3, 5), 100m, 15_000m) };
+        var asOf = new DateOnly(2026, 3, 21);
+
+        var v = VarianceCalculator.Calculate(Initiative(threshold: 10m), entries, [], Types, asOf: asOf);
+
+        Assert.Equal(asOf, v.AsOf);
+        Assert.Equal(0.3226m, VarianceCalculator.RemainingFraction(Initiative().Phases.First(), asOf));
+        var build = Assert.Single(v.ByPhase, r => r.Label == "Build");
+        Assert.Equal(6_452m, build.EtcCost);
+        Assert.Equal(64.52m, build.EtcHours);
+        Assert.Equal(21_452m, build.EacCost);
+        var launch = Assert.Single(v.ByPhase, r => r.Label == "Launch");
+        Assert.Equal(10_000m, launch.EtcCost);
+        Assert.Equal(10_000m, launch.EacCost);
+
+        Assert.Equal(16_452m, v.EtcCost);
+        Assert.Equal(31_452m, v.EacCost);
+        Assert.Equal(1_452m, v.EacCostVariance);
+        Assert.Equal(4.8m, v.EacCostVariancePct);
+        Assert.False(v.EacExceedsThreshold);
+        Assert.False(v.ExceedsThreshold);
+
+        // By resource type uses each line's phase.
+        Assert.Equal(6_452m, Assert.Single(v.ByResourceType, r => r.Label == "Engineer").EtcCost);
+        Assert.Equal(10_000m, Assert.Single(v.ByResourceType, r => r.Label == "QA").EtcCost);
+
+        // After everything has finished ETC is zero and EAC equals actuals; before start, ETC equals the baseline.
+        var done = VarianceCalculator.Calculate(Initiative(), entries, [], Types, asOf: new DateOnly(2026, 6, 1));
+        Assert.Equal(0m, done.EtcCost);
+        Assert.Equal(15_000m, done.EacCost);
+        var early = VarianceCalculator.Calculate(Initiative(), [], [], Types, asOf: new DateOnly(2026, 1, 1));
+        Assert.Equal(30_000m, early.EtcCost);
+        Assert.Equal(30_000m, early.EacCost);
+
+        // Overspend projected past threshold is flagged even when spent-to-date is not.
+        var hot = VarianceCalculator.Calculate(Initiative(threshold: 10m), [Entry(new DateOnly(2026, 3, 5), 100m, 25_000m)], [], Types, asOf: asOf);
+        Assert.False(hot.ExceedsThreshold);
+        Assert.True(hot.EacExceedsThreshold);
+    }
 }

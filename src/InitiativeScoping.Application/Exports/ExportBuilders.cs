@@ -11,12 +11,14 @@ public static class PortfolioExport
             ["Id", "Initiative", "Business unit", "Status", "Target start", "Baseline version",
              "Forecast hours", "Forecast cost", "Internal forecast cost", "Vendor forecast cost",
              "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Cost variance", "Cost variance %",
+             "ETC cost", "EAC cost", "Projected variance", "Projected variance %",
              "Threshold %", "Over threshold", "Unpriced forecast", "Unpriced actuals"],
             portfolio.Rows.Select(r => (IReadOnlyList<object?>)
             [
                 r.Initiative.Id, r.Initiative.Name, r.Initiative.BusinessUnit?.Name, r.Initiative.Status.ToString(), r.Initiative.TargetStart, r.BaselineVersion,
                 r.ForecastHours, r.ForecastCost, r.InternalForecastCost, r.VendorForecastCost,
                 r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.CostVariance, r.CostVariancePct,
+                r.Variance.EtcCost, r.Variance.EacCost, r.Variance.EacCostVariance, r.Variance.EacCostVariancePct,
                 r.Variance.ThresholdPct, r.ExceedsThreshold, r.HasUnpricedForecast, r.HasUnpricedActuals
             ]).ToList());
 
@@ -64,6 +66,13 @@ public static class InitiativeExport
             ["Actual cost", variance.ActualCost],
             ["Cost variance", variance.CostVariance],
             ["Cost variance %", variance.CostVariancePct],
+            ["ETC as of", variance.AsOf],
+            ["ETC hours", variance.EtcHours],
+            ["ETC cost", variance.EtcCost],
+            ["EAC hours", variance.EacHours],
+            ["EAC cost", variance.EacCost],
+            ["Projected variance", variance.EacCostVariance],
+            ["Projected variance %", variance.EacCostVariancePct],
             ["Threshold %", variance.ThresholdPct],
             ["Over threshold", variance.ExceedsThreshold],
             ["Unpriced actual rows", variance.UnpricedEntries]
@@ -107,6 +116,6 @@ public static class InitiativeExport
 
     private static ExportTable VarianceTable(string name, IReadOnlyList<VarianceRow> rows) =>
         new(name,
-            ["Group", "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Hours variance", "Cost variance", "Cost variance %"],
-            rows.Select(r => (IReadOnlyList<object?>)[r.Label, r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.HoursVariance, r.CostVariance, r.CostVariancePct]).ToList());
+            ["Group", "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Hours variance", "Cost variance", "Cost variance %", "ETC hours", "ETC cost", "EAC hours", "EAC cost", "Projected variance", "Projected variance %"],
+            rows.Select(r => (IReadOnlyList<object?>)[r.Label, r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.HoursVariance, r.CostVariance, r.CostVariancePct, r.EtcHours, r.EtcCost, r.EacHours, r.EacCost, r.EacCostVariance, r.EacCostVariancePct]).ToList());
 }

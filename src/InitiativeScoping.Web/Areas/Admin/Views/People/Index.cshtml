@@ -9,13 +9,25 @@
     <h2 class="h5 mb-0">People roster</h2>
     <div class="d-flex gap-2">
         <form method="get" class="d-flex gap-2">
-            <input name="search" value="@search" class="form-control form-control-sm" placeholder="Name or external ID" />
+            <input name="search" value="@search" class="form-control form-control-sm" placeholder="Name or external ID" aria-label="Search people" />
             <button type="submit" class="btn btn-outline-secondary btn-sm">Search</button>
         </form>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Export">Export CSV</a>
         <a class="btn btn-primary btn-sm" asp-action="Create">New person</a>
     </div>
 </div>
 <p class="text-muted small">Imported actuals are matched to people by external ID and priced from the person's resource type, seniority, location, class and business unit.</p>
+<div class="card mb-3">
+    <div class="card-header py-2">Import CSV</div>
+    <div class="card-body">
+        <form asp-action="Import" method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="file" name="File" accept=".csv,text/csv" class="form-control form-control-sm w-auto" aria-label="People CSV file" required />
+            <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
+            <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
+        </form>
+        <p class="text-muted small mt-2 mb-0">Columns: DisplayName, ExternalIds (';'-separated), ResourceType, BusinessUnit, Seniority, Location, ResourcingClass (Internal/Vendor), IsActive (optional). Rows update an existing person matched by external ID, else by name; otherwise a new person is added. The whole file is rejected if any row is invalid.</p>
+    </div>
+</div>
 <table class="table table-sm align-middle">
     <thead><tr><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Status</th><th>Actuals</th><th></th></tr></thead>
     <tbody>

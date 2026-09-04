@@ -59,7 +59,10 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.EndsWith(".csv", csv.Content.Headers.ContentDisposition!.FileName!.Trim('"'));
         var text = await csv.Content.ReadAsStringAsync();
         Assert.StartsWith("# Initiatives", text);
-        Assert.Contains($"{id},Export {tag},Boarding,Active,2026-03-01,1,200,24000,24000,0,200,24000,5,500,-23500,-97.9,10,No,No,No", text);
+        var row = Assert.Single(text.Split('\n'), l => l.StartsWith($"{id},Export {tag},"));
+        Assert.StartsWith($"{id},Export {tag},Boarding,Active,2026-03-01,1,200,24000,24000,0,200,24000,5,500,-23500,-97.9,", row);
+        Assert.EndsWith(",10,No,No,No", row.TrimEnd('\r'));
+        Assert.Contains("ETC cost,EAC cost,Projected variance,Projected variance %", text);
         Assert.Contains("# By status", text);
 
         var xlsx = await client.GetAsync("/Portfolio/Export?format=XLSX");

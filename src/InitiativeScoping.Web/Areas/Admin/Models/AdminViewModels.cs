@@ -141,6 +141,12 @@ public class PersonEditModel
     public bool IsActive { get; set; } = true;
 }
 
+public class PeopleImportModel
+{
+    [Required]
+    public IFormFile? File { get; set; }
+}
+
 public class PersonListItem
 {
     public required Person Person { get; init; }
