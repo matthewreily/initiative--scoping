@@ -12,14 +12,15 @@ public static class PortfolioExport
              "Forecast hours", "Forecast cost", "Internal forecast cost", "Vendor forecast cost",
              "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Cost variance", "Cost variance %",
              "ETC cost", "EAC cost", "Projected variance", "Projected variance %",
-             "Threshold %", "Over threshold", "Unpriced forecast", "Unpriced actuals"],
+             "Threshold %", "Over threshold", "Unpriced forecast", "Unpriced actuals", "Planning mode", "Target end"],
             portfolio.Rows.Select(r => (IReadOnlyList<object?>)
             [
                 r.Initiative.Id, r.Initiative.Name, r.Initiative.BusinessUnit?.Name, r.Initiative.Status.ToString(), r.Initiative.TargetStart, r.BaselineVersion,
                 r.ForecastHours, r.ForecastCost, r.InternalForecastCost, r.VendorForecastCost,
                 r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.CostVariance, r.CostVariancePct,
                 r.Variance.EtcCost, r.Variance.EacCost, r.Variance.EacCostVariance, r.Variance.EacCostVariancePct,
-                r.Variance.ThresholdPct, r.ExceedsThreshold, r.HasUnpricedForecast, r.HasUnpricedActuals
+                r.Variance.ThresholdPct, r.ExceedsThreshold, r.HasUnpricedForecast, r.HasUnpricedActuals,
+                r.Initiative.PlanningMode.ToString(), r.Initiative.TargetEnd
             ]).ToList());
 
         return
@@ -55,7 +56,9 @@ public static class InitiativeExport
             ["Business unit", initiative.BusinessUnit?.Name],
             ["Status", initiative.Status.ToString()],
             ["Sizing", initiative.SizingMethod == Domain.Enums.SizingMethod.Direct ? "Direct" : $"{initiative.SizingMethod} {initiative.SizeKey}"],
+            ["Planning mode", initiative.PlanningMode.ToString()],
             ["Target start", initiative.TargetStart],
+            ["Target end", initiative.TargetEnd],
             ["Forecast hours", forecast.TotalHours],
             ["Forecast cost", forecast.TotalCost],
             ["Forecast complete", forecast.IsComplete],

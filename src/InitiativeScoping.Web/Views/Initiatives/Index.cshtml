@@ -35,7 +35,7 @@
 <table class="table table-sm align-middle">
     <thead>
     <tr>
-        <th>Name</th><th class="d-none d-md-table-cell">Business unit</th><th>Status</th><th class="d-none d-lg-table-cell">Sizing</th><th class="d-none d-md-table-cell">Target start</th>
+        <th>Name</th><th class="d-none d-md-table-cell">Business unit</th><th>Status</th><th class="d-none d-lg-table-cell">Sizing</th><th class="d-none d-md-table-cell">Schedule</th>
         <th class="text-end d-none d-lg-table-cell">Phases</th><th class="text-end d-none d-md-table-cell">Hours</th><th class="text-end">Forecast cost</th>
     </tr>
     </thead>
@@ -48,7 +48,7 @@
             <td class="d-none d-md-table-cell">@i.BusinessUnit?.Name</td>
             <td><partial name="_StatusBadge" model="i.Status" /></td>
             <td class="d-none d-lg-table-cell">@(i.SizingMethod == SizingMethod.Direct ? "Direct" : $"{i.SizingMethod} {i.SizeKey}")</td>
-            <td class="d-none d-md-table-cell">@i.TargetStart.ToString("yyyy-MM-dd")</td>
+            <td class="d-none d-md-table-cell">@i.TargetStart.ToString("yyyy-MM-dd")@if (i.PlanningMode == PlanningMode.FixedDuration && i.TargetEnd is not null) { <span class="text-nowrap"> → @i.TargetEnd.Value.ToString("yyyy-MM-dd")</span> <span class="badge bg-light text-dark border" title="Fixed duration">Fixed</span> }</td>
             <td class="text-end d-none d-lg-table-cell">@item.PhaseCount</td>
             <td class="text-end d-none d-md-table-cell">@item.TotalHours.ToString("N1")</td>
             <td class="text-end">

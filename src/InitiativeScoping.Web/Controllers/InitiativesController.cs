@@ -16,7 +16,7 @@ namespace InitiativeScoping.Web.Controllers;
 
 [Authorize(Policy = AppPolicies.CanView)]
 [AutoValidateAntiforgeryToken]
-public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IConfiguration config) : Controller
+public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IConfiguration config, IWorkCalendar workCalendar) : Controller
 {
     private const string Entity = nameof(Initiative);
     private const string ScopeLockedMessage = "Scope is locked; it can only change in Draft or during an approved re-baseline.";
@@ -87,7 +87,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             SponsoringTeam = model.SponsoringTeam?.Trim(),
             SizingMethod = model.SizingMethod,
             SizeKey = model.SizingMethod == SizingMethod.Direct ? null : model.SizeKey?.Trim(),
+            PlanningMode = model.PlanningMode,
             TargetStart = model.TargetStart,
+            TargetEnd = model.PlanningMode == PlanningMode.FixedDuration ? model.TargetEnd : null,
             VarianceThresholdPct = model.VarianceThresholdPct,
             CreatedBy = currentUser.UserId,
             CreatedAt = clock.GetUtcNow()
@@ -95,7 +97,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         initiative.Members.Add(new InitiativeMember { UserId = currentUser.UserId, Role = InitiativeMemberRole.Owner });
         db.Initiatives.Add(initiative);
         await db.SaveChangesAsync(ct);
-        audit.Record(Entity, initiative.Id, AuditActions.Create, new { initiative.Name, initiative.BusinessUnitId, initiative.SizingMethod, initiative.SizeKey, initiative.TargetStart });
+        audit.Record(Entity, initiative.Id, AuditActions.Create, new { initiative.Name, initiative.BusinessUnitId, initiative.SizingMethod, initiative.SizeKey, initiative.PlanningMode, initiative.TargetStart, initiative.TargetEnd });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Initiative '{initiative.Name}' created. Add phases and allocations to build the forecast.", initiative.Id);
     }
@@ -118,7 +120,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             Id = initiative.Id, Name = initiative.Name, Description = initiative.Description, BusinessUnitId = initiative.BusinessUnitId,
             SponsoringTeam = initiative.SponsoringTeam, SizingMethod = initiative.SizingMethod, SizeKey = initiative.SizeKey,
-            TargetStart = initiative.TargetStart, VarianceThresholdPct = initiative.VarianceThresholdPct
+            PlanningMode = initiative.PlanningMode, TargetStart = initiative.TargetStart, TargetEnd = initiative.TargetEnd,
+            VarianceThresholdPct = initiative.VarianceThresholdPct
         });
     }
 
@@ -138,6 +141,21 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         model.Id = id;
         await ValidateInitiative(model, ct);
+        var scheduleChanged = initiative.PlanningMode != model.PlanningMode || initiative.TargetStart != model.TargetStart || initiative.TargetEnd != model.TargetEnd;
+        if (scheduleChanged && !InitiativeAccess.IsScopeEditable(initiative))
+        {
+            ModelState.AddModelError(nameof(model.TargetStart), ScopeLockedMessage);
+        }
+
+        if (model.PlanningMode == PlanningMode.FixedDuration && model.TargetEnd is not null && initiative.Phases.Count > 0)
+        {
+            var tiling = DurationCalculator.ValidateTiling(model.TargetStart, model.TargetEnd.Value, initiative.Phases);
+            if (tiling is not null)
+            {
+                ModelState.AddModelError(nameof(model.TargetEnd), $"Existing phases must tile the new window: {tiling} Adjust the phases first.");
+            }
+        }
+
         if (!ModelState.IsValid)
         {
             await PopulateEditLists(ct);
@@ -151,11 +169,36 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         initiative.SponsoringTeam = model.SponsoringTeam?.Trim();
         initiative.SizingMethod = model.SizingMethod;
         initiative.SizeKey = model.SizingMethod == SizingMethod.Direct ? null : model.SizeKey?.Trim();
+        initiative.PlanningMode = model.PlanningMode;
         initiative.TargetStart = model.TargetStart;
+        initiative.TargetEnd = model.PlanningMode == PlanningMode.FixedDuration ? model.TargetEnd : null;
         initiative.VarianceThresholdPct = model.VarianceThresholdPct;
-        audit.Record(Entity, initiative.Id, AuditActions.Update, new { Before = before, After = Snapshot(initiative) });
+        var recomputed = 0;
+        if (scheduleChanged && initiative.PlanningMode == PlanningMode.FixedDuration)
+        {
+            var calendar = await workCalendar.GetAsync(ct);
+            // Allocations created in effort-driven mode keep their hours: derive the staffing % that reproduces them.
+            foreach (var allocation in initiative.Allocations.Where(a => a.AllocationPercent is null))
+            {
+                var phase = initiative.Phases.First(p => p.Id == allocation.PhaseId);
+                allocation.AllocationPercent = DurationCalculator.PercentFor(
+                    allocation.EstimatedHours,
+                    DurationCalculator.WorkingDays(phase.PlannedStart, phase.PlannedEnd, calendar.Holidays), calendar.HoursPerDay);
+            }
+
+            recomputed = RecomputeFixedDurationHours(initiative, initiative.Allocations, calendar);
+        }
+        else if (scheduleChanged && initiative.PlanningMode == PlanningMode.EffortDriven)
+        {
+            foreach (var allocation in initiative.Allocations)
+            {
+                allocation.AllocationPercent = null;
+            }
+        }
+
+        audit.Record(Entity, initiative.Id, AuditActions.Update, new { Before = before, After = Snapshot(initiative), RecomputedAllocations = recomputed });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess("Initiative updated.", id);
+        return RedirectWithSuccess(recomputed > 0 ? $"Initiative updated; {recomputed} allocation hour value(s) recomputed from the fixed-duration schedule." : "Initiative updated.", id);
     }
 
     [HttpPost]
@@ -203,6 +246,13 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var orderedPhases = initiative.Phases.OrderBy(p => p.Sequence).ThenBy(p => p.PlannedStart).ToList();
         var actuals = await db.LoadActualsAsync(initiative, config.GetValue<decimal?>(ActualsQueries.DefaultThresholdKey), ct);
         var unmappedForProjects = await db.ActualEntries.CountAsync(e => e.InitiativeId == id && e.IsUnmapped, ct);
+        var fixedDuration = initiative.PlanningMode == PlanningMode.FixedDuration && initiative.TargetEnd is not null
+            ? BuildFixedDurationSummary(initiative, orderedPhases, forecast, await workCalendar.GetAsync(ct))
+            : null;
+        var nextPhaseStart = orderedPhases.LastOrDefault()?.PlannedEnd.AddDays(1) ?? initiative.TargetStart;
+        var nextPhaseEnd = initiative.PlanningMode == PlanningMode.FixedDuration && initiative.TargetEnd is not null && initiative.TargetEnd.Value >= nextPhaseStart
+            ? initiative.TargetEnd.Value
+            : nextPhaseStart.AddDays(29);
 
         var model = new InitiativeDetailsModel
         {
@@ -213,12 +263,13 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ByResourceType = Rollup(forecast, l => typeNames.GetValueOrDefault(l.Allocation.ResourceTypeId, "?")),
             ByClass = Rollup(forecast, l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : "Vendor"),
             Gantt = BuildGantt(orderedPhases),
+            FixedDuration = fixedDuration,
             ResourceTypeNames = typeNames,
             NewPhase = new PhaseEditModel
             {
                 InitiativeId = id,
-                PlannedStart = orderedPhases.LastOrDefault()?.PlannedEnd.AddDays(1) ?? initiative.TargetStart,
-                PlannedEnd = (orderedPhases.LastOrDefault()?.PlannedEnd.AddDays(1) ?? initiative.TargetStart).AddDays(29)
+                PlannedStart = nextPhaseStart,
+                PlannedEnd = nextPhaseEnd
             },
             NewAllocation = new AllocationEditModel { InitiativeId = id },
             NewMember = new MemberEditModel { InitiativeId = id },
@@ -266,11 +317,6 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
 
         ValidatePhase(model, initiative);
-        if (!ModelState.IsValid)
-        {
-            return RedirectWithError(FirstError(), id);
-        }
-
         var phase = new Phase
         {
             Name = model.Name.Trim(),
@@ -278,6 +324,12 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             PlannedStart = model.PlannedStart,
             PlannedEnd = model.PlannedEnd
         };
+        ValidateFixedDurationTiling(initiative, initiative.Phases.Append(phase));
+        if (!ModelState.IsValid)
+        {
+            return RedirectWithError(FirstError(), id);
+        }
+
         initiative.Phases.Add(phase);
         await db.SaveChangesAsync(ct);
         audit.Record(nameof(Phase), phase.Id, AuditActions.Create, new { initiative.Id, phase.Name, phase.PlannedStart, phase.PlannedEnd });
@@ -330,6 +382,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         model.Id = id;
         model.InitiativeId = initiative.Id;
         ValidatePhase(model, initiative);
+        ValidateFixedDurationTiling(initiative, initiative.Phases.Select(p => p.Id == id
+            ? new Phase { Name = model.Name.Trim(), Sequence = p.Sequence, PlannedStart = model.PlannedStart, PlannedEnd = model.PlannedEnd }
+            : p));
         if (!ModelState.IsValid)
         {
             ViewBag.Initiative = initiative;
@@ -352,9 +407,16 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         phase.Name = model.Name.Trim();
         phase.PlannedStart = model.PlannedStart;
         phase.PlannedEnd = model.PlannedEnd;
-        audit.Record(nameof(Phase), phase.Id, AuditActions.Update, new { initiative.Id, Before = before, After = new { phase.Name, phase.PlannedStart, phase.PlannedEnd }, model.Reason });
+        var recomputed = 0;
+        if (datesChanged && initiative.PlanningMode == PlanningMode.FixedDuration)
+        {
+            var allocations = await db.InitiativeAllocations.Where(a => a.PhaseId == id).ToListAsync(ct);
+            recomputed = RecomputeFixedDurationHours(initiative, allocations, await workCalendar.GetAsync(ct));
+        }
+
+        audit.Record(nameof(Phase), phase.Id, AuditActions.Update, new { initiative.Id, Before = before, After = new { phase.Name, phase.PlannedStart, phase.PlannedEnd }, model.Reason, RecomputedAllocations = recomputed });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Phase '{phase.Name}' updated.", initiative.Id);
+        return RedirectWithSuccess(recomputed > 0 ? $"Phase '{phase.Name}' updated; {recomputed} allocation hour value(s) recomputed." : $"Phase '{phase.Name}' updated.", initiative.Id);
     }
 
     [HttpPost]
@@ -421,6 +483,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, Quantity = model.Quantity,
             EstimatedHours = model.EstimatedHours, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
         };
+        await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
         initiative.Allocations.Add(allocation);
         await db.SaveChangesAsync(ct);
         audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Create, AllocationSnapshot(allocation));
@@ -447,7 +510,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, ResourceTypeId = allocation.ResourceTypeId,
             Seniority = allocation.Seniority, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass,
-            Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours,
+            Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
             ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
         });
     }
@@ -490,6 +553,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         allocation.ResourcingClass = model.ResourcingClass;
         allocation.Quantity = model.Quantity;
         allocation.EstimatedHours = model.EstimatedHours;
+        await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
         allocation.ContractReference = model.ContractReference?.Trim();
         allocation.CostCenter = model.CostCenter?.Trim();
         audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Update, new { Before = before, After = AllocationSnapshot(allocation) });
@@ -569,42 +633,131 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             initiative.Allocations.Clear();
         }
 
-        var phasesByName = initiative.Phases.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
-        var nextSequence = (initiative.Phases.Count == 0 ? 0 : initiative.Phases.Max(p => p.Sequence)) + 1;
-        var nextStart = initiative.Phases.Count == 0 ? initiative.TargetStart : initiative.Phases.Max(p => p.PlannedEnd).AddDays(1);
-        var createdPhases = 0;
-        foreach (var name in SizingApplier.PhaseNames(lines))
+        var location = model.Location.Trim();
+        var sizedLines = SizingApplier.Apply(conversion.Hours, lines);
+        int createdPhases;
+        string modeNote;
+        if (initiative.PlanningMode == PlanningMode.FixedDuration)
         {
-            if (phasesByName.ContainsKey(name))
+            if (initiative.TargetEnd is null)
             {
-                continue;
+                return RedirectWithError("Set a target end date before applying a size to a fixed-duration initiative.", id);
             }
 
-            var phase = new Phase { Name = name, Sequence = nextSequence++, PlannedStart = nextStart, PlannedEnd = nextStart.AddDays(29) };
-            nextStart = phase.PlannedEnd.AddDays(1);
-            initiative.Phases.Add(phase);
-            phasesByName[name] = phase;
-            createdPhases++;
-        }
-
-        var location = model.Location.Trim();
-        foreach (var sized in SizingApplier.Apply(conversion.Hours, lines))
-        {
-            initiative.Allocations.Add(new InitiativeAllocation
+            var calendar = await workCalendar.GetAsync(ct);
+            var phaseNames = SizingApplier.PhaseNames(lines);
+            var phasesByName = initiative.Phases.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+            createdPhases = 0;
+            if (model.Replace)
             {
-                Phase = phasesByName[sized.PhaseName], ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
-                Location = location, ResourcingClass = model.ResourcingClass, Quantity = 1, EstimatedHours = sized.Hours
-            });
+                // Re-tile the fixed window across the template phases, weighted by each phase's share of the template hours.
+                // Existing phases with a matching name are re-dated (history recorded); others are removed (their allocations were just cleared).
+                var weights = phaseNames.Select(n => lines.Where(l => string.Equals(l.PhaseName, n, StringComparison.OrdinalIgnoreCase)).Sum(l => l.Percent)).ToList();
+                var windows = DurationCalculator.SplitWindow(initiative.TargetStart, initiative.TargetEnd.Value, weights);
+                var obsolete = initiative.Phases.Where(p => !phaseNames.Contains(p.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+                db.Phases.RemoveRange(obsolete);
+                foreach (var p in obsolete)
+                {
+                    initiative.Phases.Remove(p);
+                }
+
+                for (var i = 0; i < phaseNames.Count; i++)
+                {
+                    if (phasesByName.TryGetValue(phaseNames[i], out var existing))
+                    {
+                        existing.Sequence = i + 1;
+                        if (existing.PlannedStart != windows[i].Start || existing.PlannedEnd != windows[i].End)
+                        {
+                            existing.DateHistory.Add(new PhaseDateHistory
+                            {
+                                OldStart = existing.PlannedStart, OldEnd = existing.PlannedEnd, NewStart = windows[i].Start, NewEnd = windows[i].End,
+                                ChangedBy = currentUser.UserId, ChangedAt = clock.GetUtcNow(), Reason = $"Apply size {model.Method} '{key}' (fixed duration)"
+                            });
+                            existing.PlannedStart = windows[i].Start;
+                            existing.PlannedEnd = windows[i].End;
+                        }
+
+                        continue;
+                    }
+
+                    var phase = new Phase { Name = phaseNames[i], Sequence = i + 1, PlannedStart = windows[i].Start, PlannedEnd = windows[i].End };
+                    initiative.Phases.Add(phase);
+                    phasesByName[phase.Name] = phase;
+                    createdPhases++;
+                }
+            }
+            else if (phaseNames.Any(n => !phasesByName.ContainsKey(n)))
+            {
+                return RedirectWithError("Template phases don't match the existing phases. Tick 'Replace existing allocations' to re-tile the schedule from the template, or rename phases to match.", id);
+            }
+
+            var zeroDayPhases = new List<string>();
+            foreach (var sized in sizedLines)
+            {
+                var phase = phasesByName[sized.PhaseName];
+                var workingDays = DurationCalculator.WorkingDays(phase.PlannedStart, phase.PlannedEnd, calendar.Holidays);
+                var percent = DurationCalculator.PercentFor(sized.Hours, workingDays, calendar.HoursPerDay);
+                if (workingDays == 0)
+                {
+                    zeroDayPhases.Add(phase.Name);
+                }
+
+                initiative.Allocations.Add(new InitiativeAllocation
+                {
+                    Phase = phase, ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
+                    Location = location, ResourcingClass = model.ResourcingClass, Quantity = 1,
+                    AllocationPercent = percent,
+                    EstimatedHours = DurationCalculator.Hours(percent, workingDays, calendar.HoursPerDay)
+                });
+            }
+
+            var totalWorkingDays = DurationCalculator.WorkingDays(initiative.TargetStart, initiative.TargetEnd.Value, calendar.Holidays);
+            modeNote = $" Staffing % set so the {totalWorkingDays} working days from {initiative.TargetStart:yyyy-MM-dd} to {initiative.TargetEnd:yyyy-MM-dd} deliver ~{conversion.Hours}h.";
+            if (zeroDayPhases.Count > 0)
+            {
+                modeNote += $" Warning: phase(s) {string.Join(", ", zeroDayPhases.Distinct())} have no working days, so their allocations are 0%.";
+            }
+        }
+        else
+        {
+            var phasesByName = initiative.Phases.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+            var nextSequence = (initiative.Phases.Count == 0 ? 0 : initiative.Phases.Max(p => p.Sequence)) + 1;
+            var nextStart = initiative.Phases.Count == 0 ? initiative.TargetStart : initiative.Phases.Max(p => p.PlannedEnd).AddDays(1);
+            createdPhases = 0;
+            foreach (var name in SizingApplier.PhaseNames(lines))
+            {
+                if (phasesByName.ContainsKey(name))
+                {
+                    continue;
+                }
+
+                var phase = new Phase { Name = name, Sequence = nextSequence++, PlannedStart = nextStart, PlannedEnd = nextStart.AddDays(29) };
+                nextStart = phase.PlannedEnd.AddDays(1);
+                initiative.Phases.Add(phase);
+                phasesByName[name] = phase;
+                createdPhases++;
+            }
+
+            foreach (var sized in sizedLines)
+            {
+                initiative.Allocations.Add(new InitiativeAllocation
+                {
+                    Phase = phasesByName[sized.PhaseName], ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
+                    Location = location, ResourcingClass = model.ResourcingClass, Quantity = 1, EstimatedHours = sized.Hours
+                });
+            }
+
+            modeNote = string.Empty;
         }
 
         initiative.SizingMethod = model.Method;
         initiative.SizeKey = key;
         audit.Record(Entity, initiative.Id, AuditActions.Update, new
         {
-            Action = "ApplySize", model.Method, SizeKey = key, conversion.Hours, TemplateId = template.Id, model.Replace, PhasesCreated = createdPhases, Lines = lines.Count
+            Action = "ApplySize", model.Method, SizeKey = key, conversion.Hours, TemplateId = template.Id, model.Replace, PhasesCreated = createdPhases, Lines = lines.Count, initiative.PlanningMode
         });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Applied {model.Method} '{key}' ({conversion.Hours}h) using template '{template.Name}': {lines.Count} allocation(s), {createdPhases} new phase(s). Adjust as needed.", id);
+        return RedirectWithSuccess($"Applied {model.Method} '{key}' ({conversion.Hours}h) using template '{template.Name}': {lines.Count} allocation(s), {createdPhases} new phase(s).{modeNote} Adjust as needed.", id);
     }
 
     // ----- Members -----
@@ -801,6 +954,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ModelState.AddModelError(nameof(model.BusinessUnitId), "Select an active business unit.");
         }
 
+        ValidateSchedule(model);
+
         if (model.SizingMethod == SizingMethod.Direct)
         {
             return;
@@ -815,6 +970,87 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             ModelState.AddModelError(nameof(model.SizeKey), $"'{key}' is not a defined {model.SizingMethod} size. Choose a size that has an allocation template.");
         }
+    }
+
+    private void ValidateSchedule(InitiativeEditModel model)
+    {
+        if (model.PlanningMode != PlanningMode.FixedDuration)
+        {
+            return;
+        }
+
+        if (model.TargetEnd is null)
+        {
+            ModelState.AddModelError(nameof(model.TargetEnd), "Target end is required for fixed-duration initiatives.");
+        }
+        else if (model.TargetEnd < model.TargetStart)
+        {
+            ModelState.AddModelError(nameof(model.TargetEnd), "Target end must be on or after target start.");
+        }
+    }
+
+    private void ValidateFixedDurationTiling(Initiative initiative, IEnumerable<Phase> phases)
+    {
+        if (initiative.PlanningMode != PlanningMode.FixedDuration || initiative.TargetEnd is null)
+        {
+            return;
+        }
+
+        var error = DurationCalculator.ValidateTiling(initiative.TargetStart, initiative.TargetEnd.Value, phases);
+        if (error is not null)
+        {
+            ModelState.AddModelError(nameof(PhaseEditModel.PlannedStart), $"Fixed-duration phases must tile the target window contiguously. {error}");
+        }
+    }
+
+    /// <summary>In fixed-duration mode hours are derived from AllocationPercent × working days; in effort-driven mode they are as entered.</summary>
+    private async Task ApplyAllocationEffortAsync(Initiative initiative, InitiativeAllocation allocation, AllocationEditModel model, CancellationToken ct)
+    {
+        if (initiative.PlanningMode != PlanningMode.FixedDuration)
+        {
+            allocation.AllocationPercent = null;
+            return;
+        }
+
+        var phase = initiative.Phases.First(p => p.Id == allocation.PhaseId);
+        var calendar = await workCalendar.GetAsync(ct);
+        allocation.AllocationPercent = model.AllocationPercent;
+        allocation.EstimatedHours = DurationCalculator.Hours(allocation, phase, calendar.Holidays, calendar.HoursPerDay);
+    }
+
+    private static int RecomputeFixedDurationHours(Initiative initiative, IEnumerable<InitiativeAllocation> allocations, WorkCalendar calendar)
+    {
+        var phases = initiative.Phases.ToDictionary(p => p.Id);
+        var changed = 0;
+        foreach (var allocation in allocations)
+        {
+            if (allocation.AllocationPercent is null || !phases.TryGetValue(allocation.PhaseId, out var phase))
+            {
+                continue;
+            }
+
+            var hours = DurationCalculator.Hours(allocation, phase, calendar.Holidays, calendar.HoursPerDay);
+            if (hours != allocation.EstimatedHours)
+            {
+                allocation.EstimatedHours = hours;
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    private static FixedDurationSummary BuildFixedDurationSummary(Initiative initiative, IReadOnlyList<Phase> phases, ForecastResult forecast, WorkCalendar calendar)
+    {
+        var end = initiative.TargetEnd!.Value;
+        var workingDays = DurationCalculator.WorkingDays(initiative.TargetStart, end, calendar.Holidays);
+        var capacity = workingDays * calendar.HoursPerDay;
+        return new FixedDurationSummary(
+            initiative.TargetStart, end,
+            Math.Max(0, end.DayNumber - initiative.TargetStart.DayNumber + 1),
+            workingDays, calendar.HoursPerDay,
+            capacity <= 0 ? 0 : Math.Round(forecast.TotalHours / capacity, 2, MidpointRounding.AwayFromZero),
+            phases.ToDictionary(p => p.Id, p => DurationCalculator.WorkingDays(p.PlannedStart, p.PlannedEnd, calendar.Holidays)));
     }
 
     private void ValidatePhase(PhaseEditModel model, Initiative initiative)
@@ -844,6 +1080,18 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             ModelState.AddModelError(nameof(model.ResourceTypeId), "Select a resource type.");
         }
+
+        if (initiative.PlanningMode == PlanningMode.FixedDuration)
+        {
+            if (model.AllocationPercent is null)
+            {
+                ModelState.AddModelError(nameof(model.AllocationPercent), "Allocation % is required for fixed-duration initiatives; hours are computed from it.");
+            }
+        }
+        else if (model.EstimatedHours < 0.25m)
+        {
+            ModelState.AddModelError(nameof(model.EstimatedHours), "Hours must be at least 0.25.");
+        }
     }
 
     private string FirstError() =>
@@ -862,10 +1110,10 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     }
 
     private static object Snapshot(Initiative i) =>
-        new { i.Name, i.Description, i.BusinessUnitId, i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.TargetStart, i.VarianceThresholdPct };
+        new { i.Name, i.Description, i.BusinessUnitId, i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct };
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
-        new { a.InitiativeId, a.PhaseId, a.ResourceTypeId, a.Seniority, a.Location, a.ResourcingClass, a.Quantity, a.EstimatedHours, a.ContractReference, a.CostCenter };
+        new { a.InitiativeId, a.PhaseId, a.ResourceTypeId, a.Seniority, a.Location, a.ResourcingClass, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
 
     private static List<RollupRow> Rollup(ForecastResult forecast, Func<ForecastLine, string> key, IEnumerable<string>? order = null)
     {

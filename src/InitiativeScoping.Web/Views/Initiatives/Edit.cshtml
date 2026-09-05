@@ -52,17 +52,34 @@
             <span asp-validation-for="SizeKey" class="text-danger"></span>
             <div class="form-text" id="size-key-empty" hidden>No sizes are defined for this method. Ask an administrator to add an allocation template.</div>
         </div>
-        <div class="col-md-3">
-            <label asp-for="TargetStart" class="form-label"></label>
-            <input asp-for="TargetStart" class="form-control" />
-            <span asp-validation-for="TargetStart" class="text-danger"></span>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-6">
             <label asp-for="VarianceThresholdPct" class="form-label"></label>
             <input asp-for="VarianceThresholdPct" class="form-control" type="number" step="0.5" min="0" />
             <span asp-validation-for="VarianceThresholdPct" class="text-danger"></span>
         </div>
     </div>
+    <fieldset class="row g-3 mb-3">
+        <legend class="h6 mb-0">Schedule</legend>
+        <div class="col-md-4">
+            <label asp-for="PlanningMode" class="form-label"></label>
+            <select asp-for="PlanningMode" class="form-select" id="planning-mode">
+                <option value="@PlanningMode.EffortDriven">Effort-driven (enter hours)</option>
+                <option value="@PlanningMode.FixedDuration">Fixed duration (hours from staffing %)</option>
+            </select>
+            <div class="form-text" id="planning-mode-help"></div>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="TargetStart" class="form-label"></label>
+            <input asp-for="TargetStart" class="form-control" id="target-start" />
+            <span asp-validation-for="TargetStart" class="text-danger"></span>
+        </div>
+        <div class="col-md-4" id="target-end-group">
+            <label asp-for="TargetEnd" class="form-label"></label>
+            <input asp-for="TargetEnd" class="form-control" id="target-end" />
+            <span asp-validation-for="TargetEnd" class="text-danger"></span>
+            <div class="form-text" id="duration-summary"></div>
+        </div>
+    </fieldset>
     <button type="submit" class="btn btn-primary">Save</button>
     @if (isNew)
     {
@@ -99,6 +116,32 @@
             }
             method.addEventListener('change', sync);
             sync();
+
+            const mode = document.getElementById('planning-mode');
+            const endGroup = document.getElementById('target-end-group');
+            const start = document.getElementById('target-start');
+            const end = document.getElementById('target-end');
+            const help = document.getElementById('planning-mode-help');
+            const summary = document.getElementById('duration-summary');
+            const modeNames = { '@((int)PlanningMode.EffortDriven)': '@PlanningMode.EffortDriven', '@((int)PlanningMode.FixedDuration)': '@PlanningMode.FixedDuration' };
+            function syncMode() {
+                const fixed = (modeNames[mode.value] || mode.value) === '@PlanningMode.FixedDuration';
+                endGroup.hidden = !fixed;
+                end.required = fixed;
+                help.textContent = fixed
+                    ? 'Phases must tile start–end; allocation hours = staffing % × working days (Mon–Fri minus holidays) × hours/day.'
+                    : 'Allocation hours are entered directly; phase dates are informational.';
+                if (fixed && start.value && end.value) {
+                    const days = Math.round((new Date(end.value) - new Date(start.value)) / 86400000) + 1;
+                    summary.textContent = days > 0 ? `${days} calendar days (~${(days / 7).toFixed(1)} weeks)` : 'Target end must be on or after target start.';
+                } else {
+                    summary.textContent = '';
+                }
+            }
+            mode.addEventListener('change', syncMode);
+            start.addEventListener('change', syncMode);
+            end.addEventListener('change', syncMode);
+            syncMode();
         })();
     </script>
 }

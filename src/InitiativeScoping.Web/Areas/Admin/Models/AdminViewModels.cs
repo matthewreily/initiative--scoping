@@ -167,3 +167,20 @@ public class PersonListItem
     public required Person Person { get; init; }
     public int EntryCount { get; init; }
 }
+
+public class WorkCalendarViewModel
+{
+    [Display(Name = "Hours per working day")]
+    [Range(0.5, 24)]
+    public decimal HoursPerDay { get; set; } = 8;
+    public IReadOnlyList<Holiday> Holidays { get; set; } = [];
+}
+
+public class HolidayEditModel
+{
+    public int Id { get; set; }
+    [Required]
+    public DateOnly? Date { get; set; }
+    [Required, StringLength(200)]
+    public string Name { get; set; } = string.Empty;
+}

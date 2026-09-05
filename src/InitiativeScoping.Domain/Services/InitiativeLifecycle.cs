@@ -46,6 +46,19 @@ public static class InitiativeLifecycle
             errors.Add("Every phase must end on or after it starts.");
         }
 
+        if (initiative.PlanningMode == PlanningMode.FixedDuration)
+        {
+            if (initiative.TargetEnd is null)
+            {
+                errors.Add("Fixed-duration initiatives need a target end date.");
+            }
+            else if (initiative.Phases.Count > 0
+                && DurationCalculator.ValidateTiling(initiative.TargetStart, initiative.TargetEnd.Value, initiative.Phases, requireFullCoverage: true) is { } tiling)
+            {
+                errors.Add($"Fixed-duration phases must cover the whole target window. {tiling}");
+            }
+        }
+
         return errors;
     }
 }
