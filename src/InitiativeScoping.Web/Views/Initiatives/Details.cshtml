@@ -11,6 +11,8 @@
         .OrderBy(a => i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence ?? int.MaxValue)
         .ThenBy(a => Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId))
         .ThenBy(a => a.Seniority).ToList();
+    var fixedDuration = i.PlanningMode == PlanningMode.FixedDuration;
+    var fd = Model.FixedDuration;
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li><li class="breadcrumb-item active">@i.Name</li></ol></nav>
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
@@ -19,7 +21,14 @@
         <div class="text-muted small">
             @i.BusinessUnit?.Name
             @if (!string.IsNullOrEmpty(i.SponsoringTeam)) { <span> &middot; @i.SponsoringTeam</span> }
-            &middot; Target start @i.TargetStart.ToString("yyyy-MM-dd")
+            @if (fixedDuration && i.TargetEnd is not null)
+            {
+                <span> &middot; Fixed duration @i.TargetStart.ToString("yyyy-MM-dd") → @i.TargetEnd.Value.ToString("yyyy-MM-dd")</span>
+            }
+            else
+            {
+                <span> &middot; Target start @i.TargetStart.ToString("yyyy-MM-dd")</span>
+            }
             &middot; Sizing: @(i.SizingMethod == SizingMethod.Direct ? "Direct hours" : $"{i.SizingMethod} {i.SizeKey}")
             @if (i.VarianceThresholdPct is not null) { <span> &middot; Variance threshold @i.VarianceThresholdPct%</span> }
         </div>
@@ -171,6 +180,15 @@ else
 <div class="row g-4">
     <div class="col-lg-7">
         <h2 class="h5">Phases</h2>
+        @if (fd is not null)
+        {
+            <div class="alert alert-info py-2 small mb-3" role="status" id="fixed-duration-summary">
+                <strong>Fixed duration:</strong> @fd.Weeks.ToString("0.#") weeks (@fd.CalendarDays calendar days, @fd.WorkingDays working days)
+                &middot; @fd.HoursPerDay.ToString("0.##") h/day
+                &middot; average staffing @fd.AverageFte.ToString("0.##") FTE
+                &middot; phases must tile @fd.Start.ToString("yyyy-MM-dd") → @fd.End.ToString("yyyy-MM-dd") contiguously before activation; allocation hours are computed from staffing %.
+            </div>
+        }
         @if (Model.Gantt.Count > 0)
         {
             <div class="mb-3 border rounded p-2 bg-light">
@@ -191,7 +209,7 @@ else
         }
         <div class="table-responsive">
         <table class="table table-sm align-middle">
-            <thead><tr><th>#</th><th>Phase</th><th>Start</th><th>End</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th></th></tr></thead>
+            <thead><tr><th>#</th><th>Phase</th><th>Start</th><th>End</th>@if (fd is not null) { <th class="text-end">Working days</th> }<th class="text-end">Hours</th><th class="text-end">Cost</th><th></th></tr></thead>
             <tbody>
             @foreach (var p in i.Phases.OrderBy(p => p.Sequence))
             {
@@ -201,6 +219,7 @@ else
                     <td>@p.Name @if (p.DateHistory.Count > 0) { <span class="badge bg-light text-dark border" title="Dates changed @p.DateHistory.Count time(s)">@p.DateHistory.Count</span> }</td>
                     <td>@p.PlannedStart.ToString("yyyy-MM-dd")</td>
                     <td>@p.PlannedEnd.ToString("yyyy-MM-dd")</td>
+                    @if (fd is not null) { <td class="text-end">@fd.PhaseWorkingDays.GetValueOrDefault(p.Id)</td> }
                     <td class="text-end">@((roll?.Hours ?? 0).ToString("N1"))</td>
                     <td class="text-end">@((roll?.Cost ?? 0).ToString("C0")) @if (roll?.HasUnpriced == true) { <span class="text-warning" title="Unpriced lines">&#9888;</span> }</td>
                     <td class="text-end text-nowrap">
@@ -216,7 +235,7 @@ else
             }
             @if (i.Phases.Count == 0)
             {
-                <tr><td colspan="7" class="text-muted">No phases yet. Add at least one phase before allocating resources.</td></tr>
+                <tr><td colspan="8" class="text-muted">No phases yet. Add at least one phase before allocating resources.@if (fixedDuration) { <text> In fixed-duration mode the first phase must start on the target start and phases must end on the target end.</text> }</td></tr>
             }
             </tbody>
         </table>
@@ -243,7 +262,7 @@ else
         <h2 class="h5">Allocations</h2>
         <div class="table-responsive">
         <table class="table table-sm align-middle">
-            <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th><th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th></th></tr></thead>
+            <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th></th></tr></thead>
             <tbody>
             @foreach (var a in orderedAllocations)
             {
@@ -255,6 +274,7 @@ else
                     <td>@a.Location</td>
                     <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
                     <td class="text-end">@a.Quantity</td>
+                    @if (fixedDuration) { <td class="text-end">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
                     <td class="text-end">@line.Hours.ToString("N1")</td>
                     <td class="text-end">@(line.HourlyRate is decimal r ? r.ToString("C2") : Html.Raw("<span class='text-danger' title='No exact rate-card match for this resource type / BU / seniority / location / class'>Unpriced</span>"))</td>
                     <td class="text-end">@line.Cost.ToString("C0")</td>
@@ -271,12 +291,12 @@ else
             }
             @if (i.Allocations.Count == 0)
             {
-                <tr><td colspan="10" class="text-muted">No allocations yet.</td></tr>
+                <tr><td colspan="11" class="text-muted">No allocations yet.</td></tr>
             }
             </tbody>
             @if (i.Allocations.Count > 0)
             {
-                <tfoot class="fw-semibold"><tr><td colspan="6" class="text-end">Total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.TotalCost.ToString("C0")</td><td></td></tr></tfoot>
+                <tfoot class="fw-semibold"><tr><td colspan="@(fixedDuration ? 7 : 6)" class="text-end">Total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.TotalCost.ToString("C0")</td><td></td></tr></tfoot>
             }
         </table>
         </div>
@@ -307,10 +327,21 @@ else
                     <label for="quantity" class="form-label small mb-0">Quantity</label>
                     <input name="Quantity" id="quantity" type="number" min="1" class="form-control form-control-sm" value="1" required />
                 </div>
-                <div class="col-md-2">
-                    <label for="estimatedhours" class="form-label small mb-0">Hours (each)</label>
-                    <input name="EstimatedHours" id="estimatedhours" type="number" min="0.25" step="0.25" class="form-control form-control-sm" required />
-                </div>
+                @if (fixedDuration)
+                {
+                    <div class="col-md-2">
+                        <label for="allocationpercent" class="form-label small mb-0">Staffing %</label>
+                        <input name="AllocationPercent" id="allocationpercent" type="number" min="0.01" max="100" step="0.01" class="form-control form-control-sm" value="100" required aria-describedby="allocationpercent-help" />
+                        <div class="form-text" id="allocationpercent-help">Hours are computed per phase.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="col-md-2">
+                        <label for="estimatedhours" class="form-label small mb-0">Hours (each)</label>
+                        <input name="EstimatedHours" id="estimatedhours" type="number" min="0.25" step="0.25" class="form-control form-control-sm" required />
+                    </div>
+                }
                 <div class="col-md-3">
                     <label for="contractreference" class="form-label small mb-0">Contract ref</label>
                     <input name="ContractReference" id="contractreference" class="form-control form-control-sm" />
@@ -342,7 +373,14 @@ else
         @if (Model.ScopeWritable)
         {
             <h2 class="h5 mt-4">Apply relative size</h2>
-            <p class="small text-muted mb-2">Converts a size to hours (admin conversion table) and splits them per the matching allocation template, creating any missing phases.</p>
+            @if (fixedDuration)
+            {
+                <p class="small text-muted mb-2">Converts a size to target hours (admin conversion table), tiles the fixed window across the template's phases, and sets each allocation's staffing % so it delivers the template hours in its phase.</p>
+            }
+            else
+            {
+                <p class="small text-muted mb-2">Converts a size to hours (admin conversion table) and splits them per the matching allocation template, creating any missing phases.</p>
+            }
             <form asp-action="ApplySize" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
                 <div class="col-5">
                     <label for="method" class="form-label small mb-0">Method</label>
@@ -371,6 +409,7 @@ else
                 </div>
                 <div class="col-4 form-check ms-2 mb-1">
                     <input name="Replace" type="checkbox" value="true" class="form-check-input" id="replace" checked />
+                    <input name="Replace" type="hidden" value="false" />
                     <label class="form-check-label small" for="replace">Replace existing</label>
                 </div>
                 <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Apply</button></div>

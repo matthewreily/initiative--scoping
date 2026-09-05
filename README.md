@@ -43,6 +43,7 @@ Users in the `Administrator` role get an **Admin** nav link (`/Admin/...`) for c
 - **Business Units** and **Resource Types** – CRUD with active/inactive flag; deletion is blocked while referenced (deactivate instead).
 - **Rate Cards** – Draft → Published → Retired lifecycle with an effective start date. Entries are keyed by resource type × business unit × seniority × location × internal/vendor. Entries can be added inline or bulk-imported via CSV (`ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate`; merge or replace; the file is rejected as a whole if any row is invalid). Export and a template download are available. Published cards cannot be deleted – retire them so historical baselines stay reproducible.
 - **Sizing** – T-shirt / story-point → hours conversions and optional allocation templates (phase × resource type × seniority percentages that must total 100%).
+- **Work calendar** – hours per working day (single row, default 8) and a holiday list (unique weekday dates). Working days are Mon–Fri minus holidays; used by fixed-duration initiatives.
 
 Every admin create/update/delete/publish/retire/import writes an `AuditEvent` row (user, timestamp, JSON diff).
 
@@ -51,7 +52,8 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 `/Initiatives` (spec §5.2–5.3) is readable by every role; Administrators, Initiative Owners and Contributors can create initiatives. The creator becomes the initiative's **Owner** member; per-initiative editing is limited to Administrators and members with the Owner/Contributor role, and member management to Administrators/Owners.
 
 - **Phases** – planned start/end with sequence; every date change is recorded in `PhaseDateHistory` (old/new dates, who, why).
-- **Allocations** – phase × resource type × seniority × location × internal/vendor × quantity × estimated hours. Seniority lives on the allocation, not the resource type.
+- **Allocations** – phase × resource type × seniority × location × internal/vendor × quantity × estimated hours (per person; forecast = quantity × hours × rate). Seniority lives on the allocation, not the resource type.
+- **Planning mode** – *Effort-driven* (default: hours are entered) or *Fixed duration* (`TargetEnd` required; phases must start on `TargetStart`, be contiguous and not run past `TargetEnd`, with full coverage enforced as an activation blocker). In fixed mode each allocation stores an `AllocationPercent` and `EstimatedHours` is strictly computed by `DurationCalculator` as `percent/100 × working days × hours/day`, re-derived whenever phase dates or the target window change. Everything downstream (forecast, baselines, variance, ETC/EAC, portfolio, exports) keeps consuming `EstimatedHours`.
 - **Sizing** – *Direct* hours, or *Apply size* (T-shirt / story points) which looks up the admin conversion + allocation template, creates any missing template phases and generates allocation lines from the template percentages (optionally replacing existing lines).
 - **Forecast** – live cost uses the published rate card in effect at each phase's planned start with exact-match rate resolution; lines with no matching rate show as **Unpriced** and the initiative forecast is flagged **Incomplete**. Rollups by phase, resource type and internal vs vendor, plus a Gantt-style phase timeline, are on the details page.
 - Scope (phases/allocations/sizing) is editable only while the initiative is **Draft** or during an approved re-baseline (below).

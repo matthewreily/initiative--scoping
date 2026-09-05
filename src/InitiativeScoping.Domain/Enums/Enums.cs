@@ -53,3 +53,9 @@ public enum InitiativeMemberRole
     Contributor = 2,
     Viewer = 3
 }
+
+public enum PlanningMode
+{
+    EffortDriven = 1,
+    FixedDuration = 2
+}

@@ -13,7 +13,10 @@ public class Initiative
     public InitiativeStatus Status { get; set; } = InitiativeStatus.Draft;
     public SizingMethod SizingMethod { get; set; } = SizingMethod.Direct;
     public string? SizeKey { get; set; }
+    public PlanningMode PlanningMode { get; set; } = PlanningMode.EffortDriven;
     public DateOnly TargetStart { get; set; }
+    /// <summary>Fixed end date; required when <see cref="PlanningMode"/> is <see cref="PlanningMode.FixedDuration"/>.</summary>
+    public DateOnly? TargetEnd { get; set; }
     public decimal? VarianceThresholdPct { get; set; }
     public required string CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -95,6 +98,8 @@ public class InitiativeAllocation
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
     public int Quantity { get; set; } = 1;
+    /// <summary>Staffing level per person over the phase window (100 = full time); fixed-duration initiatives only.</summary>
+    public decimal? AllocationPercent { get; set; }
     public decimal EstimatedHours { get; set; }
     public string? ContractReference { get; set; }
     public string? CostCenter { get; set; }

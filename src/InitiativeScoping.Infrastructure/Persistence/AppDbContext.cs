@@ -13,6 +13,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<RateCardEntry> RateCardEntries => Set<RateCardEntry>();
     public DbSet<SizingConversion> SizingConversions => Set<SizingConversion>();
+    public DbSet<WorkCalendarSettings> WorkCalendarSettings => Set<WorkCalendarSettings>();
+    public DbSet<Holiday> Holidays => Set<Holiday>();
     public DbSet<AllocationTemplate> AllocationTemplates => Set<AllocationTemplate>();
     public DbSet<AllocationTemplateLine> AllocationTemplateLines => Set<AllocationTemplateLine>();
     public DbSet<Initiative> Initiatives => Set<Initiative>();
@@ -85,6 +87,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => new { x.Method, x.Key }).IsUnique();
         });
 
+        b.Entity<WorkCalendarSettings>(e => e.Property(x => x.HoursPerDay).HasPrecision(4, 2));
+
+        b.Entity<Holiday>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.HasIndex(x => x.Date).IsUnique();
+        });
+
         b.Entity<AllocationTemplate>(e =>
         {
             e.Property(x => x.SizeKey).HasMaxLength(50);
@@ -132,6 +142,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Location).HasMaxLength(100);
             e.Property(x => x.EstimatedHours).HasPrecision(18, 2);
+            e.Property(x => x.AllocationPercent).HasPrecision(6, 2);
             e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
         });

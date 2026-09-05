@@ -56,3 +56,18 @@ public class SizingConversion
     public required string Key { get; set; }
     public decimal Hours { get; set; }
 }
+
+/// <summary>Single-row settings for converting fixed-duration staffing into hours.</summary>
+public class WorkCalendarSettings
+{
+    public int Id { get; set; }
+    public decimal HoursPerDay { get; set; } = 8;
+}
+
+/// <summary>A non-working weekday excluded from fixed-duration hour calculations.</summary>
+public class Holiday
+{
+    public int Id { get; set; }
+    public DateOnly Date { get; set; }
+    public required string Name { get; set; }
+}

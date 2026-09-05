@@ -54,6 +54,7 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuditLog, DbAuditLog>();
+        services.AddScoped<IWorkCalendar, DbWorkCalendar>();
         services.AddScoped<IActualsImporter, ActualsImporter>();
         services.AddSingleton<IExportWriter, CsvExportWriter>();
         services.AddSingleton<IExportWriter, XlsxExportWriter>();

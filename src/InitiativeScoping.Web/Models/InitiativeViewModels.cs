@@ -46,8 +46,12 @@ public class InitiativeEditModel
     public SizingMethod SizingMethod { get; set; } = SizingMethod.Direct;
     [StringLength(50), Display(Name = "Size")]
     public string? SizeKey { get; set; }
+    [Required, Display(Name = "Planning mode")]
+    public PlanningMode PlanningMode { get; set; } = PlanningMode.EffortDriven;
     [Required, DataType(DataType.Date), Display(Name = "Target start")]
     public DateOnly TargetStart { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
+    [DataType(DataType.Date), Display(Name = "Target end")]
+    public DateOnly? TargetEnd { get; set; }
     [Range(0, 1000), Display(Name = "Variance threshold %")]
     public decimal? VarianceThresholdPct { get; set; }
 }
@@ -82,8 +86,11 @@ public class AllocationEditModel
     public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
     [Required, Range(1, 1000)]
     public int Quantity { get; set; } = 1;
-    [Required, Range(0.25, 1000000), Display(Name = "Hours (each)")]
+    /// <summary>Entered directly in effort-driven mode; computed from <see cref="AllocationPercent"/> in fixed-duration mode.</summary>
+    [Range(0, 1000000), Display(Name = "Hours (each)")]
     public decimal EstimatedHours { get; set; }
+    [Range(0.01, 100), Display(Name = "Allocation %")]
+    public decimal? AllocationPercent { get; set; }
     [StringLength(100), Display(Name = "Contract ref")]
     public string? ContractReference { get; set; }
     [StringLength(100), Display(Name = "Cost center")]
@@ -118,6 +125,12 @@ public sealed record RollupRow(string Label, decimal Hours, decimal Cost, bool H
 
 public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 
+/// <summary>Fixed-duration schedule summary shown on the Details page.</summary>
+public sealed record FixedDurationSummary(DateOnly Start, DateOnly End, int CalendarDays, int WorkingDays, decimal HoursPerDay, decimal AverageFte, IReadOnlyDictionary<int, int> PhaseWorkingDays)
+{
+    public decimal Weeks => Math.Round(CalendarDays / 7m, 1);
+}
+
 public class InitiativeDetailsModel
 {
     public required Initiative Initiative { get; init; }
@@ -126,6 +139,7 @@ public class InitiativeDetailsModel
     public required IReadOnlyList<RollupRow> ByResourceType { get; init; }
     public required IReadOnlyList<RollupRow> ByClass { get; init; }
     public required IReadOnlyList<GanttBar> Gantt { get; init; }
+    public FixedDurationSummary? FixedDuration { get; init; }
     public required IReadOnlyDictionary<int, string> ResourceTypeNames { get; init; }
     public required PhaseEditModel NewPhase { get; init; }
     public required AllocationEditModel NewAllocation { get; init; }
