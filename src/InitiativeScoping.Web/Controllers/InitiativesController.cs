@@ -945,6 +945,12 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         ViewBag.Initiative = initiative;
         ViewBag.Phases = new SelectList(initiative.Phases.OrderBy(p => p.Sequence), "Id", "Name");
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
+        if (initiative.PlanningMode == PlanningMode.FixedDuration)
+        {
+            var calendar = await workCalendar.GetAsync(ct);
+            ViewBag.HoursPerDay = calendar.HoursPerDay;
+            ViewBag.PhaseWorkingDays = initiative.Phases.ToDictionary(p => p.Id, p => DurationCalculator.WorkingDays(p.PlannedStart, p.PlannedEnd, calendar.Holidays));
+        }
     }
 
     private async Task ValidateInitiative(InitiativeEditModel model, CancellationToken ct)

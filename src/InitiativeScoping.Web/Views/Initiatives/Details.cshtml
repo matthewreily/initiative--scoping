@@ -332,7 +332,12 @@ else
                     <div class="col-md-2">
                         <label for="allocationpercent" class="form-label small mb-0">Staffing %</label>
                         <input name="AllocationPercent" id="allocationpercent" type="number" min="0.01" max="100" step="0.01" class="form-control form-control-sm" value="100" required aria-describedby="allocationpercent-help" />
-                        <div class="form-text" id="allocationpercent-help">Hours are computed per phase.</div>
+                        <div class="form-text" id="allocationpercent-help">100% = all working hours in the phase.</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="computed-hours-new" class="form-label small mb-0">Hours (each)</label>
+                        <input id="computed-hours-new" class="form-control form-control-sm" readonly tabindex="-1" aria-describedby="computed-hours-new-help" />
+                        <div class="form-text" id="computed-hours-new-help">Computed; final value set on save.</div>
                     </div>
                 }
                 else
@@ -352,6 +357,10 @@ else
                 </div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
+            @if (fd is not null)
+            {
+                <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />
+            }
         }
     </div>
 

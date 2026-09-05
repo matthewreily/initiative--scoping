@@ -1,0 +1,20 @@
+@model ComputedHoursScriptModel
+<script>
+    (function () {
+        const phase = document.getElementById('@Model.PhaseSelectId');
+        const percent = document.getElementById('@Model.PercentInputId');
+        const output = document.getElementById('@Model.OutputId');
+        const workingDays = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PhaseWorkingDays));
+        const hoursPerDay = @Model.HoursPerDay.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        function sync() {
+            const days = workingDays[phase.value] || 0;
+            const pct = parseFloat(percent.value);
+            const hours = isNaN(pct) ? 0 : pct / 100 * days * hoursPerDay;
+            output.value = hours.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            output.title = days + ' working days × ' + hoursPerDay + ' h/day × ' + (isNaN(pct) ? 0 : pct) + '%';
+        }
+        phase.addEventListener('change', sync);
+        percent.addEventListener('input', sync);
+        sync();
+    })();
+</script>
