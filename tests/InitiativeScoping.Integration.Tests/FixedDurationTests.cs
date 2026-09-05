@@ -86,6 +86,9 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         html = await client.GetStringAsync(details);
         Assert.DoesNotContain("Last phase must end on", html);
         Assert.Contains("id=\"allocationpercent\"", html);
+        Assert.Contains("value=\"100\"", html);
+        Assert.Contains("id=\"computed-hours-new\"", html);
+        Assert.Contains($"{{\"{phaseId}\":60}}", html); // phase working days feed the live hours preview
         Assert.DoesNotContain("id=\"estimatedhours\"", html);
 
         var noPercent = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
@@ -115,6 +118,16 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         Assert.Contains("480.0", html); // 2 people × 240h
         Assert.Contains("50%", html);
         Assert.Contains("average staffing 1 FTE", html);
+
+        int allocationId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            allocationId = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.SingleAsync(a => a.InitiativeId == id)).Id;
+        }
+        var editHtml = await client.GetStringAsync($"/Initiatives/EditAllocation/{allocationId}");
+        Assert.Contains("id=\"computed-hours\"", editHtml);
+        Assert.Contains($"{{\"{phaseId}\":60}}", editHtml);
+        Assert.Contains("const hoursPerDay = 8", editHtml);
 
         // The initiative window cannot shrink past its phases; shrink the phase first (hours recompute), then the window.
         var badWindow = await PostFormAsync(client, $"/Initiatives/Edit/{id}", $"/Initiatives/Edit/{id}", await EditFieldsAsync(id, "2026-01-05", "2026-02-27"));

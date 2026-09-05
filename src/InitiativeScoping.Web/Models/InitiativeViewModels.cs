@@ -125,6 +125,8 @@ public sealed record RollupRow(string Label, decimal Hours, decimal Cost, bool H
 
 public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 
+public sealed record ComputedHoursScriptModel(string PhaseSelectId, string PercentInputId, string OutputId, IReadOnlyDictionary<int, int> PhaseWorkingDays, decimal HoursPerDay);
+
 /// <summary>Fixed-duration schedule summary shown on the Details page.</summary>
 public sealed record FixedDurationSummary(DateOnly Start, DateOnly End, int CalendarDays, int WorkingDays, decimal HoursPerDay, decimal AverageFte, IReadOnlyDictionary<int, int> PhaseWorkingDays)
 {
