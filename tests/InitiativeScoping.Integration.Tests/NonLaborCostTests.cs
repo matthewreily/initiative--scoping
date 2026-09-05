@@ -146,6 +146,31 @@ public class NonLaborCostTests(WebAppFactory factory) : IClassFixture<WebAppFact
             ["Quantity"] = "1", ["UnitCost"] = "100", ["StartDate"] = "2026-03-15", ["EndDate"] = "2026-04-15"
         })).StatusCode);
 
+        // A phase referenced only by a non-labor line cannot be deleted.
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Temp", ["PlannedStart"] = "2026-05-01", ["PlannedEnd"] = "2026-05-31" });
+        int tempPhaseId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            tempPhaseId = (await db.Phases.SingleAsync(p => p.InitiativeId == id && p.Name == "Temp")).Id;
+        }
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddNonLaborCost/{id}", new()
+        {
+            ["PhaseId"] = tempPhaseId.ToString(), ["Category"] = nameof(CostCategory.Other), ["Description"] = "Temp tool",
+            ["BillingModel"] = nameof(BillingModel.OneTime), ["Quantity"] = "1", ["UnitCost"] = "10"
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/DeletePhase/{tempPhaseId}", new())).StatusCode);
+        Assert.Contains("has non-labor costs", await client.GetStringAsync(details));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.True(await db.Phases.AnyAsync(p => p.Id == tempPhaseId));
+            var temp = await db.InitiativeNonLaborCosts.SingleAsync(l => l.Description == "Temp tool");
+            db.InitiativeNonLaborCosts.Remove(temp);
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/DeletePhase/{tempPhaseId}", new())).StatusCode);
+
         var html = await client.GetStringAsync(details);
         Assert.Contains("id=\"non-labor-costs\"", html);
         Assert.Contains("IDE seats", html);

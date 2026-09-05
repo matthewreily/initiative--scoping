@@ -447,6 +447,11 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return RedirectWithError($"Phase '{phase.Name}' has allocations; remove or move them first.", initiative.Id);
         }
 
+        if (await db.InitiativeNonLaborCosts.AnyAsync(l => l.PhaseId == id, ct))
+        {
+            return RedirectWithError($"Phase '{phase.Name}' has non-labor costs; remove or move them first.", initiative.Id);
+        }
+
         db.Phases.Remove(phase);
         audit.Record(nameof(Phase), phase.Id, AuditActions.Delete, new { initiative.Id, phase.Name });
         await db.SaveChangesAsync(ct);
