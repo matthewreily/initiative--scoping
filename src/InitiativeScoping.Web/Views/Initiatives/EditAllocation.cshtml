@@ -17,7 +17,7 @@
     <div class="row g-3 mb-3">
         <div class="col-md-6">
             <label asp-for="PhaseId" class="form-label"></label>
-            <select asp-for="PhaseId" asp-items="phases" class="form-select" id="phase-id"></select>
+            <select asp-for="PhaseId" asp-items="phases" class="form-select"></select>
             <span asp-validation-for="PhaseId" class="text-danger"></span>
         </div>
         <div class="col-md-6">
@@ -51,7 +51,7 @@
         {
             <div class="col-md-3">
                 <label asp-for="AllocationPercent" class="form-label"></label>
-                <input asp-for="AllocationPercent" class="form-control" type="number" min="0.01" max="100" step="0.01" required id="allocation-percent" />
+                <input asp-for="AllocationPercent" class="form-control" type="number" min="0.01" max="100" step="0.01" required />
                 <span asp-validation-for="AllocationPercent" class="text-danger"></span>
             </div>
             <div class="col-md-3">
@@ -84,6 +84,6 @@
     <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
     @if (fixedDuration)
     {
-        <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phase-id", "allocation-percent", "computed-hours", (IReadOnlyDictionary<int, int>)ViewBag.PhaseWorkingDays, (decimal)ViewBag.HoursPerDay))" />
+        <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("PhaseId", "AllocationPercent", "computed-hours", (IReadOnlyDictionary<int, int>)ViewBag.PhaseWorkingDays, (decimal)ViewBag.HoursPerDay))" />
     }
 }
