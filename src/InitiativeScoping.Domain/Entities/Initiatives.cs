@@ -22,6 +22,7 @@ public class Initiative
     public DateTimeOffset CreatedAt { get; set; }
     public List<Phase> Phases { get; set; } = [];
     public List<InitiativeAllocation> Allocations { get; set; } = [];
+    public List<InitiativeNonLaborCost> NonLaborCosts { get; set; } = [];
     public List<InitiativeMember> Members { get; set; } = [];
     public List<ForecastBaseline> Baselines { get; set; } = [];
     public List<RebaselineRequest> RebaselineRequests { get; set; } = [];
@@ -105,6 +106,30 @@ public class InitiativeAllocation
     public string? CostCenter { get; set; }
 }
 
+/// <summary>
+/// A non-labor cost line (license, hardware, ...). Cost is derived, not stored: UnitCost x Quantity x billable periods
+/// over the line's window (explicit dates, else the phase, else the initiative's target window).
+/// </summary>
+public class InitiativeNonLaborCost
+{
+    public int Id { get; set; }
+    public int InitiativeId { get; set; }
+    public Initiative? Initiative { get; set; }
+    public int? PhaseId { get; set; }
+    public Phase? Phase { get; set; }
+    public CostCategory Category { get; set; } = CostCategory.SoftwareLicense;
+    public int? CostCatalogItemId { get; set; }
+    public CostCatalogItem? CostCatalogItem { get; set; }
+    public required string Description { get; set; }
+    public BillingModel BillingModel { get; set; } = BillingModel.Monthly;
+    public int Quantity { get; set; } = 1;
+    public decimal UnitCost { get; set; }
+    public DateOnly? StartDate { get; set; }
+    public DateOnly? EndDate { get; set; }
+    public string? ContractReference { get; set; }
+    public string? CostCenter { get; set; }
+}
+
 public class ForecastBaseline
 {
     public int Id { get; set; }
@@ -118,6 +143,27 @@ public class ForecastBaseline
     public decimal TotalHours { get; set; }
     public decimal TotalCost { get; set; }
     public List<ForecastBaselineLine> Lines { get; set; } = [];
+    public List<ForecastBaselineNonLaborLine> NonLaborLines { get; set; } = [];
+
+    public decimal LaborCost => Lines.Sum(l => l.Cost);
+    public decimal NonLaborCost => NonLaborLines.Sum(l => l.Cost);
+}
+
+public class ForecastBaselineNonLaborLine
+{
+    public int Id { get; set; }
+    public int ForecastBaselineId { get; set; }
+    public ForecastBaseline? ForecastBaseline { get; set; }
+    public int? PhaseId { get; set; }
+    public CostCategory Category { get; set; }
+    public required string Description { get; set; }
+    public BillingModel BillingModel { get; set; }
+    public int Quantity { get; set; }
+    public decimal UnitCost { get; set; }
+    public int Periods { get; set; }
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
+    public decimal Cost { get; set; }
 }
 
 public class ForecastBaselineLine

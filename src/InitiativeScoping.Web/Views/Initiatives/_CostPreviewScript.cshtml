@@ -1,0 +1,61 @@
+@model CostPreviewScriptModel
+@{
+    var catalog = Model.Catalog.ToDictionary(
+        c => c.Id,
+        c => new { category = (int)c.Category, name = c.Label, billing = (int)c.BillingModel, unitCost = c.UnitCost });
+    var windows = Model.Windows.ToDictionary(
+        w => w.Key,
+        w => new { start = w.Value.Start.ToString("yyyy-MM-dd"), end = w.Value.End.ToString("yyyy-MM-dd") });
+    string Id(string suffix) => Model.Prefix + suffix;
+}
+<script>
+    (function () {
+        const byId = id => document.getElementById(id);
+        const catalogSelect = byId('@Id("catalog")'), category = byId('@Id("category")'), description = byId('@Id("description")');
+        const phase = byId('@Id("phase")'), billing = byId('@Id("billing")'), quantity = byId('@Id("quantity")'), unitCost = byId('@Id("unitcost")');
+        const start = byId('@Id("start")'), end = byId('@Id("end")'), output = byId('@Id("preview")');
+        const catalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(catalog));
+        const windows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(windows));
+        const ONE_TIME = @((int)BillingModel.OneTime), ANNUAL = @((int)BillingModel.Annual);
+
+        function parse(s) { const [y, m, d] = s.split('-').map(Number); return { y, m, d }; }
+        // Mirrors NonLaborCostCalculator.BillablePeriods.
+        function periods(model, from, to) {
+            if (to.y < from.y || (to.y === from.y && (to.m < from.m || (to.m === from.m && to.d < from.d)))) { return 0; }
+            if (model === ONE_TIME) { return 1; }
+            if (model === ANNUAL) {
+                return to.y - from.y + (to.m > from.m || (to.m === from.m && to.d >= from.d) ? 1 : 0);
+            }
+            return (to.y - from.y) * 12 + to.m - from.m + (to.d >= from.d ? 1 : 0);
+        }
+        function billingWindow() {
+            if (start.value && end.value) { return { start: start.value, end: end.value }; }
+            if (start.value || end.value) { return null; }
+            return windows[phase.value || '0'] || null;
+        }
+        function sync() {
+            const w = billingWindow();
+            const model = parseInt(billing.value, 10);
+            const qty = parseInt(quantity.value, 10) || 0;
+            const unit = parseFloat(unitCost.value) || 0;
+            if (!w) { output.value = ''; output.title = 'Enter both start and end dates, or leave both blank.'; return; }
+            const n = periods(model, parse(w.start), parse(w.end));
+            const cost = unit * qty * n;
+            output.value = cost.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+            output.title = w.start + ' → ' + w.end + ': ' + n + ' period(s) × ' + qty + ' × ' + unit;
+        }
+        function prefill() {
+            const item = catalog[catalogSelect.value];
+            if (!item) { sync(); return; }
+            category.value = item.category;
+            billing.value = item.billing;
+            unitCost.value = item.unitCost;
+            if (!description.value) { description.value = item.name; }
+            sync();
+        }
+        catalogSelect.addEventListener('change', prefill);
+        [phase, billing, quantity, unitCost, start, end].forEach(el => el.addEventListener('input', sync));
+        [phase, billing].forEach(el => el.addEventListener('change', sync));
+        sync();
+    })();
+</script>

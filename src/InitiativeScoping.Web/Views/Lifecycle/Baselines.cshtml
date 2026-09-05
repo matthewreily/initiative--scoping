@@ -83,15 +83,48 @@ else
                         </tr>
                     }
                     </tbody>
-                    <tfoot><tr class="fw-semibold"><td colspan="5">Total</td><td class="text-end">@sel.TotalHours.ToString("N1")</td><td></td><td class="text-end">@sel.TotalCost.ToString("C0")</td>
+                    <tfoot><tr class="fw-semibold"><td colspan="5">Labor total</td><td class="text-end">@sel.TotalHours.ToString("N1")</td><td></td><td class="text-end">@sel.LaborCost.ToString("C0")</td>
                         @if (Model.Previous is not null)
                         {
                             var dh = sel.TotalHours - Model.Previous.TotalHours;
-                            var dc = sel.TotalCost - Model.Previous.TotalCost;
+                            var dc = sel.LaborCost - Model.Previous.LaborCost;
                             <td class="text-end">@(dh >= 0 ? "+" : "")@dh.ToString("N1")</td><td class="text-end">@(dc >= 0 ? "+" : "")@dc.ToString("C0")</td>
                         }</tr></tfoot>
                 </table>
                 </div>
+                @if (sel.NonLaborLines.Count > 0 || Model.Previous?.NonLaborLines.Count > 0)
+                {
+                    var phaseNames = Model.Initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
+                    <h3 class="h6 mt-3">Non-labor costs</h3>
+                    <div class="table-responsive">
+                    <table class="table table-sm align-middle" id="baseline-non-labor">
+                        <thead><tr><th>Scope</th><th>Category</th><th>Description</th><th>Billing</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th>Window</th><th class="text-end">Periods</th><th class="text-end">Cost</th></tr></thead>
+                        <tbody>
+                        @foreach (var l in sel.NonLaborLines.OrderBy(l => l.PhaseId ?? int.MaxValue).ThenBy(l => l.Description))
+                        {
+                            <tr>
+                                <td>@(l.PhaseId is { } pid ? phaseNames.GetValueOrDefault(pid, $"Phase #{pid}") : VarianceCalculator.WholeInitiative)</td>
+                                <td>@VarianceCalculator.CategoryLabel(l.Category)</td>
+                                <td>@l.Description</td>
+                                <td>@Html.DisplayFor(_ => l.BillingModel)</td>
+                                <td class="text-end">@l.Quantity</td>
+                                <td class="text-end">@l.UnitCost.ToString("C2")</td>
+                                <td class="text-nowrap">@l.StartDate.ToString("yyyy-MM-dd") → @l.EndDate.ToString("yyyy-MM-dd")</td>
+                                <td class="text-end">@l.Periods</td>
+                                <td class="text-end">@l.Cost.ToString("C0")</td>
+                            </tr>
+                        }
+                        </tbody>
+                        <tfoot><tr class="fw-semibold"><td colspan="8">Non-labor total</td><td class="text-end">@sel.NonLaborCost.ToString("C0")
+                            @if (Model.Previous is not null)
+                            {
+                                var dc = sel.NonLaborCost - Model.Previous.NonLaborCost;
+                                <span class="small fw-normal text-muted">(@(dc >= 0 ? "+" : "")@dc.ToString("C0") vs. v@(Model.Previous.Version))</span>
+                            }</td></tr></tfoot>
+                    </table>
+                    </div>
+                }
+                <p class="fw-semibold text-end mb-0">Baseline total @sel.TotalCost.ToString("C0")</p>
             }
         </div>
     </div>

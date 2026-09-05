@@ -24,7 +24,8 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 4. **Rate Card** – `Admin → Rate Cards → New`. Give it a name and effective start date, then add entries: one row per *Resource type × Business unit × Seniority × Location × Internal/Vendor*. Use *Import CSV* for bulk entry (download the template from the card page). **Publish** when complete; rates are only used from published cards. To change rates later, create a new card with a later effective date and retire the old one – history is preserved and existing baselines are unaffected.
 5. **Sizing conversions** – `Admin → Sizing` maps T-shirt sizes / story points to total hours; **allocation templates** define how those hours split across phases and resource types.
 6. **Work calendar** (needed for fixed-duration initiatives) – `Admin → Work calendar`. Set *hours per working day* (default 8) and add company holidays (weekdays only; Saturdays/Sundays are never working days). Working days = Mon–Fri minus holidays.
-7. **People** (needed for actuals) – `Admin → People`. Each person carries an external id (Planview/Jira resource id), resource type, BU, seniority, location and class so imported hours can be priced.
+7. **Cost catalog** (optional) – `Admin → Cost catalog`. Standard non-labor items (software licenses first; also hardware, cloud, travel, other) with vendor, billing model (*One-time*, *Monthly*, *Annual*) and unit cost, so initiatives price them consistently. Deactivate an item to hide it from new lines; it can only be deleted once no initiative references it.
+8. **People** (needed for actuals) – `Admin → People`. Each person carries an external id (Planview/Jira resource id), resource type, BU, seniority, location and class so imported hours can be priced.
 
 ## 2. Scope an initiative (Owner / Contributor)
 
@@ -34,7 +35,8 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 2. Add **phases** with planned start/end dates (`Add phase`). Dates can be edited later; every change is kept in the phase's date history.
 3. Add **allocations**: phase, resource type, seniority, location, class (Internal FTE / Vendor), quantity and hours (effort-driven) or staffing % (fixed duration; defaults to 100 %, i.e. every working hour in the phase, and the form previews the resulting hours as you change the phase or %). For relative sizing choose a size and *Apply size* to generate allocations from the template, then adjust. In fixed-duration mode *Apply size* splits the target window across the template's phases in proportion to their share of hours and derives the staffing % that yields the size's hours – e.g. “L in 12 weeks needs 1 FTE”. To switch an existing effort-driven initiative to fixed duration, set a target end; existing hours are converted to an equivalent staffing % per phase.
 4. Watch the **Forecast** panel. Each line is priced from the published rate card in effect on the phase start date. A line marked **Unpriced** has no exact rate-card match – add the missing rate (or change the allocation) before activation.
-5. Add members (`Members`) so Owners/Contributors can edit.
+5. Add **non-labor costs** (`Add non-labor cost`) for software licenses and other non-labor spend. Pick a catalog item (category, billing and unit cost prefill) or enter an ad-hoc line; set quantity (e.g. seats), scope it to one phase or the whole initiative, and optionally override the billing window with explicit dates. Billing is by whole periods counted from the start date – any partial month/year counts as a full one (15 Jan–14 Feb = 1 month, 15 Jan–15 Feb = 2; one-time bills once) – and the form previews the cost live. Lines recompute when phase or initiative dates change; a line whose window is empty (end before start, or its phase was deleted) blocks activation. The Forecast panel shows **Labor / Non-labor / Total**.
+6. Add members (`Members`) so Owners/Contributors can edit.
 
 ## 3. Activate and baseline (Owner)
 
@@ -64,12 +66,12 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 3. `Actuals → Import`. Files with any invalid row are rejected as a whole (nothing is written). Files over 10 MB are refused.
 4. Review the import summary: imported / skipped / **unmapped** counts. Unmapped rows (unknown project or person) sit in `Actuals → Unmapped`; assign them to an initiative/person there, or fix the mapping/roster and re-import.
 5. Rows flagged **Unpriced actuals** have no rate for the person's attributes on that date – add the rate to a published card.
-6. Add **adjustments** (hours/cost with a reason) on the initiative's Actuals page for invoices, accruals or corrections.
+6. Add **adjustments** (category, hours/cost with a reason) on the initiative's Actuals page for invoices, accruals or corrections. Use a non-labor category (e.g. *Software license*) for vendor invoices so they land against the non-labor baseline in the variance view.
 
 ## 5. Track variance
 
-- Initiative → **Variance**: current baseline vs. mapped actuals + adjustments, by phase and resource type, with the threshold flag (initiative-level `VarianceThresholdPct` or the global default).
-- **Portfolio** (`/Portfolio`): one row per initiative with live forecast (internal/vendor split), baseline, actuals, variance %, burn bar and badges (*Over threshold*, *Unpriced forecast/actuals*, *Re-baseline pending*), plus rollups by BU and status. Filter by status or BU; tick *Include Complete/Cancelled* to see closed work.
+- Initiative → **Variance**: current baseline vs. mapped actuals + adjustments, by phase, resource type and cost category (labor vs. software license etc.), with the threshold flag (initiative-level `VarianceThresholdPct` or the global default).
+- **Portfolio** (`/Portfolio`): one row per initiative with live forecast (internal/vendor/non-labor split), baseline, actuals, variance %, burn bar and badges (*Over threshold*, *Unpriced forecast/actuals*, *Re-baseline pending*), plus rollups by BU and status. Filter by status or BU; tick *Include Complete/Cancelled* to see closed work.
 - **Export** (Administrator / FinancePmo): *Export CSV/XLSX* on the portfolio (honours current filters) or on an initiative (summary, forecast, baseline, variance, actuals, adjustments). Exports are audited.
 
 ## 6. Audit

@@ -1,0 +1,48 @@
+@model CostCatalogItemEditModel
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "New catalog item" : "Edit catalog item";
+    var categories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString());
+    var billing = Html.GetEnumSelectList<BillingModel>();
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<h2 class="h5">@ViewData["Title"]</h2>
+<form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Category" class="form-label"></label>
+        <select asp-for="Category" asp-items="categories" class="form-select"></select>
+        <span asp-validation-for="Category" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Vendor" class="form-label"></label>
+        <input asp-for="Vendor" class="form-control" />
+        <span asp-validation-for="Vendor" class="text-danger"></span>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+            <label asp-for="BillingModel" class="form-label"></label>
+            <select asp-for="BillingModel" asp-items="billing" class="form-select"></select>
+            <span asp-validation-for="BillingModel" class="text-danger"></span>
+        </div>
+        <div class="col-sm-6">
+            <label asp-for="UnitCost" class="form-label"></label>
+            <input asp-for="UnitCost" type="number" step="0.01" min="0" class="form-control" />
+            <div class="form-text">Per unit, per billing period (e.g. per seat per month).</div>
+            <span asp-validation-for="UnitCost" class="text-danger"></span>
+        </div>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label">Active</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

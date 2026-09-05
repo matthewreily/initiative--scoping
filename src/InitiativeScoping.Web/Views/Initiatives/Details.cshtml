@@ -5,6 +5,8 @@
     var seniorities = Html.GetEnumSelectList<Seniority>();
     var classes = Html.GetEnumSelectList<ResourcingClass>();
     var roles = Html.GetEnumSelectList<InitiativeMemberRole>();
+    var nonLaborCategories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString()).ToList();
+    var billingModels = Html.GetEnumSelectList<BillingModel>();
     var phaseNames = i.Phases.ToDictionary(p => p.Id, p => p.Name);
     var lineByAllocation = Model.Forecast.Lines.ToDictionary(l => l.Allocation.Id);
     var orderedAllocations = i.Allocations
@@ -170,10 +172,15 @@ else
 <div class="row g-3 mb-4">
     <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast hours</div><div class="fs-3">@Model.Forecast.TotalHours.ToString("N1")</div></div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3">@Model.Forecast.TotalCost.ToString("C0")</div>
+        @if (Model.Forecast.NonLaborLines.Count > 0) { <div class="small text-muted" id="forecast-cost-split">Labor @Model.Forecast.LaborCost.ToString("C0") &middot; Non-labor @Model.Forecast.NonLaborCost.ToString("C0")</div> }
         @if (!Model.Forecast.IsComplete) { <span class="badge bg-warning text-dark">Incomplete – unpriced lines</span> }</div></div></div>
     @foreach (var row in Model.ByClass)
     {
         <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">@row.Label</div><div class="fs-3">@row.Cost.ToString("C0")</div><div class="small text-muted">@row.Hours.ToString("N1") h</div></div></div></div>
+    }
+    @if (Model.Forecast.NonLaborLines.Count > 0)
+    {
+        <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Non-labor</div><div class="fs-3">@Model.Forecast.NonLaborCost.ToString("C0")</div><div class="small text-muted">@Model.Forecast.NonLaborLines.Count line(s)</div></div></div></div>
     }
 </div>
 
@@ -296,7 +303,7 @@ else
             </tbody>
             @if (i.Allocations.Count > 0)
             {
-                <tfoot class="fw-semibold"><tr><td colspan="@(fixedDuration ? 7 : 6)" class="text-end">Total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.TotalCost.ToString("C0")</td><td></td></tr></tfoot>
+                <tfoot class="fw-semibold"><tr><td colspan="@(fixedDuration ? 7 : 6)" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td></td></tr></tfoot>
             }
         </table>
         </div>
@@ -361,6 +368,110 @@ else
             {
                 <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />
             }
+        }
+
+        <h2 class="h5" id="non-labor-costs">Non-labor costs</h2>
+        <p class="text-muted small mb-2">Software licenses and other non-labor spend. Recurring lines bill whole months/years over the phase or initiative window (any partial period counts as a full one) unless explicit dates are set.</p>
+        <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Scope</th><th>Category</th><th>Description</th><th>Billing</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th>Window</th><th class="text-end">Periods</th><th class="text-end">Cost</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var nl in Model.Forecast.NonLaborLines.OrderBy(l => l.Line.PhaseId is null ? int.MaxValue : i.Phases.FirstOrDefault(p => p.Id == l.Line.PhaseId)?.Sequence ?? int.MaxValue).ThenBy(l => l.Line.Description))
+            {
+                var c = nl.Line;
+                <tr class="@(nl.Periods == 0 ? "table-warning" : "")">
+                    <td>@(c.PhaseId is null ? "Whole initiative" : phaseNames.GetValueOrDefault(c.PhaseId.Value, "?"))</td>
+                    <td>@VarianceCalculator.CategoryLabel(c.Category)</td>
+                    <td>@c.Description @if (c.CostCatalogItem is not null) { <span class="badge bg-light text-dark border" title="From catalog">catalog</span> }</td>
+                    <td>@Html.DisplayFor(_ => c.BillingModel)</td>
+                    <td class="text-end">@c.Quantity</td>
+                    <td class="text-end">@c.UnitCost.ToString("C2")</td>
+                    <td class="text-nowrap">@(nl.HasWindow ? $"{nl.Start:yyyy-MM-dd} → {nl.End:yyyy-MM-dd}" : "—")</td>
+                    <td class="text-end">@(nl.Periods == 0 ? Html.Raw("<span class='text-danger' title='Empty billing window'>0</span>") : nl.Periods)</td>
+                    <td class="text-end">@nl.Cost.ToString("C0")</td>
+                    <td class="text-end text-nowrap">
+                        @if (Model.ScopeWritable)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditNonLaborCost" asp-route-id="@c.Id">Edit</a>
+                            <form asp-action="DeleteNonLaborCost" asp-route-id="@c.Id" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">&times;</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Forecast.NonLaborLines.Count == 0)
+            {
+                <tr><td colspan="10" class="text-muted">No non-labor costs yet.</td></tr>
+            }
+            </tbody>
+            @if (Model.Forecast.NonLaborLines.Count > 0)
+            {
+                <tfoot class="fw-semibold"><tr><td colspan="8" class="text-end">Non-labor total</td><td class="text-end">@Model.Forecast.NonLaborCost.ToString("C0")</td><td></td></tr></tfoot>
+            }
+        </table>
+        </div>
+        @if (Model.ScopeWritable)
+        {
+            <form asp-action="AddNonLaborCost" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4" id="nl-form">
+                <div class="col-md-4">
+                    <label for="nl-catalog" class="form-label small mb-0">Catalog item</label>
+                    <select name="CostCatalogItemId" id="nl-catalog" class="form-select form-select-sm">
+                        <option value="">Ad-hoc (enter details below)</option>
+                        @foreach (var opt in Model.CatalogOptions) { <option value="@opt.Id">@opt.Label</option> }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="nl-category" class="form-label small mb-0">Category</label>
+                    <select name="Category" id="nl-category" asp-items="nonLaborCategories" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-5">
+                    <label for="nl-description" class="form-label small mb-0">Description</label>
+                    <input name="Description" id="nl-description" class="form-control form-control-sm" placeholder="e.g. Jira Software seats" required maxlength="300" />
+                </div>
+                <div class="col-md-3">
+                    <label for="nl-phase" class="form-label small mb-0">Scope</label>
+                    <select name="PhaseId" id="nl-phase" class="form-select form-select-sm">
+                        <option value="">Whole initiative</option>
+                        @foreach (var p in i.Phases.OrderBy(p => p.Sequence)) { <option value="@p.Id">@p.Name</option> }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="nl-billing" class="form-label small mb-0">Billing</label>
+                    <select name="BillingModel" id="nl-billing" asp-items="billingModels" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-1">
+                    <label for="nl-quantity" class="form-label small mb-0">Qty</label>
+                    <input name="Quantity" id="nl-quantity" type="number" min="1" class="form-control form-control-sm" value="1" required />
+                </div>
+                <div class="col-md-2">
+                    <label for="nl-unitcost" class="form-label small mb-0">Unit cost</label>
+                    <input name="UnitCost" id="nl-unitcost" type="number" min="0" step="0.01" class="form-control form-control-sm" required />
+                </div>
+                <div class="col-md-2">
+                    <label for="nl-start" class="form-label small mb-0">Start (optional)</label>
+                    <input name="StartDate" id="nl-start" type="date" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2">
+                    <label for="nl-end" class="form-label small mb-0">End (optional)</label>
+                    <input name="EndDate" id="nl-end" type="date" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-3">
+                    <label for="nl-contract" class="form-label small mb-0">Contract ref</label>
+                    <input name="ContractReference" id="nl-contract" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-3">
+                    <label for="nl-costcenter" class="form-label small mb-0">Cost center</label>
+                    <input name="CostCenter" id="nl-costcenter" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-4">
+                    <label for="nl-preview" class="form-label small mb-0">Cost preview</label>
+                    <input id="nl-preview" class="form-control form-control-sm" readonly tabindex="-1" aria-describedby="nl-preview-help" />
+                    <div class="form-text" id="nl-preview-help">Unit cost × qty × whole periods; final value computed on save.</div>
+                </div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
+            </form>
+            <partial name="_CostPreviewScript" model="@(new CostPreviewScriptModel("nl-", Model.CatalogOptions, Model.CostPreviewWindows))" />
         }
     </div>
 

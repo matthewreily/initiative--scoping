@@ -11,10 +11,25 @@ public sealed record ForecastLine(
     public decimal Cost => Hours * (HourlyRate ?? 0m);
 }
 
-public sealed record ForecastResult(IReadOnlyList<ForecastLine> Lines)
+/// <summary>Priced non-labor line. <see cref="Periods"/> is 0 (and cost 0) when the window is empty or its phase is missing.</summary>
+public sealed record NonLaborForecastLine(
+    InitiativeNonLaborCost Line,
+    DateOnly? Start,
+    DateOnly? End,
+    int Periods,
+    decimal Cost)
 {
+    public bool HasWindow => Start is not null;
+}
+
+public sealed record ForecastResult(IReadOnlyList<ForecastLine> Lines, IReadOnlyList<NonLaborForecastLine> NonLaborLines)
+{
+    public ForecastResult(IReadOnlyList<ForecastLine> lines) : this(lines, []) { }
+
     public decimal TotalHours => Lines.Sum(l => l.Hours);
-    public decimal TotalCost => Lines.Sum(l => l.Cost);
+    public decimal LaborCost => Lines.Sum(l => l.Cost);
+    public decimal NonLaborCost => NonLaborLines.Sum(l => l.Cost);
+    public decimal TotalCost => LaborCost + NonLaborCost;
     public bool IsComplete => Lines.All(l => !l.IsUnpriced);
 }
 
@@ -35,6 +50,22 @@ public static class ForecastCalculator
             return new ForecastLine(a, a.Quantity * a.EstimatedHours, rate);
         }).ToList();
 
-        return new ForecastResult(lines);
+        var nonLabor = initiative.NonLaborCosts.Select(c => PriceNonLabor(c, initiative)).ToList();
+
+        return new ForecastResult(lines, nonLabor);
+    }
+
+    public static NonLaborForecastLine PriceNonLabor(InitiativeNonLaborCost line, Initiative initiative)
+    {
+        var window = NonLaborCostCalculator.Window(line, initiative);
+        if (window is null)
+        {
+            return new NonLaborForecastLine(line, null, null, 0, 0m);
+        }
+
+        var (start, end) = window.Value;
+        var periods = NonLaborCostCalculator.BillablePeriods(line.BillingModel, start, end);
+        return new NonLaborForecastLine(line, start, end, periods,
+            NonLaborCostCalculator.Cost(line.BillingModel, line.UnitCost, line.Quantity, start, end));
     }
 }

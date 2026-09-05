@@ -116,7 +116,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             return NotFound();
         }
 
-        var baselines = await db.ForecastBaselines.Include(b => b.Lines)
+        var baselines = await db.ForecastBaselines.Include(b => b.Lines).Include(b => b.NonLaborLines)
             .Where(b => b.InitiativeId == id).AsNoTracking().ToListAsync(ct);
         baselines = baselines.OrderByDescending(b => b.Version).ToList();
         var selected = version is null ? baselines.FirstOrDefault(b => b.IsCurrent) ?? baselines.FirstOrDefault()
@@ -296,6 +296,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.Members)
             .Include(i => i.Phases)
             .Include(i => i.Allocations)
+            .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines)
             .Include(i => i.RebaselineRequests)
             .AsSplitQuery()

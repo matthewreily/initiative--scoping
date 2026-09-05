@@ -87,20 +87,42 @@
             </tbody>
         </table>
         </div>
+
+        <h2 class="h5 mt-4">By cost category <span class="text-muted small fw-normal">(imported time is labor; adjustments count against their category)</span></h2>
+        <div class="table-responsive">
+        <table class="table table-sm" id="variance-by-category">
+            <thead><tr><th>Category</th><th class="text-end">Baseline $</th><th class="text-end">Actual $</th><th class="text-end">Variance</th><th class="text-end">EAC $</th><th class="text-end">Projected</th></tr></thead>
+            <tbody>
+            @foreach (var r in v.ByCategory)
+            {
+                <tr>
+                    <td>@r.Label</td>
+                    <td class="text-end">@r.BaselineCost.ToString("C0")</td>
+                    <td class="text-end">@r.ActualCost.ToString("C0")</td>
+                    <td class="text-end @VarClass(r.CostVariance)">@Signed(r.CostVariance, "C0") @(r.CostVariancePct is null ? "" : $"({Signed(r.CostVariancePct.Value, "0.0")}%)")</td>
+                    <td class="text-end">@r.EacCost.ToString("C0")</td>
+                    <td class="text-end @VarClass(r.EacCostVariance)">@Signed(r.EacCostVariance, "C0") @(r.EacCostVariancePct is null ? "" : $"({Signed(r.EacCostVariancePct.Value, "0.0")}%)")</td>
+                </tr>
+            }
+            @if (v.ByCategory.Count == 0) { <tr><td colspan="6" class="text-muted">Nothing yet.</td></tr> }
+            </tbody>
+        </table>
+        </div>
     </div>
 </div>
 
 <h2 class="h5 mt-4">Adjustments</h2>
-<p class="text-muted small">Manual corrections to actuals (e.g. vendor invoices not in the time system). Adjustments add to sourced actuals and are audited.</p>
+<p class="text-muted small">Manual corrections to actuals (e.g. vendor invoices not in the time system, software license invoices). Adjustments add to sourced actuals, count against their cost category, and are audited.</p>
 <div class="table-responsive">
 <table class="table table-sm align-middle">
-    <thead><tr><th>Date</th><th>By</th><th>Reason</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>By</th><th>Category</th><th>Reason</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th></th></tr></thead>
     <tbody>
     @foreach (var a in Model.Adjustments)
     {
         <tr>
             <td class="small">@a.CreatedAt.ToString("yyyy-MM-dd")</td>
             <td class="small">@a.CreatedBy</td>
+            <td>@VarianceCalculator.CategoryLabel(a.Category)</td>
             <td>@a.Reason</td>
             <td class="text-end">@Signed(a.Hours, "N1")</td>
             <td class="text-end">@Signed(a.Cost, "C0")</td>
@@ -114,13 +136,17 @@
             </td>
         </tr>
     }
-    @if (Model.Adjustments.Count == 0) { <tr><td colspan="6" class="text-muted">No adjustments.</td></tr> }
+    @if (Model.Adjustments.Count == 0) { <tr><td colspan="7" class="text-muted">No adjustments.</td></tr> }
     </tbody>
 </table>
 </div>
 @if (Model.CanManage)
 {
     <form asp-action="AddAdjustment" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
+        <div class="col-md-2">
+            <label for="category" class="form-label small mb-0">Category</label>
+            <select name="Category" id="category" asp-items="Html.GetEnumSelectList<CostCategory>()" class="form-select form-select-sm"></select>
+        </div>
         <div class="col-md-2">
             <label for="hours" class="form-label small mb-0">Hours (&plusmn;)</label>
             <input name="Hours" id="hours" type="number" step="0.5" value="0" class="form-control form-control-sm" required />
@@ -129,7 +155,7 @@
             <label for="cost" class="form-label small mb-0">Cost (&plusmn;)</label>
             <input name="Cost" id="cost" type="number" step="0.01" value="0" class="form-control form-control-sm" required />
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label for="reason" class="form-label small mb-0">Reason</label>
             <input name="Reason" id="reason" class="form-control form-control-sm" placeholder="e.g. Vendor invoice INV-2231 for March" required maxlength="1000" />
         </div>

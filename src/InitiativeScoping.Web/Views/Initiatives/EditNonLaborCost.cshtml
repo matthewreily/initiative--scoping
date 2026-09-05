@@ -1,0 +1,93 @@
+@model NonLaborCostEditModel
+@{
+    var initiative = (Initiative)ViewBag.Initiative;
+    var catalog = (IReadOnlyList<CatalogOption>)ViewBag.CatalogOptions;
+    var windows = (IReadOnlyDictionary<int, (DateOnly Start, DateOnly End)>)ViewBag.CostPreviewWindows;
+    var categories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString()).ToList();
+    ViewData["Title"] = "Edit non-labor cost";
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+    <li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>
+    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@initiative.Id">@initiative.Name</a></li>
+    <li class="breadcrumb-item active">Edit non-labor cost</li>
+</ol></nav>
+<h1 class="h3">Edit non-labor cost</h1>
+<form asp-action="EditNonLaborCost" asp-route-id="@Model.Id" method="post" class="col-lg-8">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label asp-for="CostCatalogItemId" class="form-label"></label>
+            <select asp-for="CostCatalogItemId" id="nl-catalog" class="form-select">
+                <option value="">Ad-hoc</option>
+                @foreach (var opt in catalog) { <option value="@opt.Id">@opt.Label</option> }
+            </select>
+            <span asp-validation-for="CostCatalogItemId" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Category" class="form-label"></label>
+            <select asp-for="Category" id="nl-category" asp-items="categories" class="form-select"></select>
+            <span asp-validation-for="Category" class="text-danger"></span>
+        </div>
+        <div class="col-12">
+            <label asp-for="Description" class="form-label"></label>
+            <input asp-for="Description" id="nl-description" class="form-control" />
+            <span asp-validation-for="Description" class="text-danger"></span>
+        </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label asp-for="PhaseId" class="form-label">Scope</label>
+            <select asp-for="PhaseId" id="nl-phase" class="form-select">
+                <option value="">Whole initiative</option>
+                @foreach (var p in initiative.Phases.OrderBy(p => p.Sequence)) { <option value="@p.Id">@p.Name</option> }
+            </select>
+            <span asp-validation-for="PhaseId" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="BillingModel" class="form-label"></label>
+            <select asp-for="BillingModel" id="nl-billing" asp-items="Html.GetEnumSelectList<BillingModel>()" class="form-select"></select>
+        </div>
+        <div class="col-md-2">
+            <label asp-for="Quantity" class="form-label"></label>
+            <input asp-for="Quantity" id="nl-quantity" class="form-control" type="number" min="1" />
+            <span asp-validation-for="Quantity" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="UnitCost" class="form-label"></label>
+            <input asp-for="UnitCost" id="nl-unitcost" class="form-control" type="number" min="0" step="0.01" />
+            <span asp-validation-for="UnitCost" class="text-danger"></span>
+        </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <label asp-for="StartDate" class="form-label"></label>
+            <input asp-for="StartDate" id="nl-start" class="form-control" type="date" />
+            <span asp-validation-for="StartDate" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="EndDate" class="form-label"></label>
+            <input asp-for="EndDate" id="nl-end" class="form-control" type="date" />
+            <span asp-validation-for="EndDate" class="text-danger"></span>
+            <div class="form-text">Leave both blank to bill over the phase/initiative window.</div>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="ContractReference" class="form-label"></label>
+            <input asp-for="ContractReference" class="form-control" />
+        </div>
+        <div class="col-md-3">
+            <label asp-for="CostCenter" class="form-label"></label>
+            <input asp-for="CostCenter" class="form-control" />
+        </div>
+        <div class="col-md-4">
+            <label for="nl-preview" class="form-label">Cost preview</label>
+            <input id="nl-preview" class="form-control" readonly tabindex="-1" aria-describedby="nl-preview-help" />
+            <div class="form-text" id="nl-preview-help">Unit cost × qty × whole periods; final value computed on save.</div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Details" asp-route-id="@initiative.Id" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts {
+    <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
+    <partial name="_CostPreviewScript" model="@(new CostPreviewScriptModel("nl-", catalog, windows))" />
+}

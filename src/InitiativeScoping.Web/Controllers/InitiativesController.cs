@@ -25,7 +25,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     public async Task<IActionResult> Index(InitiativeStatus? status, int? businessUnitId, string? search, CancellationToken ct)
     {
-        var query = db.Initiatives.Include(i => i.BusinessUnit).Include(i => i.Phases).Include(i => i.Allocations).AsSplitQuery().AsQueryable();
+        var query = db.Initiatives.Include(i => i.BusinessUnit).Include(i => i.Phases).Include(i => i.Allocations).Include(i => i.NonLaborCosts).AsSplitQuery().AsQueryable();
         if (status is not null)
         {
             query = query.Where(i => i.Status == status);
@@ -272,6 +272,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 PlannedEnd = nextPhaseEnd
             },
             NewAllocation = new AllocationEditModel { InitiativeId = id },
+            NewNonLaborCost = new NonLaborCostEditModel { InitiativeId = id },
+            CatalogOptions = await CatalogOptionsAsync(ct),
+            CostPreviewWindows = CostPreviewWindows(initiative),
             NewMember = new MemberEditModel { InitiativeId = id },
             ApplySize = new ApplySizeModel
             {
@@ -444,6 +447,11 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return RedirectWithError($"Phase '{phase.Name}' has allocations; remove or move them first.", initiative.Id);
         }
 
+        if (await db.InitiativeNonLaborCosts.AnyAsync(l => l.PhaseId == id, ct))
+        {
+            return RedirectWithError($"Phase '{phase.Name}' has non-labor costs; remove or move them first.", initiative.Id);
+        }
+
         db.Phases.Remove(phase);
         audit.Record(nameof(Phase), phase.Id, AuditActions.Delete, new { initiative.Id, phase.Name });
         await db.SaveChangesAsync(ct);
@@ -585,6 +593,127 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Delete, AllocationSnapshot(allocation));
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Allocation removed.", initiative.Id);
+    }
+
+    // ----- Non-labor costs -----
+
+    [HttpPost]
+    public async Task<IActionResult> AddNonLaborCost(int id, NonLaborCostEditModel model, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsScopeEditable(initiative))
+        {
+            return RedirectWithError(ScopeLockedMessage, id);
+        }
+
+        await ValidateNonLaborCost(model, initiative, ct);
+        if (!ModelState.IsValid)
+        {
+            return RedirectWithError(FirstError(), id);
+        }
+
+        var line = new InitiativeNonLaborCost { Description = model.Description.Trim() };
+        ApplyNonLaborCost(line, model);
+        initiative.NonLaborCosts.Add(line);
+        await db.SaveChangesAsync(ct);
+        audit.Record(nameof(InitiativeNonLaborCost), line.Id, AuditActions.Create, NonLaborSnapshot(line));
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess("Non-labor cost added.", id);
+    }
+
+    public async Task<IActionResult> EditNonLaborCost(int id, CancellationToken ct)
+    {
+        var line = await LoadNonLaborCostAsync(id, ct);
+        if (line is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanEdit(currentUser, line.Initiative!))
+        {
+            return Forbid();
+        }
+
+        await PopulateNonLaborLists(line.Initiative!, ct);
+        return View(new NonLaborCostEditModel
+        {
+            Id = line.Id, InitiativeId = line.InitiativeId, PhaseId = line.PhaseId, CostCatalogItemId = line.CostCatalogItemId,
+            Category = line.Category, Description = line.Description, BillingModel = line.BillingModel, Quantity = line.Quantity,
+            UnitCost = line.UnitCost, StartDate = line.StartDate, EndDate = line.EndDate,
+            ContractReference = line.ContractReference, CostCenter = line.CostCenter
+        });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> EditNonLaborCost(int id, NonLaborCostEditModel model, CancellationToken ct)
+    {
+        var line = await LoadNonLaborCostAsync(id, ct);
+        if (line is null)
+        {
+            return NotFound();
+        }
+
+        var initiative = line.Initiative!;
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsScopeEditable(initiative))
+        {
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
+        }
+
+        model.Id = id;
+        model.InitiativeId = initiative.Id;
+        await ValidateNonLaborCost(model, initiative, ct);
+        if (!ModelState.IsValid)
+        {
+            await PopulateNonLaborLists(initiative, ct);
+            return View(model);
+        }
+
+        var before = NonLaborSnapshot(line);
+        ApplyNonLaborCost(line, model);
+        audit.Record(nameof(InitiativeNonLaborCost), line.Id, AuditActions.Update, new { Before = before, After = NonLaborSnapshot(line) });
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess("Non-labor cost updated.", initiative.Id);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeleteNonLaborCost(int id, CancellationToken ct)
+    {
+        var line = await LoadNonLaborCostAsync(id, ct);
+        if (line is null)
+        {
+            return NotFound();
+        }
+
+        var initiative = line.Initiative!;
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsScopeEditable(initiative))
+        {
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
+        }
+
+        db.InitiativeNonLaborCosts.Remove(line);
+        audit.Record(nameof(InitiativeNonLaborCost), line.Id, AuditActions.Delete, NonLaborSnapshot(line));
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess("Non-labor cost removed.", initiative.Id);
     }
 
     // ----- Relative sizing -----
@@ -902,7 +1031,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.Members)
             .Include(i => i.Phases)
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
+            .Include(i => i.NonLaborCosts).ThenInclude(c => c.CostCatalogItem)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
+            .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)
             .Include(i => i.RebaselineRequests)
             .Include(i => i.SourceMappings)
             .AsSplitQuery();
@@ -1099,6 +1230,79 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ModelState.AddModelError(nameof(model.EstimatedHours), "Hours must be at least 0.25.");
         }
     }
+
+    private Task<InitiativeNonLaborCost?> LoadNonLaborCostAsync(int id, CancellationToken ct) =>
+        db.InitiativeNonLaborCosts
+            .Include(c => c.Initiative!).ThenInclude(i => i.Members)
+            .Include(c => c.Initiative!).ThenInclude(i => i.RebaselineRequests)
+            .Include(c => c.Initiative!).ThenInclude(i => i.Phases)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+    private Task<List<CatalogOption>> CatalogOptionsAsync(CancellationToken ct) =>
+        db.CostCatalogItems.Where(i => i.IsActive).OrderBy(i => i.Category).ThenBy(i => i.Name)
+            .Select(i => new CatalogOption(i.Id, i.Category, i.Name, i.Vendor, i.BillingModel, i.UnitCost))
+            .ToListAsync(ct);
+
+    private static Dictionary<int, (DateOnly Start, DateOnly End)> CostPreviewWindows(Initiative initiative)
+    {
+        var windows = initiative.Phases.ToDictionary(p => p.Id, p => (p.PlannedStart, p.PlannedEnd));
+        windows[0] = (initiative.TargetStart, NonLaborCostCalculator.InitiativeEnd(initiative));
+        return windows;
+    }
+
+    private async Task PopulateNonLaborLists(Initiative initiative, CancellationToken ct)
+    {
+        ViewBag.Initiative = initiative;
+        ViewBag.Phases = new SelectList(initiative.Phases.OrderBy(p => p.Sequence), "Id", "Name");
+        ViewBag.CatalogOptions = await CatalogOptionsAsync(ct);
+        ViewBag.CostPreviewWindows = CostPreviewWindows(initiative);
+    }
+
+    private async Task ValidateNonLaborCost(NonLaborCostEditModel model, Initiative initiative, CancellationToken ct)
+    {
+        if (model.Category == CostCategory.Labor)
+        {
+            ModelState.AddModelError(nameof(model.Category), "Labor is planned through allocations; pick a non-labor category.");
+        }
+
+        if (model.PhaseId is { } phaseId && initiative.Phases.All(p => p.Id != phaseId))
+        {
+            ModelState.AddModelError(nameof(model.PhaseId), "Select a phase that belongs to this initiative, or leave blank for the whole initiative.");
+        }
+
+        if (model.CostCatalogItemId is { } catalogId && !await db.CostCatalogItems.AnyAsync(i => i.Id == catalogId, ct))
+        {
+            ModelState.AddModelError(nameof(model.CostCatalogItemId), "Select a catalog item.");
+        }
+
+        if (model.StartDate is null != model.EndDate is null)
+        {
+            ModelState.AddModelError(nameof(model.EndDate), "Enter both start and end dates, or leave both blank to use the phase/initiative window.");
+        }
+        else if (model.EndDate < model.StartDate)
+        {
+            ModelState.AddModelError(nameof(model.EndDate), "End must be on or after start.");
+        }
+    }
+
+    private static void ApplyNonLaborCost(InitiativeNonLaborCost line, NonLaborCostEditModel model)
+    {
+        line.PhaseId = model.PhaseId;
+        line.CostCatalogItemId = model.CostCatalogItemId;
+        line.Category = model.Category;
+        line.Description = model.Description.Trim();
+        line.BillingModel = model.BillingModel;
+        line.Quantity = model.Quantity;
+        line.UnitCost = model.UnitCost!.Value;
+        line.StartDate = model.StartDate;
+        line.EndDate = model.EndDate;
+        line.ContractReference = string.IsNullOrWhiteSpace(model.ContractReference) ? null : model.ContractReference.Trim();
+        line.CostCenter = string.IsNullOrWhiteSpace(model.CostCenter) ? null : model.CostCenter.Trim();
+    }
+
+    private static object NonLaborSnapshot(InitiativeNonLaborCost c) =>
+        new { c.InitiativeId, c.PhaseId, c.CostCatalogItemId, c.Category, c.Description, c.BillingModel, c.Quantity, c.UnitCost, c.StartDate, c.EndDate, c.ContractReference, c.CostCenter };
 
     private string FirstError() =>
         ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault(m => !string.IsNullOrEmpty(m)) ?? "Invalid input.";
