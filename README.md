@@ -100,7 +100,7 @@ To apply migrations without starting the web server (used by the Cloud Run migra
 
 ## Deployment (GCP)
 
-See [`deploy/gcp/README.md`](deploy/gcp/README.md): Terraform for Cloud Run + Cloud SQL (PostgreSQL 16) + Secret Manager + Artifact Registry + Workload Identity Federation, and `.github/workflows/deploy.yml` which builds the image, runs the migrate job, deploys and smoke-tests `/health`.
+See [`deploy/gcp/README.md`](deploy/gcp/README.md): Terraform for Cloud Run + Cloud SQL (PostgreSQL 16) + Secret Manager + Artifact Registry + Workload Identity Federation, and `.github/workflows/deploy.yml` which builds the image, runs the migrate job, deploys and smoke-tests `/health`. Live URLs, console links and identifiers for every environment are listed in [`ENVIRONMENTS.md`](ENVIRONMENTS.md).
 
 ## Authentication (non-development)
 
