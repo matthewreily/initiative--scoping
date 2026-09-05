@@ -75,6 +75,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
         var adjustment = new ActualAdjustment
         {
             InitiativeId = id,
+            Category = model.Category,
             Hours = model.Hours,
             Cost = model.Cost,
             Reason = model.Reason.Trim(),
@@ -83,7 +84,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
         };
         db.ActualAdjustments.Add(adjustment);
         await db.SaveChangesAsync(ct);
-        audit.Record(nameof(Initiative), id, AuditActions.Adjustment, new { adjustment.Id, adjustment.Hours, adjustment.Cost, adjustment.Reason });
+        audit.Record(nameof(Initiative), id, AuditActions.Adjustment, new { adjustment.Id, adjustment.Category, adjustment.Hours, adjustment.Cost, adjustment.Reason });
         await db.SaveChangesAsync(ct);
         return RedirectToInitiative(id, success: $"Adjustment recorded ({adjustment.Hours:+0.0;-0.0;0} h, {adjustment.Cost:+$#,0;-$#,0;$0}).");
     }
@@ -271,6 +272,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
             .Include(i => i.Members)
             .Include(i => i.Phases)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
+            .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)
             .Include(i => i.RebaselineRequests)
             .Include(i => i.SourceMappings)
             .AsNoTracking()

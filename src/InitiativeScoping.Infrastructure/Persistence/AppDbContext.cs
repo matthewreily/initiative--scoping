@@ -15,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SizingConversion> SizingConversions => Set<SizingConversion>();
     public DbSet<WorkCalendarSettings> WorkCalendarSettings => Set<WorkCalendarSettings>();
     public DbSet<Holiday> Holidays => Set<Holiday>();
+    public DbSet<CostCatalogItem> CostCatalogItems => Set<CostCatalogItem>();
     public DbSet<AllocationTemplate> AllocationTemplates => Set<AllocationTemplate>();
     public DbSet<AllocationTemplateLine> AllocationTemplateLines => Set<AllocationTemplateLine>();
     public DbSet<Initiative> Initiatives => Set<Initiative>();
@@ -22,8 +23,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Phase> Phases => Set<Phase>();
     public DbSet<PhaseDateHistory> PhaseDateHistories => Set<PhaseDateHistory>();
     public DbSet<InitiativeAllocation> InitiativeAllocations => Set<InitiativeAllocation>();
+    public DbSet<InitiativeNonLaborCost> InitiativeNonLaborCosts => Set<InitiativeNonLaborCost>();
     public DbSet<ForecastBaseline> ForecastBaselines => Set<ForecastBaseline>();
     public DbSet<ForecastBaselineLine> ForecastBaselineLines => Set<ForecastBaselineLine>();
+    public DbSet<ForecastBaselineNonLaborLine> ForecastBaselineNonLaborLines => Set<ForecastBaselineNonLaborLine>();
     public DbSet<RebaselineRequest> RebaselineRequests => Set<RebaselineRequest>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<InitiativeSourceMapping> InitiativeSourceMappings => Set<InitiativeSourceMapping>();
@@ -89,6 +92,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<WorkCalendarSettings>(e => e.Property(x => x.HoursPerDay).HasPrecision(4, 2));
 
+        b.Entity<CostCatalogItem>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
+            e.Property(x => x.Vendor).HasMaxLength(200);
+            e.Property(x => x.UnitCost).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.Category, x.Name }).IsUnique();
+        });
+
         b.Entity<Holiday>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200);
@@ -120,6 +131,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.Phases).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Allocations).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
+            e.HasMany(x => x.NonLaborCosts).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Members).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Baselines).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
         });
@@ -147,6 +159,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
+        b.Entity<InitiativeNonLaborCost>(e =>
+        {
+            e.Property(x => x.Description).HasMaxLength(300);
+            e.Property(x => x.UnitCost).HasPrecision(18, 2);
+            e.Property(x => x.ContractReference).HasMaxLength(200);
+            e.Property(x => x.CostCenter).HasMaxLength(100);
+            e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CostCatalogItem).WithMany().HasForeignKey(x => x.CostCatalogItemId).OnDelete(DeleteBehavior.SetNull);
+        });
+
         b.Entity<ForecastBaseline>(e =>
         {
             e.Property(x => x.SnapshotBy).HasMaxLength(200);
@@ -155,6 +177,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => new { x.InitiativeId, x.Version }).IsUnique();
             e.HasIndex(x => new { x.InitiativeId, x.IsCurrent });
             e.HasMany(x => x.Lines).WithOne(x => x.ForecastBaseline).HasForeignKey(x => x.ForecastBaselineId);
+            e.HasMany(x => x.NonLaborLines).WithOne(x => x.ForecastBaseline).HasForeignKey(x => x.ForecastBaselineId);
+        });
+
+        b.Entity<ForecastBaselineNonLaborLine>(e =>
+        {
+            e.Property(x => x.Description).HasMaxLength(300);
+            e.Property(x => x.UnitCost).HasPrecision(18, 2);
+            e.Property(x => x.Cost).HasPrecision(18, 2);
         });
 
         b.Entity<RebaselineRequest>(e =>

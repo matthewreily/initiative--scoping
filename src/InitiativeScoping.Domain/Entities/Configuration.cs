@@ -64,6 +64,18 @@ public class WorkCalendarSettings
     public decimal HoursPerDay { get; set; } = 8;
 }
 
+/// <summary>Admin-managed non-labor cost item (software license, hardware SKU, ...) initiatives can pick to prefill a cost line.</summary>
+public class CostCatalogItem
+{
+    public int Id { get; set; }
+    public CostCategory Category { get; set; } = CostCategory.SoftwareLicense;
+    public required string Name { get; set; }
+    public string? Vendor { get; set; }
+    public BillingModel BillingModel { get; set; } = BillingModel.Monthly;
+    public decimal UnitCost { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
 /// <summary>A non-working weekday excluded from fixed-duration hour calculations.</summary>
 public class Holiday
 {

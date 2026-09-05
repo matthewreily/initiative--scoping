@@ -9,14 +9,14 @@ public static class PortfolioExport
     {
         var initiatives = new ExportTable("Initiatives",
             ["Id", "Initiative", "Business unit", "Status", "Target start", "Baseline version",
-             "Forecast hours", "Forecast cost", "Internal forecast cost", "Vendor forecast cost",
+             "Forecast hours", "Forecast cost", "Internal forecast cost", "Vendor forecast cost", "Non-labor forecast cost",
              "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Cost variance", "Cost variance %",
              "ETC cost", "EAC cost", "Projected variance", "Projected variance %",
              "Threshold %", "Over threshold", "Unpriced forecast", "Unpriced actuals", "Planning mode", "Target end"],
             portfolio.Rows.Select(r => (IReadOnlyList<object?>)
             [
                 r.Initiative.Id, r.Initiative.Name, r.Initiative.BusinessUnit?.Name, r.Initiative.Status.ToString(), r.Initiative.TargetStart, r.BaselineVersion,
-                r.ForecastHours, r.ForecastCost, r.InternalForecastCost, r.VendorForecastCost,
+                r.ForecastHours, r.ForecastCost, r.InternalForecastCost, r.VendorForecastCost, r.NonLaborForecastCost,
                 r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.CostVariance, r.CostVariancePct,
                 r.Variance.EtcCost, r.Variance.EacCost, r.Variance.EacCostVariance, r.Variance.EacCostVariancePct,
                 r.Variance.ThresholdPct, r.ExceedsThreshold, r.HasUnpricedForecast, r.HasUnpricedActuals,
@@ -60,6 +60,8 @@ public static class InitiativeExport
             ["Target start", initiative.TargetStart],
             ["Target end", initiative.TargetEnd],
             ["Forecast hours", forecast.TotalHours],
+            ["Forecast labor cost", forecast.LaborCost],
+            ["Forecast non-labor cost", forecast.NonLaborCost],
             ["Forecast cost", forecast.TotalCost],
             ["Forecast complete", forecast.IsComplete],
             ["Baseline version", baseline?.Version],
@@ -91,6 +93,15 @@ public static class InitiativeExport
                 l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
 
+        var nonLaborLines = new ExportTable("Non-labor forecast",
+            ["Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Contract", "Cost center"],
+            forecast.NonLaborLines.Select(l => (IReadOnlyList<object?>)
+            [
+                l.Line.PhaseId is { } pid ? phases.GetValueOrDefault(pid) : VarianceCalculator.WholeInitiative,
+                VarianceCalculator.CategoryLabel(l.Line.Category), l.Line.Description, l.Line.BillingModel.ToString(),
+                l.Line.Quantity, l.Line.UnitCost, l.Start, l.End, l.Periods, l.Cost, l.Line.ContractReference, l.Line.CostCenter
+            ]).ToList());
+
         var baselineLines = new ExportTable("Baseline",
             ["Version", "Phase", "Resource type", "Seniority", "Location", "Class", "Hours", "Hourly rate", "Cost"],
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
@@ -99,8 +110,18 @@ public static class InitiativeExport
                 l.Seniority.ToString(), l.Location, l.ResourcingClass.ToString(), l.Hours, l.HourlyRate, l.Cost
             ]).ToList());
 
+        var baselineNonLabor = new ExportTable("Baseline non-labor",
+            ["Version", "Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost"],
+            (baseline?.NonLaborLines ?? []).Select(l => (IReadOnlyList<object?>)
+            [
+                baseline!.Version, l.PhaseId is { } pid ? phases.GetValueOrDefault(pid) : VarianceCalculator.WholeInitiative,
+                VarianceCalculator.CategoryLabel(l.Category), l.Description, l.BillingModel.ToString(),
+                l.Quantity, l.UnitCost, l.StartDate, l.EndDate, l.Periods, l.Cost
+            ]).ToList());
+
         var variancePhase = VarianceTable("Variance by phase", variance.ByPhase);
         var varianceType = VarianceTable("Variance by resource type", variance.ByResourceType);
+        var varianceCategory = VarianceTable("Variance by category", variance.ByCategory);
 
         var actuals = new ExportTable("Actuals",
             ["Work date", "Person", "External person id", "External project id", "Hours", "Sourced cost", "Calculated cost", "Effective cost", "Source", "Reference", "Unmapped"],
@@ -111,10 +132,10 @@ public static class InitiativeExport
             ]).ToList());
 
         var adjustmentTable = new ExportTable("Adjustments",
-            ["Created", "Created by", "Hours", "Cost", "Reason"],
-            adjustments.Select(a => (IReadOnlyList<object?>)[a.CreatedAt, a.CreatedBy, a.Hours, a.Cost, a.Reason]).ToList());
+            ["Created", "Created by", "Category", "Hours", "Cost", "Reason"],
+            adjustments.Select(a => (IReadOnlyList<object?>)[a.CreatedAt, a.CreatedBy, VarianceCalculator.CategoryLabel(a.Category), a.Hours, a.Cost, a.Reason]).ToList());
 
-        return [summary, forecastLines, baselineLines, variancePhase, varianceType, actuals, adjustmentTable];
+        return [summary, forecastLines, nonLaborLines, baselineLines, baselineNonLabor, variancePhase, varianceType, varianceCategory, actuals, adjustmentTable];
     }
 
     private static ExportTable VarianceTable(string name, IReadOnlyList<VarianceRow> rows) =>

@@ -97,6 +97,44 @@ public class AllocationEditModel
     public string? CostCenter { get; set; }
 }
 
+public class NonLaborCostEditModel
+{
+    public int Id { get; set; }
+    public int InitiativeId { get; set; }
+    /// <summary>Null = whole initiative window.</summary>
+    [Display(Name = "Phase")]
+    public int? PhaseId { get; set; }
+    [Display(Name = "Catalog item")]
+    public int? CostCatalogItemId { get; set; }
+    [Required]
+    public CostCategory Category { get; set; } = CostCategory.SoftwareLicense;
+    [Required, StringLength(300)]
+    public string Description { get; set; } = string.Empty;
+    [Required, Display(Name = "Billing")]
+    public BillingModel BillingModel { get; set; } = BillingModel.Monthly;
+    [Required, Range(1, 100000)]
+    public int Quantity { get; set; } = 1;
+    [Required, Range(0, 999_999_999), Display(Name = "Unit cost")]
+    public decimal? UnitCost { get; set; }
+    [Display(Name = "Start")]
+    public DateOnly? StartDate { get; set; }
+    [Display(Name = "End")]
+    public DateOnly? EndDate { get; set; }
+    [StringLength(200), Display(Name = "Contract ref")]
+    public string? ContractReference { get; set; }
+    [StringLength(100), Display(Name = "Cost center")]
+    public string? CostCenter { get; set; }
+}
+
+/// <summary>Catalog item as offered to the initiative form; the client prefills description/billing/unit cost from it.</summary>
+public sealed record CatalogOption(int Id, CostCategory Category, string Name, string? Vendor, BillingModel BillingModel, decimal UnitCost)
+{
+    public string Label => Vendor is null ? Name : $"{Name} ({Vendor})";
+}
+
+/// <summary>Inputs for the live cost preview script. <paramref name="Windows"/>: phase id → planned window, 0 → initiative window (used when the line has no explicit dates).</summary>
+public sealed record CostPreviewScriptModel(string Prefix, IReadOnlyList<CatalogOption> Catalog, IReadOnlyDictionary<int, (DateOnly Start, DateOnly End)> Windows);
+
 public class MemberEditModel
 {
     public int InitiativeId { get; set; }
@@ -145,6 +183,9 @@ public class InitiativeDetailsModel
     public required IReadOnlyDictionary<int, string> ResourceTypeNames { get; init; }
     public required PhaseEditModel NewPhase { get; init; }
     public required AllocationEditModel NewAllocation { get; init; }
+    public required NonLaborCostEditModel NewNonLaborCost { get; init; }
+    public required IReadOnlyList<CatalogOption> CatalogOptions { get; init; }
+    public required IReadOnlyDictionary<int, (DateOnly Start, DateOnly End)> CostPreviewWindows { get; init; }
     public required MemberEditModel NewMember { get; init; }
     public required ApplySizeModel ApplySize { get; init; }
     public required SelectList Phases { get; init; }
@@ -174,6 +215,8 @@ public class InitiativeActualsModel
 public class AdjustmentEditModel
 {
     public int InitiativeId { get; set; }
+    [Required]
+    public CostCategory Category { get; set; } = CostCategory.Labor;
     [Required, Range(-1000000, 1000000)]
     public decimal Hours { get; set; }
     [Required, Range(-1000000000, 1000000000)]

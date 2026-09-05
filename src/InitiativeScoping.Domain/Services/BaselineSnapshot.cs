@@ -42,6 +42,19 @@ public static class BaselineSnapshot
                 Hours = l.Hours,
                 HourlyRate = l.HourlyRate!.Value,
                 Cost = l.Cost
+            }).ToList(),
+            NonLaborLines = forecast.NonLaborLines.Where(l => l.HasWindow).Select(l => new ForecastBaselineNonLaborLine
+            {
+                PhaseId = l.Line.PhaseId,
+                Category = l.Line.Category,
+                Description = l.Line.Description,
+                BillingModel = l.Line.BillingModel,
+                Quantity = l.Line.Quantity,
+                UnitCost = l.Line.UnitCost,
+                Periods = l.Periods,
+                StartDate = l.Start!.Value,
+                EndDate = l.End!.Value,
+                Cost = l.Cost
             }).ToList()
         };
 

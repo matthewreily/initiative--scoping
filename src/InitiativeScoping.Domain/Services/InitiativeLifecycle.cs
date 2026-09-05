@@ -41,6 +41,12 @@ public static class InitiativeLifecycle
             errors.Add($"{unpriced} allocation line(s) have no matching published rate.");
         }
 
+        var emptyNonLabor = forecast.NonLaborLines.Count(l => l.Periods == 0);
+        if (emptyNonLabor > 0)
+        {
+            errors.Add($"{emptyNonLabor} non-labor cost line(s) have an empty billing window (end before start or missing phase).");
+        }
+
         if (initiative.Phases.Any(p => p.PlannedEnd < p.PlannedStart))
         {
             errors.Add("Every phase must end on or after it starts.");

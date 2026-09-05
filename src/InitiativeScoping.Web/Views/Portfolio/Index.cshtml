@@ -48,11 +48,12 @@
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Initiatives</div><div class="fs-3">@p.Count</div><div class="small text-muted">@p.Baselined baselined</div></div></div></div>
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3">@p.ForecastCost.ToString("C0")</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor</div><div class="fs-5">@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0")</div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor / Non-labor</div><div class="fs-6">@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0") / @p.NonLaborForecastCost.ToString("C0")</div>
         @if (p.ForecastCost > 0)
         {
             var internalPct = Math.Round(p.InternalForecastCost / p.ForecastCost * 100m);
-            <div class="progress mt-1" style="height: 6px" title="Internal @internalPct%"><div class="progress-bar bg-primary" style="width: @internalPct%"></div><div class="progress-bar bg-info" style="width: @(100 - internalPct)%"></div></div>
+            var vendorPct = Math.Round(p.VendorForecastCost / p.ForecastCost * 100m);
+            <div class="progress mt-1" style="height: 6px" title="Internal @internalPct% · Vendor @vendorPct% · Non-labor @(100 - internalPct - vendorPct)%"><div class="progress-bar bg-primary" style="width: @internalPct%"></div><div class="progress-bar bg-info" style="width: @vendorPct%"></div><div class="progress-bar bg-warning" style="width: @(100 - internalPct - vendorPct)%"></div></div>
         }
     </div></div></div>
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Baseline cost</div><div class="fs-3">@p.BaselineCost.ToString("C0")</div><div class="small text-muted">@p.BaselineHours.ToString("N0") h</div></div></div></div>

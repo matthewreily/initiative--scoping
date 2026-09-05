@@ -13,6 +13,7 @@ public sealed record PortfolioRow(
     public decimal ForecastCost => Forecast.TotalCost;
     public decimal InternalForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte).Sum(l => l.Cost);
     public decimal VendorForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.Vendor).Sum(l => l.Cost);
+    public decimal NonLaborForecastCost => Forecast.NonLaborCost;
     public bool HasBaseline => Variance.Baseline is not null;
     public int? BaselineVersion => Variance.Baseline?.Version;
     public decimal BaselineHours => Variance.BaselineHours;
@@ -50,6 +51,7 @@ public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
     public decimal ForecastCost => Rows.Sum(r => r.ForecastCost);
     public decimal InternalForecastCost => Rows.Sum(r => r.InternalForecastCost);
     public decimal VendorForecastCost => Rows.Sum(r => r.VendorForecastCost);
+    public decimal NonLaborForecastCost => Rows.Sum(r => r.NonLaborForecastCost);
     public decimal BaselineHours => Rows.Sum(r => r.BaselineHours);
     public decimal BaselineCost => Rows.Sum(r => r.BaselineCost);
     public decimal ActualHours => Rows.Sum(r => r.ActualHours);

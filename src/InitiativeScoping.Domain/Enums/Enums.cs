@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace InitiativeScoping.Domain.Enums;
 
 public enum ResourcingClass
@@ -58,4 +60,25 @@ public enum PlanningMode
 {
     EffortDriven = 1,
     FixedDuration = 2
+}
+
+/// <summary>What a cost line pays for. Labor is priced from rate cards; the rest are non-labor lines.</summary>
+public enum CostCategory
+{
+    Labor = 1,
+    [Display(Name = "Software license")]
+    SoftwareLicense = 2,
+    Hardware = 3,
+    Cloud = 4,
+    Travel = 5,
+    Other = 6
+}
+
+/// <summary>How a non-labor unit cost recurs. Recurring models bill whole periods: any partial period counts as a full one.</summary>
+public enum BillingModel
+{
+    [Display(Name = "One-time")]
+    OneTime = 1,
+    Monthly = 2,
+    Annual = 3
 }

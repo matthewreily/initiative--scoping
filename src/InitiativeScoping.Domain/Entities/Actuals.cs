@@ -86,6 +86,7 @@ public class ActualAdjustment
     public int Id { get; set; }
     public int InitiativeId { get; set; }
     public Initiative? Initiative { get; set; }
+    public CostCategory Category { get; set; } = CostCategory.Labor;
     public decimal Hours { get; set; }
     public decimal Cost { get; set; }
     public required string Reason { get; set; }

@@ -48,7 +48,9 @@ public static class PortfolioQueries
             .Include(i => i.Members)
             .Include(i => i.Phases)
             .Include(i => i.Allocations)
+            .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
+            .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)
             .Include(i => i.RebaselineRequests)
             .AsNoTracking()
             .AsSplitQuery();

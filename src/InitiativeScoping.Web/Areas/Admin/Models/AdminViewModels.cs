@@ -184,3 +184,25 @@ public class HolidayEditModel
     [Required, StringLength(200)]
     public string Name { get; set; } = string.Empty;
 }
+
+public class CostCatalogItemEditModel
+{
+    public int Id { get; set; }
+    [Required(ErrorMessage = "Select a category.")]
+    public CostCategory? Category { get; set; } = CostCategory.SoftwareLicense;
+    [Required, StringLength(200)]
+    public string Name { get; set; } = string.Empty;
+    [StringLength(200)]
+    public string? Vendor { get; set; }
+    [Required(ErrorMessage = "Select a billing model."), Display(Name = "Billing model")]
+    public BillingModel? BillingModel { get; set; } = Domain.Enums.BillingModel.Monthly;
+    [Required, Range(0, 999_999_999), Display(Name = "Unit cost")]
+    public decimal? UnitCost { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public class CostCatalogItemListItem
+{
+    public required CostCatalogItem Item { get; init; }
+    public int ReferenceCount { get; init; }
+}

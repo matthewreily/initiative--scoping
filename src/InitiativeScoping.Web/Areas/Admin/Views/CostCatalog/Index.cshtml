@@ -1,0 +1,50 @@
+@using InitiativeScoping.Domain.Services
+@model IReadOnlyList<CostCatalogItemListItem>
+@{
+    ViewData["Title"] = "Cost catalog";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h2 class="h5 mb-0">Cost catalog</h2>
+        <div class="text-muted small">Software licenses and other non-labor items initiatives can add as cost lines. Recurring items bill whole months/years; any partial period counts as a full one.</div>
+    </div>
+    <a class="btn btn-primary btn-sm" asp-action="Create">New catalog item</a>
+</div>
+<div class="table-responsive">
+<table class="table table-sm align-middle">
+    <thead><tr><th>Category</th><th>Name</th><th>Vendor</th><th>Billing</th><th class="text-end">Unit cost</th><th>Status</th><th>References</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var row in Model)
+    {
+        <tr>
+            <td>@VarianceCalculator.CategoryLabel(row.Item.Category)</td>
+            <td>@row.Item.Name</td>
+            <td>@row.Item.Vendor</td>
+            <td>@Html.DisplayFor(_ => row.Item.BillingModel)</td>
+            <td class="text-end">@row.Item.UnitCost.ToString("N2")</td>
+            <td>@(row.Item.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
+            <td>@row.ReferenceCount</td>
+            <td class="text-end">
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@row.Item.Id">Edit</a>
+                @if (row.ReferenceCount == 0)
+                {
+                    <form asp-action="Delete" asp-route-id="@row.Item.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @row.Item.Name?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                    </form>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled title="Referenced; deactivate instead">Delete</button>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Count == 0)
+    {
+        <tr><td colspan="8" class="text-muted">No catalog items yet.</td></tr>
+    }
+    </tbody>
+</table>
+</div>
