@@ -141,7 +141,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
-    public async Task Unmatched_rate_is_flagged_unpriced()
+    public async Task Combination_without_published_rate_is_rejected_when_the_card_prices_the_business_unit()
     {
         var client = factory.CreateClient(NoRedirect);
         var id = await CreateInitiativeAsync(client, "Unpriced test");
@@ -155,8 +155,87 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         });
 
         var html = await client.GetStringAsync(details);
+        Assert.Contains("No published rate for that resource type", html);
+        Assert.Contains("business unit &#x27;Boarding&#x27;", html);
+        Assert.Contains("No allocations yet.", html);
+    }
+
+    [Fact]
+    public async Task Allocation_form_shows_initiative_business_unit_and_location_dropdown()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "BU form test");
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+
+        var html = await client.GetStringAsync(details);
+        Assert.Contains("Business unit: <strong>Boarding</strong>", html);
+        Assert.Contains("<select name=\"Location\" id=\"location\"", html);
+        Assert.Contains("<option selected=\"selected\">Onshore</option>", html);
+        Assert.Contains("id=\"rate-preview-new\"", html);
+        Assert.DoesNotContain("No published rate card prices this business unit yet", html);
+    }
+
+    [Fact]
+    public async Task Any_combination_is_accepted_but_unpriced_when_no_card_prices_the_business_unit_on_the_phase_start()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "No card test");
+        var details = $"/Initiatives/Details/{id}";
+        // Seeded card is effective from Jan 1 of the current year, so a phase in 2020 has no effective card.
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2020-03-01", ["PlannedEnd"] = "2020-04-30" });
+        var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
+        var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);
+
+        var html = await client.GetStringAsync(details);
         Assert.Contains("Unpriced", html);
         Assert.Contains("Incomplete", html);
+    }
+
+    [Fact]
+    public async Task Editing_an_allocation_to_an_unpriced_combination_is_rejected_but_saving_it_unchanged_is_allowed()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "Edit allocation test");
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
+        await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+        });
+        int allocationId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            allocationId = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.SingleAsync(a => a.InitiativeId == id)).Id;
+        }
+
+        var edit = $"/Initiatives/EditAllocation/{allocationId}";
+        var page = await client.GetStringAsync(edit);
+        Assert.Contains("Business unit: <strong>Boarding</strong>", page);
+        Assert.Matches("<select[^>]*id=\"Location\"[^>]*name=\"Location\"", page);
+        Assert.DoesNotMatch("<input[^>]*name=\"Location\"", page);
+
+        var rejected = await PostFormAsync(client, edit, edit, new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+        });
+        Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);
+        Assert.Contains("No published rate for that resource type", await rejected.Content.ReadAsStringAsync());
+
+        var unchanged = await PostFormAsync(client, edit, edit, new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["Location"] = "onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "3", ["EstimatedHours"] = "10"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, unchanged.StatusCode);
     }
 
     [Fact]

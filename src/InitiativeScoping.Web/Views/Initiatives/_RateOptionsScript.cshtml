@@ -1,0 +1,78 @@
+@model RateOptionsScriptModel
+@{
+    var cards = Model.Data.Cards.Select(c => new
+    {
+        effectiveStart = c.EffectiveStart.ToString("yyyy-MM-dd"),
+        options = c.Options.Select(o => new { type = o.ResourceTypeId, seniority = (int)o.Seniority, location = o.Location, cls = (int)o.ResourcingClass, rate = o.Rate })
+    });
+    var phaseStarts = Model.Data.PhaseStarts.ToDictionary(p => p.Key, p => p.Value.ToString("yyyy-MM-dd"));
+}
+<script>
+    (function () {
+        const byId = id => document.getElementById(id);
+        const phase = byId('@Model.PhaseSelectId'), type = byId('@Model.ResourceTypeSelectId'), seniority = byId('@Model.SenioritySelectId');
+        const location = byId('@Model.LocationSelectId'), cls = byId('@Model.ClassSelectId'), output = byId('@Model.RateOutputId');
+        const cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cards));
+        const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
+        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@((int)Model.Current.Seniority)', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)' };
+        const businessUnit = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Data.BusinessUnit));
+        const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
+
+        function pricedFor(phaseId) {
+            const start = phaseStarts[phaseId];
+            if (!start) { return []; }
+            const card = cards.filter(c => c.effectiveStart <= start).sort((a, b) => b.effectiveStart < a.effectiveStart ? -1 : 1)[0];
+            return card ? card.options : [];
+        }
+
+        // Restricts a select to the given allowed values, keeping the preferred value when it is still allowed.
+        function restrict(select, allowed, preferred, eq) {
+            let kept = null;
+            for (const opt of select.options) {
+                const ok = allowed.length === 0 || allowed.some(a => eq(a, opt.value));
+                opt.hidden = !ok;
+                opt.disabled = !ok;
+                if (ok && kept === null && (preferred === null || eq(preferred, opt.value))) { kept = opt.value; }
+            }
+            if (kept === null) { kept = Array.from(select.options).find(o => !o.disabled)?.value ?? select.value; }
+            select.value = kept;
+        }
+
+        const same = (a, b) => String(a) === String(b);
+        const sameText = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+
+        function sync(preferCurrent) {
+            const cardPriced = pricedFor(phase.value);
+            let priced = cardPriced;
+            const currentPriced = priced.some(o => same(o.type, current.type) && same(o.seniority, current.seniority) && sameText(o.location, current.location) && same(o.cls, current.cls));
+            if (preferCurrent && current.type !== '0' && !currentPriced) { priced = []; } // keep a legacy unpriced allocation visible as saved
+            const pick = (sel, key) => preferCurrent ? current[key] : sel.value;
+            restrict(type, [...new Set(priced.map(o => o.type))], pick(type, 'type'), same);
+            const byType = priced.filter(o => same(o.type, type.value));
+            restrict(seniority, [...new Set(byType.map(o => o.seniority))], pick(seniority, 'seniority'), same);
+            const bySen = byType.filter(o => same(o.seniority, seniority.value));
+            restrict(location, [...new Set(bySen.map(o => o.location))], pick(location, 'location'), sameText);
+            const byLoc = bySen.filter(o => sameText(o.location, location.value));
+            restrict(cls, [...new Set(byLoc.map(o => o.cls))], pick(cls, 'cls'), same);
+            const match = byLoc.find(o => same(o.cls, cls.value));
+            if (match) {
+                output.value = money.format(match.rate) + ' /h';
+                output.classList.remove('is-invalid');
+                output.title = 'Published rate for this combination in ' + businessUnit + ' on ' + phaseStarts[phase.value];
+            } else {
+                output.value = cardPriced.length === 0 ? 'No rate card' : 'No published rate';
+                output.classList.add('is-invalid');
+                output.title = cardPriced.length === 0
+                    ? 'No published rate card prices business unit ' + businessUnit + ' on ' + phaseStarts[phase.value] + '; any combination can be chosen but will not be costed.'
+                    : 'This combination has no published rate.';
+            }
+        }
+
+        phase.addEventListener('change', () => sync(false));
+        type.addEventListener('change', () => sync(false));
+        seniority.addEventListener('change', () => sync(false));
+        location.addEventListener('change', () => sync(false));
+        cls.addEventListener('change', () => sync(false));
+        sync(true);
+    })();
+</script>

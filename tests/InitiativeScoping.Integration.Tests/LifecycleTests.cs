@@ -44,8 +44,8 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.Contains("Cannot activate", await client.GetStringAsync(details));
         Assert.Equal(InitiativeStatus.Draft, await StatusAsync(factory, id));
 
-        // Unpriced allocation (Offshore has no seeded rate) still blocks.
-        await AddPhaseAndAllocationAsync(client, factory, id, location: "Offshore");
+        // Unpriced allocation (phase starts before any published rate card is effective) still blocks.
+        await AddPhaseAndAllocationAsync(client, factory, id, location: "Offshore", phaseYear: 2020);
         await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new());
         html = await client.GetStringAsync(details);
         Assert.Contains("no matching published rate", html);
@@ -285,10 +285,10 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "50"
     };
 
-    private static async Task<(int PhaseId, int TypeId)> AddPhaseAndAllocationAsync(HttpClient client, WebAppFactory f, int id, string location)
+    private static async Task<(int PhaseId, int TypeId)> AddPhaseAndAllocationAsync(HttpClient client, WebAppFactory f, int id, string location, int phaseYear = 2026)
     {
         var details = $"/Initiatives/Details/{id}";
-        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = $"{phaseYear}-03-01", ["PlannedEnd"] = $"{phaseYear}-04-30" });
         using var scope = f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var phaseId = (await db.Phases.FirstAsync(p => p.InitiativeId == id)).Id;

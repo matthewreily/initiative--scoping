@@ -283,7 +283,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 SizeKey = initiative.SizeKey ?? string.Empty
             },
             Phases = new SelectList(orderedPhases, "Id", "Name"),
-            ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name"),
+            RateOptions = await BuildRateOptionsAsync(initiative, cards, ct),
             SizeOptions = await SizeOptionsAsync(ct),
             CanEdit = InitiativeAccess.CanEdit(currentUser, initiative),
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
@@ -546,7 +546,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         model.Id = id;
         model.InitiativeId = initiative.Id;
-        await ValidateAllocation(model, initiative, ct);
+        await ValidateAllocation(model, initiative, ct, allocation);
         if (!ModelState.IsValid)
         {
             await PopulateAllocationLists(initiative, ct);
@@ -1075,7 +1075,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     {
         ViewBag.Initiative = initiative;
         ViewBag.Phases = new SelectList(initiative.Phases.OrderBy(p => p.Sequence), "Id", "Name");
-        ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
+        ViewBag.RateOptions = await BuildRateOptionsAsync(initiative, await LoadRateCardsAsync(ct), ct);
         if (initiative.PlanningMode == PlanningMode.FixedDuration)
         {
             var calendar = await workCalendar.GetAsync(ct);
@@ -1204,9 +1204,37 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
     }
 
-    private async Task ValidateAllocation(AllocationEditModel model, Initiative initiative, CancellationToken ct)
+    /// <summary>Priced (type, seniority, location, class) combinations for the initiative's BU per published card, plus fallbacks for when nothing is priced yet.</summary>
+    private async Task<RateOptionsData> BuildRateOptionsAsync(Initiative initiative, IReadOnlyList<RateCard> cards, CancellationToken ct)
     {
-        if (initiative.Phases.All(p => p.Id != model.PhaseId))
+        var types = await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).Select(t => new NamedId(t.Id, t.Name)).ToListAsync(ct);
+        var typeNames = types.ToDictionary(t => t.Id, t => t.Name);
+        var cardOptions = cards
+            .Where(c => c.Status == RateCardStatus.Published)
+            .OrderBy(c => c.EffectiveStart)
+            .Select(c => new RateCardOptions(c.EffectiveStart, c.Entries
+                .Where(e => e.BusinessUnitId == initiative.BusinessUnitId && typeNames.ContainsKey(e.ResourceTypeId))
+                .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => e.Seniority).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass)
+                .Select(e => new RateOption(e.ResourceTypeId, typeNames[e.ResourceTypeId], e.Seniority, e.Location, e.ResourcingClass, e.HourlyRate))
+                .ToList()))
+            .ToList();
+        var locations = cards.SelectMany(c => c.Entries.Select(e => e.Location))
+            .Append("Onshore")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(l => l, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new RateOptionsData(
+            initiative.BusinessUnit?.Name ?? (await db.BusinessUnits.Where(b => b.Id == initiative.BusinessUnitId).Select(b => b.Name).FirstAsync(ct)),
+            cardOptions,
+            initiative.Phases.ToDictionary(p => p.Id, p => p.PlannedStart),
+            types,
+            locations);
+    }
+
+    private async Task ValidateAllocation(AllocationEditModel model, Initiative initiative, CancellationToken ct, InitiativeAllocation? existing = null)
+    {
+        var phase = initiative.Phases.FirstOrDefault(p => p.Id == model.PhaseId);
+        if (phase is null)
         {
             ModelState.AddModelError(nameof(model.PhaseId), initiative.Phases.Count == 0
                 ? "Add a phase before adding allocations."
@@ -1216,6 +1244,22 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         if (!await db.ResourceTypes.AnyAsync(t => t.Id == model.ResourceTypeId, ct))
         {
             ModelState.AddModelError(nameof(model.ResourceTypeId), "Select a resource type.");
+        }
+        else if (phase is not null)
+        {
+            var priced = RateResolver.PricedEntries(await LoadRateCardsAsync(ct), initiative.BusinessUnitId, phase.PlannedStart);
+            var location = model.Location.Trim();
+            var unchanged = existing is not null
+                && existing.ResourceTypeId == model.ResourceTypeId && existing.Seniority == model.Seniority && existing.ResourcingClass == model.ResourcingClass
+                && string.Equals(existing.Location, location, StringComparison.OrdinalIgnoreCase);
+            if (priced.Count > 0 && !unchanged && !priced.Any(e =>
+                    e.ResourceTypeId == model.ResourceTypeId && e.Seniority == model.Seniority && e.ResourcingClass == model.ResourcingClass
+                    && string.Equals(e.Location, location, StringComparison.OrdinalIgnoreCase)))
+            {
+                var bu = initiative.BusinessUnit?.Name ?? await db.BusinessUnits.Where(b => b.Id == initiative.BusinessUnitId).Select(b => b.Name).FirstAsync(ct);
+                ModelState.AddModelError(nameof(model.ResourceTypeId),
+                    $"No published rate for that resource type / seniority / location / class in business unit '{bu}' on {phase.PlannedStart:yyyy-MM-dd}. Pick a priced combination or add it to the rate card.");
+            }
         }
 
         if (initiative.PlanningMode == PlanningMode.FixedDuration)
