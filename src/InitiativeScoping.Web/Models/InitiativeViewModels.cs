@@ -38,8 +38,11 @@ public class InitiativeEditModel
     public string Name { get; set; } = string.Empty;
     [StringLength(4000)]
     public string? Description { get; set; }
-    [Required, Display(Name = "Business unit")]
+    [Required, Display(Name = "Sponsoring business unit")]
     public int BusinessUnitId { get; set; }
+    /// <summary>Additional business units allowed to supply resources; the sponsor is always included.</summary>
+    [Display(Name = "Participating business units")]
+    public List<int> ParticipatingBusinessUnitIds { get; set; } = [];
     [StringLength(200), Display(Name = "Sponsoring team")]
     public string? SponsoringTeam { get; set; }
     [Required, Display(Name = "Sizing method")]
@@ -76,6 +79,8 @@ public class AllocationEditModel
     public int InitiativeId { get; set; }
     [Required, Display(Name = "Phase")]
     public int PhaseId { get; set; }
+    [Required, Display(Name = "Business unit")]
+    public int BusinessUnitId { get; set; }
     [Required, Display(Name = "Resource type")]
     public int ResourceTypeId { get; set; }
     [Required]
@@ -84,6 +89,8 @@ public class AllocationEditModel
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
     public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    [Display(Name = "Vendor")]
+    public int? VendorId { get; set; }
     [Required, Range(1, 1000)]
     public int Quantity { get; set; } = 1;
     /// <summary>Entered directly in effort-driven mode; computed from <see cref="AllocationPercent"/> in fixed-duration mode.</summary>
@@ -151,10 +158,14 @@ public class ApplySizeModel
     public SizingMethod Method { get; set; } = SizingMethod.TShirt;
     [Required, StringLength(50), Display(Name = "Size")]
     public string SizeKey { get; set; } = string.Empty;
+    [Required, Display(Name = "Business unit")]
+    public int BusinessUnitId { get; set; }
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
     public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    [Display(Name = "Vendor")]
+    public int? VendorId { get; set; }
     [Display(Name = "Replace existing allocations")]
     public bool Replace { get; set; } = true;
 }
@@ -163,8 +174,8 @@ public sealed record RollupRow(string Label, decimal Hours, decimal Cost, bool H
 
 public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 
-/// <summary>One priced (resource type, seniority, location, class) combination from a published rate card.</summary>
-public sealed record RateOption(int ResourceTypeId, string ResourceType, Seniority Seniority, string Location, ResourcingClass ResourcingClass, decimal Rate);
+/// <summary>One priced (BU, resource type, seniority, location, class, vendor) combination from a published rate card.</summary>
+public sealed record RateOption(int BusinessUnitId, int ResourceTypeId, string ResourceType, Seniority Seniority, string Location, ResourcingClass ResourcingClass, int? VendorId, decimal Rate);
 
 public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, IReadOnlyList<RateOption> Options);
 
@@ -177,16 +188,24 @@ public sealed record RateOptionsScriptModel(
     string ClassSelectId,
     string RateOutputId,
     RateOptionsData Data,
-    AllocationEditModel Current);
+    AllocationEditModel Current)
+{
+    public string BusinessUnitSelectId { get; init; } = "BusinessUnitId";
+    public string VendorSelectId { get; init; } = "VendorId";
+}
 
+/// <summary>Priced combinations per published card across the initiative's participating BUs, plus the catalogs needed for the unpriced fallback.</summary>
 public sealed record RateOptionsData(
-    string BusinessUnit,
+    IReadOnlyList<NamedId> BusinessUnits,
+    int SponsorBusinessUnitId,
     IReadOnlyList<RateCardOptions> Cards,
     IReadOnlyDictionary<int, DateOnly> PhaseStarts,
     IReadOnlyList<NamedId> AllResourceTypes,
-    IReadOnlyList<string> AllLocations)
+    IReadOnlyList<string> AllLocations,
+    IReadOnlyList<NamedId> Vendors)
 {
     public bool HasAnyPricing => Cards.Any(c => c.Options.Count > 0);
+    public bool HasPricingFor(int businessUnitId) => Cards.Any(c => c.Options.Any(o => o.BusinessUnitId == businessUnitId));
 }
 
 public sealed record NamedId(int Id, string Name);
@@ -206,6 +225,8 @@ public class InitiativeDetailsModel
     public required IReadOnlyList<RollupRow> ByPhase { get; init; }
     public required IReadOnlyList<RollupRow> ByResourceType { get; init; }
     public required IReadOnlyList<RollupRow> ByClass { get; init; }
+    public required IReadOnlyList<RollupRow> ByBusinessUnit { get; init; }
+    public required IReadOnlyList<RollupRow> ByVendor { get; init; }
     public required IReadOnlyList<GanttBar> Gantt { get; init; }
     public FixedDurationSummary? FixedDuration { get; init; }
     public required IReadOnlyDictionary<int, string> ResourceTypeNames { get; init; }
@@ -268,6 +289,8 @@ public class BaselinesModel
 
 public sealed record BaselineLineRow(
     string Phase,
+    string BusinessUnit,
+    string? Vendor,
     string ResourceType,
     Seniority Seniority,
     string Location,

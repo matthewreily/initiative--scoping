@@ -11,7 +11,8 @@ public sealed record RateCardCsvRow(
     Seniority Seniority,
     string Location,
     ResourcingClass ResourcingClass,
-    decimal HourlyRate);
+    decimal HourlyRate,
+    string? Vendor = null);
 
 public sealed record RateCardCsvError(int Line, string Message);
 
@@ -21,12 +22,14 @@ public sealed record RateCardCsvResult(IReadOnlyList<RateCardCsvRow> Rows, IRead
 }
 
 /// <summary>
-/// CSV format: ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate
+/// CSV format: ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate,Vendor
 /// Seniority: Associate|Mid|Senior|Staff|Principal. ResourcingClass: InternalFte|Vendor.
+/// Vendor names a specific vendor for Vendor rows (blank = generic "any vendor" rate) and must be blank for InternalFte rows; the column may be omitted.
 /// </summary>
 public static class RateCardCsv
 {
-    public static readonly string[] Headers = ["ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "HourlyRate"];
+    public static readonly string[] RequiredHeaders = ["ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "HourlyRate"];
+    public static readonly string[] Headers = [.. RequiredHeaders, "Vendor"];
 
     private static readonly CsvConfiguration Config = new(CultureInfo.InvariantCulture)
     {
@@ -49,7 +52,8 @@ public static class RateCardCsv
         }
 
         var header = csv.HeaderRecord ?? [];
-        var missing = Headers.Where(h => !header.Contains(h, StringComparer.OrdinalIgnoreCase)).ToList();
+        var missing = RequiredHeaders.Where(h => !header.Contains(h, StringComparer.OrdinalIgnoreCase)).ToList();
+        var hasVendorColumn = header.Contains("Vendor", StringComparer.OrdinalIgnoreCase);
         if (missing.Count > 0)
         {
             errors.Add(new RateCardCsvError(1, $"Missing column(s): {string.Join(", ", missing)}"));
@@ -88,16 +92,24 @@ public static class RateCardCsv
                 continue;
             }
 
-            rows.Add(new RateCardCsvRow(resourceType, businessUnit, seniority, location, resourcingClass, rate));
+            var vendor = hasVendorColumn ? csv.GetField("Vendor") : null;
+            vendor = string.IsNullOrWhiteSpace(vendor) ? null : vendor.Trim();
+            if (resourcingClass != ResourcingClass.Vendor && vendor is not null)
+            {
+                errors.Add(new RateCardCsvError(line, "Vendor must be blank for internal FTE rows."));
+                continue;
+            }
+
+            rows.Add(new RateCardCsvRow(resourceType, businessUnit, seniority, location, resourcingClass, rate, vendor));
         }
 
         var duplicates = rows
-            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.BusinessUnit.ToLowerInvariant(), r.Seniority, r.Location.ToLowerInvariant(), r.ResourcingClass))
+            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.BusinessUnit.ToLowerInvariant(), r.Seniority, r.Location.ToLowerInvariant(), r.ResourcingClass, r.Vendor?.ToLowerInvariant()))
             .Where(g => g.Count() > 1)
             .Select(g => g.First());
         foreach (var d in duplicates)
         {
-            errors.Add(new RateCardCsvError(0, $"Duplicate entry for {d.ResourceType}/{d.BusinessUnit}/{d.Seniority}/{d.Location}/{d.ResourcingClass}."));
+            errors.Add(new RateCardCsvError(0, $"Duplicate entry for {d.ResourceType}/{d.BusinessUnit}/{d.Seniority}/{d.Location}/{d.ResourcingClass}{(d.Vendor is null ? string.Empty : "/" + d.Vendor)}."));
         }
 
         return new RateCardCsvResult(rows, errors);
@@ -119,6 +131,7 @@ public static class RateCardCsv
             csv.WriteField(r.Location);
             csv.WriteField(r.ResourcingClass.ToString());
             csv.WriteField(r.HourlyRate.ToString("0.00", CultureInfo.InvariantCulture));
+            csv.WriteField(r.Vendor ?? string.Empty);
             csv.NextRecord();
         }
         csv.Flush();

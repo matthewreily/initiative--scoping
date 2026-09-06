@@ -33,6 +33,22 @@ public class DisciplineListItem
     public int ReferenceCount { get; init; }
 }
 
+public class VendorEditModel
+{
+    public int Id { get; set; }
+    [Required, StringLength(200)]
+    public string Name { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+}
+
+public class VendorListItem
+{
+    public required Vendor Vendor { get; init; }
+    public int RateCardEntries { get; init; }
+    public int Allocations { get; init; }
+    public int People { get; init; }
+}
+
 public class ResourceTypeEditModel
 {
     public int Id { get; set; }
@@ -73,6 +89,8 @@ public class RateCardEntryEditModel
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
     public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    [Display(Name = "Vendor")]
+    public int? VendorId { get; set; }
     [Required, Range(0, 100000), Display(Name = "Hourly rate")]
     public decimal HourlyRate { get; set; }
 }
@@ -83,6 +101,7 @@ public class RateCardDetailsModel
     public required RateCardEntryEditModel NewEntry { get; init; }
     public required SelectList ResourceTypes { get; init; }
     public required SelectList BusinessUnits { get; init; }
+    public required SelectList Vendors { get; init; }
     public string? FilterResourceType { get; init; }
     public bool IsEditable => Card.Status != RateCardStatus.Retired;
 }
@@ -153,6 +172,8 @@ public class PersonEditModel
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
     public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    [Display(Name = "Vendor")]
+    public int? VendorId { get; set; }
     public bool IsActive { get; set; } = true;
 }
 

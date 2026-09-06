@@ -131,7 +131,7 @@ public class HardeningTests(WebAppFactory factory) : IClassFixture<WebAppFactory
             {
                 initiative.Allocations.Add(new InitiativeAllocation
                 {
-                    Phase = phase, ResourceTypeId = typeId, Seniority = Seniority.Senior, Location = "Onshore",
+                    Phase = phase, BusinessUnitId = initiative.BusinessUnitId, ResourceTypeId = typeId, Seniority = Seniority.Senior, Location = "Onshore",
                     ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 100
                 });
             }

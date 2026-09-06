@@ -24,7 +24,7 @@ public class PortfolioCalculatorTests
             TargetStart = new DateOnly(2026, 3, 1), CreatedBy = "u", VarianceThresholdPct = threshold
         };
         i.Phases.Add(new Phase { Id = id * 10, InitiativeId = id, Name = "Build", Sequence = 1, PlannedStart = new DateOnly(2026, 3, 1), PlannedEnd = new DateOnly(2026, 3, 31) });
-        i.Allocations.Add(new InitiativeAllocation { Id = id * 100, InitiativeId = id, PhaseId = id * 10, ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = cls, Quantity = 1, EstimatedHours = 100m });
+        i.Allocations.Add(new InitiativeAllocation { Id = id * 100, InitiativeId = id, PhaseId = id * 10, BusinessUnitId = 1, BusinessUnit = i.BusinessUnit, ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = cls, Quantity = 1, EstimatedHours = 100m });
         if (baselineCost is not null)
         {
             i.Baselines.Add(new ForecastBaseline
@@ -113,7 +113,7 @@ public class PortfolioCalculatorTests
 
         var tables = PortfolioExport.Build(result);
 
-        Assert.Equal(["Initiatives", "By business unit", "By status"], tables.Select(t => t.Name));
+        Assert.Equal(["Initiatives", "By sponsor business unit", "By status", "By resourcing business unit", "By vendor"], tables.Select(t => t.Name));
         var row = Assert.Single(tables[0].Rows);
         Assert.Equal(tables[0].Headers.Count, row.Count);
         Assert.Equal("I1", row[1]);

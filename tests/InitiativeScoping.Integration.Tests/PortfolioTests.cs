@@ -31,7 +31,9 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.Contains("Over threshold", html);
         Assert.Contains("+25.0%", html);
         Assert.Contains("Export", html);
-        Assert.Contains("By business unit", html);
+        Assert.Contains("By sponsor business unit", html);
+        Assert.Contains("Labor by resourcing business unit", html);
+        Assert.Contains("Labor by vendor", html);
 
         var active = WebUtility.HtmlDecode(await client.GetStringAsync($"/Portfolio?status={nameof(InitiativeStatus.Active)}"));
         Assert.Contains($"Portfolio {tag}", active);
@@ -68,7 +70,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         var xlsx = await client.GetAsync("/Portfolio/Export?format=XLSX");
         Assert.Equal(HttpStatusCode.OK, xlsx.StatusCode);
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx.Content.Headers.ContentType!.MediaType);
-        Assert.Equal(["By business unit", "By status", "Initiatives"], await SheetNamesAsync(xlsx));
+        Assert.Equal(["By resourcing business unit", "By sponsor business unit", "By status", "By vendor", "Initiatives"], await SheetNamesAsync(xlsx));
 
         var initiative = await client.GetAsync($"/Initiatives/{id}/Export?format=xlsx");
         Assert.Equal(HttpStatusCode.OK, initiative.StatusCode);
@@ -79,7 +81,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.Contains("# Summary", initiativeCsv);
         Assert.Contains("Baseline cost,24000", initiativeCsv);
         Assert.Contains("# Forecast", initiativeCsv);
-        Assert.Contains("Software Engineer,Senior,Onshore,InternalFte,2,100,200,120,24000", initiativeCsv);
+        Assert.Contains("Boarding,Software Engineer,Senior,Onshore,InternalFte,,2,100,200,120,24000", initiativeCsv);
         Assert.Contains("# Adjustments", initiativeCsv);
         Assert.Contains(",5,500,Adj", initiativeCsv);
 

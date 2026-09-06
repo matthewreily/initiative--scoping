@@ -20,6 +20,8 @@ public class Initiative
     public decimal? VarianceThresholdPct { get; set; }
     public required string CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>Business units that may supply resources to this initiative; always includes the sponsoring <see cref="BusinessUnitId"/>.</summary>
+    public List<InitiativeBusinessUnit> ParticipatingBusinessUnits { get; set; } = [];
     public List<Phase> Phases { get; set; } = [];
     public List<InitiativeAllocation> Allocations { get; set; } = [];
     public List<InitiativeNonLaborCost> NonLaborCosts { get; set; } = [];
@@ -33,6 +35,18 @@ public class Initiative
     /// <summary>An approved re-baseline that has not yet been finalised into a new baseline version.</summary>
     public RebaselineRequest? OpenRebaseline =>
         RebaselineRequests.FirstOrDefault(r => r.Status is RebaselineStatus.Pending or RebaselineStatus.Approved);
+
+    /// <summary>Sponsor plus explicitly added participants, without duplicates.</summary>
+    public IEnumerable<int> ParticipatingBusinessUnitIds =>
+        ParticipatingBusinessUnits.Select(p => p.BusinessUnitId).Prepend(BusinessUnitId).Distinct();
+}
+
+public class InitiativeBusinessUnit
+{
+    public int InitiativeId { get; set; }
+    public Initiative? Initiative { get; set; }
+    public int BusinessUnitId { get; set; }
+    public BusinessUnit? BusinessUnit { get; set; }
 }
 
 /// <summary>Owner-initiated, Admin-approved request to unlock scope on an Active initiative and cut a new baseline.</summary>
@@ -93,11 +107,16 @@ public class InitiativeAllocation
     public Initiative? Initiative { get; set; }
     public int PhaseId { get; set; }
     public Phase? Phase { get; set; }
+    /// <summary>Resourcing business unit used for pricing; one of the initiative's participating BUs.</summary>
+    public int BusinessUnitId { get; set; }
+    public BusinessUnit? BusinessUnit { get; set; }
     public int ResourceTypeId { get; set; }
     public ResourceType? ResourceType { get; set; }
     public Seniority Seniority { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
+    public int? VendorId { get; set; }
+    public Vendor? Vendor { get; set; }
     public int Quantity { get; set; } = 1;
     /// <summary>Staffing level per person over the phase window (100 = full time); fixed-duration initiatives only.</summary>
     public decimal? AllocationPercent { get; set; }
@@ -172,10 +191,12 @@ public class ForecastBaselineLine
     public int ForecastBaselineId { get; set; }
     public ForecastBaseline? ForecastBaseline { get; set; }
     public int PhaseId { get; set; }
+    public int BusinessUnitId { get; set; }
     public int ResourceTypeId { get; set; }
     public Seniority Seniority { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
+    public int? VendorId { get; set; }
     public decimal Hours { get; set; }
     public decimal HourlyRate { get; set; }
     public decimal Cost { get; set; }

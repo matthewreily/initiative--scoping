@@ -35,10 +35,12 @@ public static class BaselineSnapshot
             Lines = forecast.Lines.Select(l => new ForecastBaselineLine
             {
                 PhaseId = l.Allocation.PhaseId,
+                BusinessUnitId = l.Allocation.BusinessUnitId,
                 ResourceTypeId = l.Allocation.ResourceTypeId,
                 Seniority = l.Allocation.Seniority,
                 Location = l.Allocation.Location,
                 ResourcingClass = l.Allocation.ResourcingClass,
+                VendorId = l.Allocation.VendorId,
                 Hours = l.Hours,
                 HourlyRate = l.HourlyRate!.Value,
                 Cost = l.Cost

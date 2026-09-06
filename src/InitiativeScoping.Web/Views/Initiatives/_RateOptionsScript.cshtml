@@ -4,19 +4,23 @@
     {
         id = c.CardId,
         effectiveStart = c.EffectiveStart.ToString("yyyy-MM-dd"),
-        options = c.Options.Select(o => new { type = o.ResourceTypeId, seniority = (int)o.Seniority, location = o.Location, cls = (int)o.ResourcingClass, rate = o.Rate })
+        options = c.Options.Select(o => new { bu = o.BusinessUnitId, type = o.ResourceTypeId, seniority = (int)o.Seniority, location = o.Location, cls = (int)o.ResourcingClass, vendor = o.VendorId, rate = o.Rate })
     });
     var phaseStarts = Model.Data.PhaseStarts.ToDictionary(p => p.Key, p => p.Value.ToString("yyyy-MM-dd"));
+    var businessUnits = Model.Data.BusinessUnits.ToDictionary(b => b.Id, b => b.Name);
+    var vendorClass = (int)InitiativeScoping.Domain.Enums.ResourcingClass.Vendor;
 }
 <script>
     (function () {
         const byId = id => document.getElementById(id);
-        const phase = byId('@Model.PhaseSelectId'), type = byId('@Model.ResourceTypeSelectId'), seniority = byId('@Model.SenioritySelectId');
-        const location = byId('@Model.LocationSelectId'), cls = byId('@Model.ClassSelectId'), output = byId('@Model.RateOutputId');
+        const phase = byId('@Model.PhaseSelectId'), bu = byId('@Model.BusinessUnitSelectId'), type = byId('@Model.ResourceTypeSelectId'), seniority = byId('@Model.SenioritySelectId');
+        const location = byId('@Model.LocationSelectId'), cls = byId('@Model.ClassSelectId'), vendor = byId('@Model.VendorSelectId'), output = byId('@Model.RateOutputId');
+        const vendorWrap = vendor ? (vendor.closest('[data-vendor-field]') ?? vendor) : null;
         const cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cards));
         const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
-        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@((int)Model.Current.Seniority)', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)' };
-        const businessUnit = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Data.BusinessUnit));
+        const businessUnits = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(businessUnits));
+        const VENDOR = '@vendorClass';
+        const current = { bu: '@Model.Current.BusinessUnitId', type: '@Model.Current.ResourceTypeId', seniority: '@((int)Model.Current.Seniority)', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)' };
         const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
 
         function pricedFor(phaseId) {
@@ -43,11 +47,16 @@
 
         const same = (a, b) => String(a) === String(b);
         const sameText = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+        const sameVendor = (a, b) => String(a ?? '') === String(b ?? '');
+        const isVendor = () => same(cls.value, VENDOR);
+        // Mirrors RateResolver.VendorMatches: a vendor row naming no vendor is a generic rate for any vendor.
+        const vendorRowMatches = (o, vendorId) => !same(o.cls, VENDOR) || o.vendor === null || sameVendor(o.vendor, vendorId);
+        const vendorMatch = (rows, vendorId) => rows.filter(o => vendorRowMatches(o, vendorId)).sort((a, b) => (b.vendor !== null) - (a.vendor !== null))[0];
 
         function sync(preferCurrent) {
-            const cardPriced = pricedFor(phase.value);
-            let priced = cardPriced;
-            const currentPriced = priced.some(o => same(o.type, current.type) && same(o.seniority, current.seniority) && sameText(o.location, current.location) && same(o.cls, current.cls));
+            const buPriced = pricedFor(phase.value).filter(o => same(o.bu, bu.value));
+            let priced = buPriced;
+            const currentPriced = priced.some(o => same(o.type, current.type) && same(o.seniority, current.seniority) && sameText(o.location, current.location) && same(o.cls, current.cls) && vendorRowMatches(o, current.vendor));
             if (preferCurrent && current.type !== '0' && !currentPriced) { priced = []; } // keep a legacy unpriced allocation visible as saved
             const pick = (sel, key) => preferCurrent ? current[key] : sel.value;
             restrict(type, [...new Set(priced.map(o => o.type))], pick(type, 'type'), same);
@@ -57,25 +66,45 @@
             restrict(location, [...new Set(bySen.map(o => o.location))], pick(location, 'location'), sameText);
             const byLoc = bySen.filter(o => sameText(o.location, location.value));
             restrict(cls, [...new Set(byLoc.map(o => o.cls))], pick(cls, 'cls'), same);
-            const match = byLoc.find(o => same(o.cls, cls.value));
+            const byCls = byLoc.filter(o => same(o.cls, cls.value));
+            let match;
+            if (vendor) {
+                if (isVendor()) {
+                    if (vendorWrap) { vendorWrap.hidden = false; }
+                    vendor.disabled = false;
+                    const anyVendor = byCls.length === 0 || byCls.some(o => o.vendor === null);
+                    restrict(vendor, anyVendor ? [] : [...new Set(byCls.map(o => o.vendor))], pick(vendor, 'vendor'), sameVendor);
+                    match = vendorMatch(byCls, vendor.value);
+                } else {
+                    if (vendorWrap) { vendorWrap.hidden = true; }
+                    vendor.disabled = true;
+                    vendor.value = '';
+                    match = byCls[0];
+                }
+            } else {
+                match = byCls[0];
+            }
+            const buName = businessUnits[bu.value] ?? '?';
             if (match) {
                 output.value = money.format(match.rate) + ' /h';
                 output.classList.remove('is-invalid');
-                output.title = 'Published rate for this combination in ' + businessUnit + ' on ' + phaseStarts[phase.value];
+                output.title = 'Published rate for this combination in ' + buName + ' on ' + phaseStarts[phase.value];
             } else {
-                output.value = cardPriced.length === 0 ? 'No rate card' : 'No published rate';
+                output.value = buPriced.length === 0 ? 'No rate card' : 'No published rate';
                 output.classList.add('is-invalid');
-                output.title = cardPriced.length === 0
-                    ? 'No published rate card prices business unit ' + businessUnit + ' on ' + phaseStarts[phase.value] + '; any combination can be chosen but will not be costed.'
+                output.title = buPriced.length === 0
+                    ? 'No published rate card prices business unit ' + buName + ' on ' + phaseStarts[phase.value] + '; any combination can be chosen but will not be costed.'
                     : 'This combination has no published rate.';
             }
         }
 
         phase.addEventListener('change', () => sync(false));
+        bu.addEventListener('change', () => sync(false));
         type.addEventListener('change', () => sync(false));
         seniority.addEventListener('change', () => sync(false));
         location.addEventListener('change', () => sync(false));
         cls.addEventListener('change', () => sync(false));
+        if (vendor) { vendor.addEventListener('change', () => sync(false)); }
         sync(true);
     })();
 </script>

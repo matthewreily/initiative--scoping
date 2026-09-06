@@ -16,7 +16,7 @@ public static class ActualsCosting
         }
 
         var rate = RateResolver.Resolve(rateCards,
-            new RateKey(person.ResourceTypeId, person.BusinessUnitId, person.Seniority, person.Location, person.ResourcingClass),
+            new RateKey(person.ResourceTypeId, person.BusinessUnitId, person.Seniority, person.Location, person.ResourcingClass, person.VendorId),
             entry.WorkDate);
         return rate is null ? null : Math.Round(entry.Hours * rate.Value, 2);
     }

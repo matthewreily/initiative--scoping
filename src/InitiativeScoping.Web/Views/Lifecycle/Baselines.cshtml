@@ -64,14 +64,14 @@ else
                 </p>
                 <div class="table-responsive">
                 <table class="table table-sm align-middle">
-                    <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th>
+                    <thead><tr><th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th>
                         @if (Model.Previous is not null) { <th class="text-end">Δ Hours</th><th class="text-end">Δ Cost</th> }</tr></thead>
                     <tbody>
                     @foreach (var l in Model.Lines)
                     {
                         <tr class="@(l.Hours == 0 ? "text-muted" : "")">
-                            <td>@l.Phase</td><td>@l.ResourceType</td><td>@l.Seniority</td><td>@l.Location</td>
-                            <td>@(l.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : "Vendor")</td>
+                            <td>@l.Phase</td><td>@l.BusinessUnit</td><td>@l.ResourceType</td><td>@l.Seniority</td><td>@l.Location</td>
+                            <td>@(l.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : l.Vendor is null ? "Vendor" : $"Vendor: {l.Vendor}")</td>
                             <td class="text-end">@l.Hours.ToString("N1")</td>
                             <td class="text-end">@l.HourlyRate.ToString("C2")</td>
                             <td class="text-end">@l.Cost.ToString("C0")</td>
@@ -83,7 +83,7 @@ else
                         </tr>
                     }
                     </tbody>
-                    <tfoot><tr class="fw-semibold"><td colspan="5">Labor total</td><td class="text-end">@sel.TotalHours.ToString("N1")</td><td></td><td class="text-end">@sel.LaborCost.ToString("C0")</td>
+                    <tfoot><tr class="fw-semibold"><td colspan="6">Labor total</td><td class="text-end">@sel.TotalHours.ToString("N1")</td><td></td><td class="text-end">@sel.LaborCost.ToString("C0")</td>
                         @if (Model.Previous is not null)
                         {
                             var dh = sel.TotalHours - Model.Previous.TotalHours;

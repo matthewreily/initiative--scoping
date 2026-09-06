@@ -95,9 +95,10 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             CreatedAt = clock.GetUtcNow()
         };
         initiative.Members.Add(new InitiativeMember { UserId = currentUser.UserId, Role = InitiativeMemberRole.Owner });
+        SyncParticipants(initiative, model.ParticipatingBusinessUnitIds);
         db.Initiatives.Add(initiative);
         await db.SaveChangesAsync(ct);
-        audit.Record(Entity, initiative.Id, AuditActions.Create, new { initiative.Name, initiative.BusinessUnitId, initiative.SizingMethod, initiative.SizeKey, initiative.PlanningMode, initiative.TargetStart, initiative.TargetEnd });
+        audit.Record(Entity, initiative.Id, AuditActions.Create, new { initiative.Name, initiative.BusinessUnitId, ParticipatingBusinessUnitIds = initiative.ParticipatingBusinessUnitIds.ToList(), initiative.SizingMethod, initiative.SizeKey, initiative.PlanningMode, initiative.TargetStart, initiative.TargetEnd });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Initiative '{initiative.Name}' created. Add phases and allocations to build the forecast.", initiative.Id);
     }
@@ -119,6 +120,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return View(new InitiativeEditModel
         {
             Id = initiative.Id, Name = initiative.Name, Description = initiative.Description, BusinessUnitId = initiative.BusinessUnitId,
+            ParticipatingBusinessUnitIds = initiative.ParticipatingBusinessUnits.Select(p => p.BusinessUnitId).ToList(),
             SponsoringTeam = initiative.SponsoringTeam, SizingMethod = initiative.SizingMethod, SizeKey = initiative.SizeKey,
             PlanningMode = initiative.PlanningMode, TargetStart = initiative.TargetStart, TargetEnd = initiative.TargetEnd,
             VarianceThresholdPct = initiative.VarianceThresholdPct
@@ -141,6 +143,22 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         model.Id = id;
         await ValidateInitiative(model, ct);
+        var removedParticipants = initiative.ParticipatingBusinessUnitIds
+            .Except(model.ParticipatingBusinessUnitIds.Append(model.BusinessUnitId))
+            .ToList();
+        var orphaned = initiative.Allocations.Where(a => removedParticipants.Contains(a.BusinessUnitId)).ToList();
+        if (orphaned.Count > 0)
+        {
+            var names = await db.BusinessUnits.Where(b => orphaned.Select(a => a.BusinessUnitId).Contains(b.Id)).Select(b => b.Name).ToListAsync(ct);
+            ModelState.AddModelError(nameof(model.ParticipatingBusinessUnitIds),
+                $"{orphaned.Count} allocation(s) are resourced from {string.Join(", ", names)}; reassign or remove them before dropping that business unit.");
+        }
+
+        if (removedParticipants.Count > 0 && !InitiativeAccess.IsScopeEditable(initiative))
+        {
+            ModelState.AddModelError(nameof(model.ParticipatingBusinessUnitIds), ScopeLockedMessage);
+        }
+
         var scheduleChanged = initiative.PlanningMode != model.PlanningMode || initiative.TargetStart != model.TargetStart || initiative.TargetEnd != model.TargetEnd;
         if (scheduleChanged && !InitiativeAccess.IsScopeEditable(initiative))
         {
@@ -166,6 +184,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         initiative.Name = model.Name.Trim();
         initiative.Description = model.Description?.Trim();
         initiative.BusinessUnitId = model.BusinessUnitId;
+        SyncParticipants(initiative, model.ParticipatingBusinessUnitIds);
         initiative.SponsoringTeam = model.SponsoringTeam?.Trim();
         initiative.SizingMethod = model.SizingMethod;
         initiative.SizeKey = model.SizingMethod == SizingMethod.Direct ? null : model.SizeKey?.Trim();
@@ -222,6 +241,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         db.InitiativeAllocations.RemoveRange(initiative.Allocations);
         db.Phases.RemoveRange(initiative.Phases);
+        db.InitiativeBusinessUnits.RemoveRange(initiative.ParticipatingBusinessUnits);
         db.Initiatives.Remove(initiative);
         audit.Record(Entity, initiative.Id, AuditActions.Delete, new { initiative.Name });
         await db.SaveChangesAsync(ct);
@@ -262,6 +282,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 orderedPhases.Select(p => p.Name)),
             ByResourceType = Rollup(forecast, l => typeNames.GetValueOrDefault(l.Allocation.ResourceTypeId, "?")),
             ByClass = Rollup(forecast, l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : "Vendor"),
+            ByBusinessUnit = Rollup(forecast, l => l.Allocation.BusinessUnit?.Name ?? "?"),
+            ByVendor = Rollup(new ForecastResult(forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.Vendor).ToList(), []), l => l.Allocation.Vendor?.Name ?? "(no vendor)"),
             Gantt = BuildGantt(orderedPhases),
             FixedDuration = fixedDuration,
             ResourceTypeNames = typeNames,
@@ -271,7 +293,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 PlannedStart = nextPhaseStart,
                 PlannedEnd = nextPhaseEnd
             },
-            NewAllocation = new AllocationEditModel { InitiativeId = id },
+            NewAllocation = new AllocationEditModel { InitiativeId = id, BusinessUnitId = initiative.BusinessUnitId },
             NewNonLaborCost = new NonLaborCostEditModel { InitiativeId = id },
             CatalogOptions = await CatalogOptionsAsync(ct),
             CostPreviewWindows = CostPreviewWindows(initiative),
@@ -280,7 +302,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             {
                 InitiativeId = id,
                 Method = initiative.SizingMethod == SizingMethod.Direct ? SizingMethod.TShirt : initiative.SizingMethod,
-                SizeKey = initiative.SizeKey ?? string.Empty
+                SizeKey = initiative.SizeKey ?? string.Empty,
+                BusinessUnitId = initiative.BusinessUnitId
             },
             Phases = new SelectList(orderedPhases, "Id", "Name"),
             RateOptions = await BuildRateOptionsAsync(initiative, cards, ct),
@@ -487,8 +510,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         var allocation = new InitiativeAllocation
         {
-            PhaseId = model.PhaseId, ResourceTypeId = model.ResourceTypeId, Seniority = model.Seniority,
-            Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, Quantity = model.Quantity,
+            PhaseId = model.PhaseId, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = model.ResourceTypeId, Seniority = model.Seniority,
+            Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, VendorId = VendorFor(model), Quantity = model.Quantity,
             EstimatedHours = model.EstimatedHours, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
         };
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
@@ -516,8 +539,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await PopulateAllocationLists(allocation.Initiative!, ct);
         return View(new AllocationEditModel
         {
-            Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, ResourceTypeId = allocation.ResourceTypeId,
-            Seniority = allocation.Seniority, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass,
+            Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, BusinessUnitId = allocation.BusinessUnitId, ResourceTypeId = allocation.ResourceTypeId,
+            Seniority = allocation.Seniority, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass, VendorId = allocation.VendorId,
             Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
             ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
         });
@@ -555,10 +578,12 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         var before = AllocationSnapshot(allocation);
         allocation.PhaseId = model.PhaseId;
+        allocation.BusinessUnitId = model.BusinessUnitId;
         allocation.ResourceTypeId = model.ResourceTypeId;
         allocation.Seniority = model.Seniority;
         allocation.Location = model.Location.Trim();
         allocation.ResourcingClass = model.ResourcingClass;
+        allocation.VendorId = VendorFor(model);
         allocation.Quantity = model.Quantity;
         allocation.EstimatedHours = model.EstimatedHours;
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
@@ -762,6 +787,23 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             initiative.Allocations.Clear();
         }
 
+        if (model.BusinessUnitId == 0)
+        {
+            model.BusinessUnitId = initiative.BusinessUnitId;
+        }
+
+        if (!initiative.ParticipatingBusinessUnitIds.Contains(model.BusinessUnitId))
+        {
+            return RedirectWithError("Select one of the initiative's participating business units.", id);
+        }
+
+        var vendorError = await ValidateVendorAsync(model.ResourcingClass, model.VendorId, ct);
+        if (vendorError is not null)
+        {
+            return RedirectWithError(vendorError, id);
+        }
+
+        var vendorId = model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;
         var location = model.Location.Trim();
         var sizedLines = SizingApplier.Apply(conversion.Hours, lines);
         int createdPhases;
@@ -833,8 +875,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
                 initiative.Allocations.Add(new InitiativeAllocation
                 {
-                    Phase = phase, ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
-                    Location = location, ResourcingClass = model.ResourcingClass, Quantity = 1,
+                    Phase = phase, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
+                    Location = location, ResourcingClass = model.ResourcingClass, VendorId = vendorId, Quantity = 1,
                     AllocationPercent = percent,
                     EstimatedHours = DurationCalculator.Hours(percent, workingDays, calendar.HoursPerDay)
                 });
@@ -871,8 +913,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             {
                 initiative.Allocations.Add(new InitiativeAllocation
                 {
-                    Phase = phasesByName[sized.PhaseName], ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
-                    Location = location, ResourcingClass = model.ResourcingClass, Quantity = 1, EstimatedHours = sized.Hours
+                    Phase = phasesByName[sized.PhaseName], BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
+                    Location = location, ResourcingClass = model.ResourcingClass, VendorId = vendorId, Quantity = 1, EstimatedHours = sized.Hours
                 });
             }
 
@@ -883,7 +925,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         initiative.SizeKey = key;
         audit.Record(Entity, initiative.Id, AuditActions.Update, new
         {
-            Action = "ApplySize", model.Method, SizeKey = key, conversion.Hours, TemplateId = template.Id, model.Replace, PhasesCreated = createdPhases, Lines = lines.Count, initiative.PlanningMode
+            Action = "ApplySize", model.Method, SizeKey = key, conversion.Hours, TemplateId = template.Id, model.BusinessUnitId, VendorId = vendorId, model.Replace, PhasesCreated = createdPhases, Lines = lines.Count, initiative.PlanningMode
         });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Applied {model.Method} '{key}' ({conversion.Hours}h) using template '{template.Name}': {lines.Count} allocation(s), {createdPhases} new phase(s).{modeNote} Adjust as needed.", id);
@@ -1028,9 +1070,12 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     {
         IQueryable<Initiative> query = db.Initiatives
             .Include(i => i.BusinessUnit)
+            .Include(i => i.ParticipatingBusinessUnits).ThenInclude(p => p.BusinessUnit)
             .Include(i => i.Members)
             .Include(i => i.Phases)
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
+            .Include(i => i.Allocations).ThenInclude(a => a.BusinessUnit)
+            .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
             .Include(i => i.NonLaborCosts).ThenInclude(c => c.CostCatalogItem)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
             .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)
@@ -1050,7 +1095,45 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     private async Task PopulateEditLists(CancellationToken ct)
     {
         ViewBag.BusinessUnits = await BusinessUnitListAsync(ct, includeInactive: false);
+        ViewBag.AllBusinessUnits = await db.BusinessUnits.Where(b => b.IsActive).OrderBy(b => b.Name).Select(b => new NamedId(b.Id, b.Name)).ToListAsync(ct);
         ViewBag.SizeOptions = await SizeOptionsAsync(ct);
+    }
+
+    /// <summary>Makes the join rows match the posted list; the sponsor is implied and never stored twice.</summary>
+    private void SyncParticipants(Initiative initiative, IEnumerable<int> requested)
+    {
+        var wanted = requested.Where(id => id != initiative.BusinessUnitId).Distinct().ToHashSet();
+        foreach (var stale in initiative.ParticipatingBusinessUnits.Where(p => !wanted.Contains(p.BusinessUnitId)).ToList())
+        {
+            initiative.ParticipatingBusinessUnits.Remove(stale);
+            if (stale.InitiativeId != 0)
+            {
+                db.InitiativeBusinessUnits.Remove(stale);
+            }
+        }
+
+        foreach (var id in wanted.Where(id => initiative.ParticipatingBusinessUnits.All(p => p.BusinessUnitId != id)))
+        {
+            initiative.ParticipatingBusinessUnits.Add(new InitiativeBusinessUnit { BusinessUnitId = id });
+        }
+    }
+
+    private static int? VendorFor(AllocationEditModel model) =>
+        model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;
+
+    private async Task<string?> ValidateVendorAsync(ResourcingClass cls, int? vendorId, CancellationToken ct)
+    {
+        if (cls != ResourcingClass.Vendor)
+        {
+            return null;
+        }
+
+        if (vendorId is null)
+        {
+            return "Select a vendor for vendor-supplied resources.";
+        }
+
+        return await db.Vendors.AnyAsync(v => v.Id == vendorId, ct) ? null : "Select a vendor from the catalog.";
     }
 
     // Only sizes backed by an allocation template are selectable; conversions just annotate them with hours.
@@ -1089,6 +1172,16 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         if (!await db.BusinessUnits.AnyAsync(b => b.Id == model.BusinessUnitId && b.IsActive, ct))
         {
             ModelState.AddModelError(nameof(model.BusinessUnitId), "Select an active business unit.");
+        }
+
+        var participants = model.ParticipatingBusinessUnitIds.Where(id => id != model.BusinessUnitId).Distinct().ToList();
+        if (participants.Count > 0)
+        {
+            var known = await db.BusinessUnits.Where(b => participants.Contains(b.Id)).Select(b => b.Id).ToListAsync(ct);
+            if (known.Count != participants.Count)
+            {
+                ModelState.AddModelError(nameof(model.ParticipatingBusinessUnitIds), "Select participating business units from the list.");
+            }
         }
 
         ValidateSchedule(model);
@@ -1204,18 +1297,21 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
     }
 
-    /// <summary>Priced (type, seniority, location, class) combinations for the initiative's BU per published card, plus fallbacks for when nothing is priced yet.</summary>
+    /// <summary>Priced (BU, type, seniority, location, class, vendor) combinations across the participating BUs per published card, plus fallbacks for when nothing is priced yet.</summary>
     private async Task<RateOptionsData> BuildRateOptionsAsync(Initiative initiative, IReadOnlyList<RateCard> cards, CancellationToken ct)
     {
         var types = await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).Select(t => new NamedId(t.Id, t.Name)).ToListAsync(ct);
         var typeNames = types.ToDictionary(t => t.Id, t => t.Name);
+        var participantIds = initiative.ParticipatingBusinessUnitIds.ToHashSet();
+        var businessUnits = await db.BusinessUnits.Where(b => participantIds.Contains(b.Id)).OrderBy(b => b.Name).Select(b => new NamedId(b.Id, b.Name)).ToListAsync(ct);
+        var vendors = await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).Select(v => new NamedId(v.Id, v.Name)).ToListAsync(ct);
         var cardOptions = cards
             .Where(c => c.Status == RateCardStatus.Published)
             .OrderBy(c => c.EffectiveStart).ThenBy(c => c.Id)
             .Select(c => new RateCardOptions(c.Id, c.EffectiveStart, c.Entries
-                .Where(e => e.BusinessUnitId == initiative.BusinessUnitId && typeNames.ContainsKey(e.ResourceTypeId))
-                .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => e.Seniority).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass)
-                .Select(e => new RateOption(e.ResourceTypeId, typeNames[e.ResourceTypeId], e.Seniority, e.Location, e.ResourcingClass, e.HourlyRate))
+                .Where(e => participantIds.Contains(e.BusinessUnitId) && typeNames.ContainsKey(e.ResourceTypeId))
+                .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => e.Seniority).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass).ThenBy(e => e.VendorId)
+                .Select(e => new RateOption(e.BusinessUnitId, e.ResourceTypeId, typeNames[e.ResourceTypeId], e.Seniority, e.Location, e.ResourcingClass, e.VendorId, e.HourlyRate))
                 .ToList()))
             .ToList();
         var locations = cards.SelectMany(c => c.Entries.Select(e => e.Location))
@@ -1224,15 +1320,22 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .OrderBy(l => l, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return new RateOptionsData(
-            initiative.BusinessUnit?.Name ?? (await db.BusinessUnits.Where(b => b.Id == initiative.BusinessUnitId).Select(b => b.Name).FirstAsync(ct)),
+            businessUnits,
+            initiative.BusinessUnitId,
             cardOptions,
             initiative.Phases.ToDictionary(p => p.Id, p => p.PlannedStart),
             types,
-            locations);
+            locations,
+            vendors);
     }
 
     private async Task ValidateAllocation(AllocationEditModel model, Initiative initiative, CancellationToken ct, InitiativeAllocation? existing = null)
     {
+        if (model.BusinessUnitId == 0)
+        {
+            model.BusinessUnitId = initiative.BusinessUnitId;
+        }
+
         var phase = initiative.Phases.FirstOrDefault(p => p.Id == model.PhaseId);
         if (phase is null)
         {
@@ -1241,24 +1344,39 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 : "Select a phase that belongs to this initiative.");
         }
 
+        var participates = initiative.ParticipatingBusinessUnitIds.Contains(model.BusinessUnitId);
+        if (!participates)
+        {
+            ModelState.AddModelError(nameof(model.BusinessUnitId), "Select one of the initiative's participating business units.");
+        }
+
+        var vendorError = await ValidateVendorAsync(model.ResourcingClass, model.VendorId, ct);
+        if (vendorError is not null)
+        {
+            ModelState.AddModelError(nameof(model.VendorId), vendorError);
+        }
+
         if (!await db.ResourceTypes.AnyAsync(t => t.Id == model.ResourceTypeId, ct))
         {
             ModelState.AddModelError(nameof(model.ResourceTypeId), "Select a resource type.");
         }
-        else if (phase is not null)
+        else if (phase is not null && participates && vendorError is null)
         {
-            var priced = RateResolver.PricedEntries(await LoadRateCardsAsync(ct), initiative.BusinessUnitId, phase.PlannedStart);
+            var priced = RateResolver.PricedEntries(await LoadRateCardsAsync(ct), [model.BusinessUnitId], phase.PlannedStart);
             var location = model.Location.Trim();
+            var vendorId = VendorFor(model);
             var unchanged = existing is not null
-                && existing.ResourceTypeId == model.ResourceTypeId && existing.Seniority == model.Seniority && existing.ResourcingClass == model.ResourcingClass
+                && existing.BusinessUnitId == model.BusinessUnitId && existing.ResourceTypeId == model.ResourceTypeId && existing.Seniority == model.Seniority
+                && existing.ResourcingClass == model.ResourcingClass && existing.VendorId == vendorId
                 && string.Equals(existing.Location, location, StringComparison.OrdinalIgnoreCase);
             if (priced.Count > 0 && !unchanged && !priced.Any(e =>
                     e.ResourceTypeId == model.ResourceTypeId && e.Seniority == model.Seniority && e.ResourcingClass == model.ResourcingClass
+                    && RateResolver.VendorMatches(e.ResourcingClass, e.VendorId, vendorId)
                     && string.Equals(e.Location, location, StringComparison.OrdinalIgnoreCase)))
             {
-                var bu = initiative.BusinessUnit?.Name ?? await db.BusinessUnits.Where(b => b.Id == initiative.BusinessUnitId).Select(b => b.Name).FirstAsync(ct);
+                var bu = await db.BusinessUnits.Where(b => b.Id == model.BusinessUnitId).Select(b => b.Name).FirstAsync(ct);
                 ModelState.AddModelError(nameof(model.ResourceTypeId),
-                    $"No published rate for that resource type / seniority / location / class in business unit '{bu}' on {phase.PlannedStart:yyyy-MM-dd}. Pick a priced combination or add it to the rate card.");
+                    $"No published rate for that resource type / seniority / location / class{(vendorId is null ? string.Empty : " / vendor")} in business unit '{bu}' on {phase.PlannedStart:yyyy-MM-dd}. Pick a priced combination or add it to the rate card.");
             }
         }
 
@@ -1364,10 +1482,10 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     }
 
     private static object Snapshot(Initiative i) =>
-        new { i.Name, i.Description, i.BusinessUnitId, i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct };
+        new { i.Name, i.Description, i.BusinessUnitId, ParticipatingBusinessUnitIds = i.ParticipatingBusinessUnitIds.ToList(), i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct };
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
-        new { a.InitiativeId, a.PhaseId, a.ResourceTypeId, a.Seniority, a.Location, a.ResourcingClass, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
+        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.Seniority, a.Location, a.ResourcingClass, a.VendorId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
 
     private static List<RollupRow> Rollup(ForecastResult forecast, Func<ForecastLine, string> key, IEnumerable<string>? order = null)
     {

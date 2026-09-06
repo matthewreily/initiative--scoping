@@ -45,6 +45,11 @@
             <label asp-for="ResourcingClass" class="form-label"></label>
             <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
         </div>
+        <div class="col-md-4 mb-3" id="vendor-wrap" hidden>
+            <label asp-for="VendorId" class="form-label"></label>
+            <select asp-for="VendorId" asp-items="ViewBag.Vendors" class="form-select" disabled><option value="">Unspecified</option></select>
+            <span asp-validation-for="VendorId" class="text-danger"></span>
+        </div>
     </div>
     <div class="form-check mb-3">
         <input asp-for="IsActive" class="form-check-input" />
@@ -53,4 +58,14 @@
     <button type="submit" class="btn btn-primary">Save</button>
     <a asp-action="Index" class="btn btn-link">Cancel</a>
 </form>
-@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }
+@section Scripts {
+    <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
+    <script>
+        (function () {
+            const cls = document.getElementById('ResourcingClass'), wrap = document.getElementById('vendor-wrap'), vendor = document.getElementById('VendorId');
+            function sync() { const v = cls.value === '@((int)ResourcingClass.Vendor)' || cls.value === '@ResourcingClass.Vendor'; wrap.hidden = !v; vendor.disabled = !v; }
+            cls.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
+}

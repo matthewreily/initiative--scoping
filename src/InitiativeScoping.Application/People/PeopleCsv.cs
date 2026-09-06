@@ -13,7 +13,8 @@ public sealed record PeopleCsvRow(
     Seniority Seniority,
     string Location,
     ResourcingClass ResourcingClass,
-    bool IsActive);
+    bool IsActive,
+    string? Vendor = null);
 
 public sealed record PeopleCsvError(int Line, string Message);
 
@@ -23,14 +24,14 @@ public sealed record PeopleCsvResult(IReadOnlyList<PeopleCsvRow> Rows, IReadOnly
 }
 
 /// <summary>
-/// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive]
+/// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive][,Vendor]
 /// ExternalIds is ';'-separated (may be empty). Seniority: Associate|Mid|Senior|Staff|Principal.
-/// ResourcingClass: InternalFte|Vendor. IsActive defaults to true.
+/// ResourcingClass: InternalFte|Vendor. IsActive defaults to true. Vendor names the catalog vendor for Vendor rows and must be blank for InternalFte.
 /// </summary>
 public static class PeopleCsv
 {
-    public static readonly string[] Headers = ["DisplayName", "ExternalIds", "ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "IsActive"];
-    private static readonly string[] Required = Headers[..^1];
+    public static readonly string[] Headers = ["DisplayName", "ExternalIds", "ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "IsActive", "Vendor"];
+    private static readonly string[] Required = Headers[..^2];
 
     private static readonly CsvConfiguration Config = new(CultureInfo.InvariantCulture)
     {
@@ -61,6 +62,7 @@ public static class PeopleCsv
         }
 
         var hasActive = header.Contains("IsActive", StringComparer.OrdinalIgnoreCase);
+        var hasVendor = header.Contains("Vendor", StringComparer.OrdinalIgnoreCase);
 
         while (csv.Read())
         {
@@ -104,7 +106,15 @@ public static class PeopleCsv
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            rows.Add(new PeopleCsvRow(name, ids, resourceType, businessUnit, seniority, location, resourcingClass, isActive));
+            var vendor = hasVendor ? csv.GetField("Vendor") : null;
+            vendor = string.IsNullOrWhiteSpace(vendor) ? null : vendor.Trim();
+            if (resourcingClass != ResourcingClass.Vendor && vendor is not null)
+            {
+                errors.Add(new PeopleCsvError(line, "Vendor must be blank for internal FTE rows."));
+                continue;
+            }
+
+            rows.Add(new PeopleCsvRow(name, ids, resourceType, businessUnit, seniority, location, resourcingClass, isActive, vendor));
         }
 
         foreach (var dup in rows.GroupBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
@@ -140,6 +150,7 @@ public static class PeopleCsv
             csv.WriteField(r.Location);
             csv.WriteField(r.ResourcingClass.ToString());
             csv.WriteField(r.IsActive ? "true" : "false");
+            csv.WriteField(r.Vendor ?? string.Empty);
             csv.NextRecord();
         }
         csv.Flush();
