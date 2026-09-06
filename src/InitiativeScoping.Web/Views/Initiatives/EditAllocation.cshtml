@@ -2,7 +2,8 @@
 @{
     var initiative = (Initiative)ViewBag.Initiative;
     var phases = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.Phases;
-    var resourceTypes = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.ResourceTypes;
+    var rateOptions = (RateOptionsData)ViewBag.RateOptions;
+    var locations = rateOptions.AllLocations.Append(Model.Location).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(l => l, StringComparer.OrdinalIgnoreCase);
     ViewData["Title"] = "Edit Allocation";
     var fixedDuration = initiative.PlanningMode == PlanningMode.FixedDuration;
 }
@@ -12,6 +13,17 @@
     <li class="breadcrumb-item active">Edit allocation</li>
 </ol></nav>
 <h1 class="h3">Edit allocation</h1>
+<p class="text-muted small">
+    Business unit: <strong>@rateOptions.BusinessUnit</strong> (from the initiative). Only combinations with a published rate for this business unit on the phase start date are selectable.
+    @if (!rateOptions.HasAnyPricing)
+    {
+        <span class="text-warning-emphasis">No published rate card prices this business unit yet — allocations will be unpriced until an admin adds rates.</span>
+    }
+    @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
+    {
+        <a asp-area="Admin" asp-controller="RateCards" asp-action="Index">Manage rate cards</a>
+    }
+</p>
 <form asp-action="EditAllocation" asp-route-id="@Model.Id" method="post" class="col-lg-8">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <div class="row g-3 mb-3">
@@ -22,7 +34,7 @@
         </div>
         <div class="col-md-6">
             <label asp-for="ResourceTypeId" class="form-label"></label>
-            <select asp-for="ResourceTypeId" asp-items="resourceTypes" class="form-select"></select>
+            <select asp-for="ResourceTypeId" asp-items="@(new SelectList(rateOptions.AllResourceTypes, "Id", "Name"))" class="form-select"></select>
             <span asp-validation-for="ResourceTypeId" class="text-danger"></span>
         </div>
     </div>
@@ -33,12 +45,16 @@
         </div>
         <div class="col-md-3">
             <label asp-for="Location" class="form-label"></label>
-            <input asp-for="Location" class="form-control" />
+            <select asp-for="Location" asp-items="@(new SelectList(locations))" class="form-select"></select>
             <span asp-validation-for="Location" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="ResourcingClass" class="form-label"></label>
             <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+            <label for="rate-preview" class="form-label">Hourly rate</label>
+            <input id="rate-preview" class="form-control" readonly tabindex="-1" />
         </div>
     </div>
     <div class="row g-3 mb-3">
@@ -82,6 +98,7 @@
 </form>
 @section Scripts {
     <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
+    <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("PhaseId", "ResourceTypeId", "Seniority", "Location", "ResourcingClass", "rate-preview", rateOptions, Model))" />
     @if (fixedDuration)
     {
         <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("PhaseId", "AllocationPercent", "computed-hours", (IReadOnlyDictionary<int, int>)ViewBag.PhaseWorkingDays, (decimal)ViewBag.HoursPerDay))" />

@@ -163,6 +163,34 @@ public sealed record RollupRow(string Label, decimal Hours, decimal Cost, bool H
 
 public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 
+/// <summary>One priced (resource type, seniority, location, class) combination from a published rate card.</summary>
+public sealed record RateOption(int ResourceTypeId, string ResourceType, Seniority Seniority, string Location, ResourcingClass ResourcingClass, decimal Rate);
+
+public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, IReadOnlyList<RateOption> Options);
+
+/// <summary>Data for the allocation form: priced combinations per published card for the initiative's BU, and phase start dates to pick the effective card.</summary>
+public sealed record RateOptionsScriptModel(
+    string PhaseSelectId,
+    string ResourceTypeSelectId,
+    string SenioritySelectId,
+    string LocationSelectId,
+    string ClassSelectId,
+    string RateOutputId,
+    RateOptionsData Data,
+    AllocationEditModel Current);
+
+public sealed record RateOptionsData(
+    string BusinessUnit,
+    IReadOnlyList<RateCardOptions> Cards,
+    IReadOnlyDictionary<int, DateOnly> PhaseStarts,
+    IReadOnlyList<NamedId> AllResourceTypes,
+    IReadOnlyList<string> AllLocations)
+{
+    public bool HasAnyPricing => Cards.Any(c => c.Options.Count > 0);
+}
+
+public sealed record NamedId(int Id, string Name);
+
 public sealed record ComputedHoursScriptModel(string PhaseSelectId, string PercentInputId, string OutputId, IReadOnlyDictionary<int, int> PhaseWorkingDays, decimal HoursPerDay);
 
 /// <summary>Fixed-duration schedule summary shown on the Details page.</summary>
@@ -189,7 +217,7 @@ public class InitiativeDetailsModel
     public required MemberEditModel NewMember { get; init; }
     public required ApplySizeModel ApplySize { get; init; }
     public required SelectList Phases { get; init; }
-    public required SelectList ResourceTypes { get; init; }
+    public required RateOptionsData RateOptions { get; init; }
     public required IReadOnlyList<SizeOption> SizeOptions { get; init; }
     public bool CanEdit { get; init; }
     public bool CanManage { get; init; }

@@ -309,14 +309,25 @@ else
         </div>
         @if (Model.ScopeWritable && i.Phases.Count > 0)
         {
-            <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
+            <p class="small text-muted mb-1" id="allocation-bu-hint">
+                Business unit: <strong>@Model.RateOptions.BusinessUnit</strong> (from the initiative). Only resource type / seniority / location / class combinations with a published rate for this business unit on the phase start date are selectable.
+                @if (!Model.RateOptions.HasAnyPricing)
+                {
+                    <span class="text-warning-emphasis">No published rate card prices this business unit yet — allocations will be unpriced until an admin adds rates.</span>
+                }
+                @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
+                {
+                    <a asp-area="Admin" asp-controller="RateCards" asp-action="Index">Manage rate cards</a>
+                }
+            </p>
+            <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4" aria-describedby="allocation-bu-hint">
                 <div class="col-md-3">
                     <label for="phaseid" class="form-label small mb-0">Phase</label>
                     <select name="PhaseId" id="phaseid" asp-items="Model.Phases" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-3">
                     <label for="resourcetypeid" class="form-label small mb-0">Resource type</label>
-                    <select name="ResourceTypeId" id="resourcetypeid" asp-items="Model.ResourceTypes" class="form-select form-select-sm"></select>
+                    <select name="ResourceTypeId" id="resourcetypeid" asp-items="@(new SelectList(Model.RateOptions.AllResourceTypes, "Id", "Name"))" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2">
                     <label for="seniority" class="form-label small mb-0">Seniority</label>
@@ -324,11 +335,15 @@ else
                 </div>
                 <div class="col-md-2">
                     <label for="location" class="form-label small mb-0">Location</label>
-                    <input name="Location" id="location" class="form-control form-control-sm" value="Onshore" required />
+                    <select name="Location" id="location" asp-items="@(new SelectList(Model.RateOptions.AllLocations, "Onshore"))" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2">
                     <label for="resourcingclass" class="form-label small mb-0">Class</label>
                     <select name="ResourcingClass" id="resourcingclass" asp-items="classes" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-2">
+                    <label for="rate-preview-new" class="form-label small mb-0">Hourly rate</label>
+                    <input id="rate-preview-new" class="form-control form-control-sm" readonly tabindex="-1" />
                 </div>
                 <div class="col-md-2">
                     <label for="quantity" class="form-label small mb-0">Quantity</label>
@@ -364,6 +379,7 @@ else
                 </div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
+            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation))" />
             @if (fd is not null)
             {
                 <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />
