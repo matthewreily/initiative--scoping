@@ -269,17 +269,18 @@ else
         <h2 class="h5">Allocations</h2>
         <div class="table-responsive">
         <table class="table table-sm align-middle">
-            <thead><tr><th>Phase</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th></th></tr></thead>
+            <thead><tr><th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th></th></tr></thead>
             <tbody>
             @foreach (var a in orderedAllocations)
             {
                 var line = lineByAllocation[a.Id];
                 <tr class="@(line.IsUnpriced ? "table-warning" : "")">
                     <td>@phaseNames.GetValueOrDefault(a.PhaseId)</td>
+                    <td>@a.BusinessUnit?.Name</td>
                     <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
                     <td>@a.Seniority</td>
                     <td>@a.Location</td>
-                    <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
+                    <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}")</td>
                     <td class="text-end">@a.Quantity</td>
                     @if (fixedDuration) { <td class="text-end">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
                     <td class="text-end">@line.Hours.ToString("N1")</td>
@@ -298,22 +299,26 @@ else
             }
             @if (i.Allocations.Count == 0)
             {
-                <tr><td colspan="11" class="text-muted">No allocations yet.</td></tr>
+                <tr><td colspan="12" class="text-muted">No allocations yet.</td></tr>
             }
             </tbody>
             @if (i.Allocations.Count > 0)
             {
-                <tfoot class="fw-semibold"><tr><td colspan="@(fixedDuration ? 7 : 6)" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td></td></tr></tfoot>
+                <tfoot class="fw-semibold"><tr><td colspan="@(fixedDuration ? 8 : 7)" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td></td></tr></tfoot>
             }
         </table>
         </div>
         @if (Model.ScopeWritable && i.Phases.Count > 0)
         {
             <p class="small text-muted mb-1" id="allocation-bu-hint">
-                Business unit: <strong>@Model.RateOptions.BusinessUnit</strong> (from the initiative). Only resource type / seniority / location / class combinations with a published rate for this business unit on the phase start date are selectable.
+                Participating business units: <strong>@string.Join(", ", Model.RateOptions.BusinessUnits.Select(b => b.Name))</strong> (edit the initiative to change). Only resource type / seniority / location / class (and vendor) combinations with a published rate for the chosen business unit on the phase start date are selectable.
                 @if (!Model.RateOptions.HasAnyPricing)
                 {
-                    <span class="text-warning-emphasis">No published rate card prices this business unit yet — allocations will be unpriced until an admin adds rates.</span>
+                    <span class="text-warning-emphasis">No published rate card prices these business units yet — allocations will be unpriced until an admin adds rates.</span>
+                }
+                @if (Model.RateOptions.Vendors.Count == 0)
+                {
+                    <span class="text-warning-emphasis">No vendors are defined; vendor-supplied allocations need one in Admin → Vendors.</span>
                 }
                 @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
                 {
@@ -324,6 +329,10 @@ else
                 <div class="col-md-3">
                     <label for="phaseid" class="form-label small mb-0">Phase</label>
                     <select name="PhaseId" id="phaseid" asp-items="Model.Phases" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-3">
+                    <label for="businessunitid" class="form-label small mb-0">Business unit</label>
+                    <select name="BusinessUnitId" id="businessunitid" asp-items="@(new SelectList(Model.RateOptions.BusinessUnits, "Id", "Name", Model.NewAllocation.BusinessUnitId))" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-3">
                     <label for="resourcetypeid" class="form-label small mb-0">Resource type</label>
@@ -340,6 +349,10 @@ else
                 <div class="col-md-2">
                     <label for="resourcingclass" class="form-label small mb-0">Class</label>
                     <select name="ResourcingClass" id="resourcingclass" asp-items="classes" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-2" data-vendor-field hidden>
+                    <label for="vendorid" class="form-label small mb-0">Vendor</label>
+                    <select name="VendorId" id="vendorid" asp-items="@(new SelectList(Model.RateOptions.Vendors, "Id", "Name"))" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2">
                     <label for="rate-preview-new" class="form-label small mb-0">Hourly rate</label>
@@ -379,7 +392,7 @@ else
                 </div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
-            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation))" />
+            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { BusinessUnitSelectId = "businessunitid", VendorSelectId = "vendorid" })" />
             @if (fd is not null)
             {
                 <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />
@@ -506,6 +519,36 @@ else
         </table>
         </div>
 
+        <h2 class="h5 mt-4">Rollup by resourcing business unit</h2>
+        <div class="table-responsive">
+        <table class="table table-sm" id="rollup-by-bu">
+            <thead><tr><th>Business unit</th><th class="text-end">Hours</th><th class="text-end">Cost</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model.ByBusinessUnit)
+            {
+                <tr><td>@row.Label</td><td class="text-end">@row.Hours.ToString("N1")</td><td class="text-end">@row.Cost.ToString("C0") @if (row.HasUnpriced) { <span class="text-warning">&#9888;</span> }</td></tr>
+            }
+            @if (Model.ByBusinessUnit.Count == 0) { <tr><td colspan="3" class="text-muted">Nothing allocated.</td></tr> }
+            </tbody>
+        </table>
+        </div>
+
+        @if (Model.ByVendor.Count > 0)
+        {
+            <h2 class="h5 mt-4">Rollup by vendor</h2>
+            <div class="table-responsive">
+            <table class="table table-sm" id="rollup-by-vendor">
+                <thead><tr><th>Vendor</th><th class="text-end">Hours</th><th class="text-end">Cost</th></tr></thead>
+                <tbody>
+                @foreach (var row in Model.ByVendor)
+                {
+                    <tr><td>@row.Label</td><td class="text-end">@row.Hours.ToString("N1")</td><td class="text-end">@row.Cost.ToString("C0") @if (row.HasUnpriced) { <span class="text-warning">&#9888;</span> }</td></tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+
         @if (Model.ScopeWritable)
         {
             <h2 class="h5 mt-4">Apply relative size</h2>
@@ -540,8 +583,16 @@ else
                     <input name="Location" id="location-2" class="form-control form-control-sm" value="@Model.ApplySize.Location" required />
                 </div>
                 <div class="col-5">
+                    <label for="businessunitid-2" class="form-label small mb-0">Business unit</label>
+                    <select name="BusinessUnitId" id="businessunitid-2" asp-items="@(new SelectList(Model.RateOptions.BusinessUnits, "Id", "Name", Model.ApplySize.BusinessUnitId))" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-4">
                     <label for="resourcingclass-2" class="form-label small mb-0">Class</label>
                     <select name="ResourcingClass" id="resourcingclass-2" asp-items="classes" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-3" id="vendor-2-wrap" hidden>
+                    <label for="vendorid-2" class="form-label small mb-0">Vendor</label>
+                    <select name="VendorId" id="vendorid-2" asp-items="@(new SelectList(Model.RateOptions.Vendors, "Id", "Name"))" class="form-select form-select-sm" disabled></select>
                 </div>
                 <div class="col-4 form-check ms-2 mb-1">
                     <input name="Replace" type="checkbox" value="true" class="form-check-input" id="replace" checked />
@@ -552,6 +603,14 @@ else
             </form>
             <script>
                 (function () {
+                    const cls2 = document.getElementById('resourcingclass-2'), wrap2 = document.getElementById('vendor-2-wrap'), vendor2 = document.getElementById('vendorid-2');
+                    function toggleVendor() {
+                        const isVendor = cls2.value === '@((int)ResourcingClass.Vendor)' || cls2.value === '@ResourcingClass.Vendor';
+                        wrap2.hidden = !isVendor;
+                        vendor2.disabled = !isVendor;
+                    }
+                    cls2.addEventListener('change', toggleVendor);
+                    toggleVendor();
                     const method = document.getElementById('method');
                     const key = document.getElementById('sizekey');
                     function sync() {

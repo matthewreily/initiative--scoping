@@ -25,12 +25,12 @@
             <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
             <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
         </form>
-        <p class="text-muted small mt-2 mb-0">Columns: DisplayName, ExternalIds (';'-separated), ResourceType, BusinessUnit, Seniority, Location, ResourcingClass (Internal/Vendor), IsActive (optional). Rows update an existing person matched by external ID, else by name; otherwise a new person is added. The whole file is rejected if any row is invalid.</p>
+        <p class="text-muted small mt-2 mb-0">Columns: DisplayName, ExternalIds (';'-separated), ResourceType, BusinessUnit, Seniority, Location, ResourcingClass (Internal/Vendor), IsActive (optional), Vendor (optional; catalog vendor name for Vendor rows). Rows update an existing person matched by external ID, else by name; otherwise a new person is added. The whole file is rejected if any row is invalid.</p>
     </div>
 </div>
 <div class="table-responsive">
 <table class="table table-sm align-middle">
-    <thead><tr><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Status</th><th>Actuals</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th>Status</th><th>Actuals</th><th></th></tr></thead>
     <tbody>
     @foreach (var item in Model)
     {
@@ -43,6 +43,7 @@
             <td>@p.Seniority</td>
             <td>@p.Location</td>
             <td>@(p.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
+            <td>@(p.ResourcingClass == ResourcingClass.Vendor ? p.Vendor?.Name ?? "—" : "—")</td>
             <td>@(p.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
             <td>@item.EntryCount</td>
             <td class="text-end text-nowrap">

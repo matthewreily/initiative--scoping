@@ -9,6 +9,14 @@ public class BusinessUnit
     public bool IsActive { get; set; } = true;
 }
 
+/// <summary>External supplier of resources; rate-card rows, allocations and people with <see cref="ResourcingClass.Vendor"/> reference one.</summary>
+public class Vendor
+{
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
 public class Discipline
 {
     public int Id { get; set; }
@@ -46,6 +54,9 @@ public class RateCardEntry
     public Seniority Seniority { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
+    /// <summary>Required when <see cref="ResourcingClass"/> is <see cref="ResourcingClass.Vendor"/>; null for internal resources.</summary>
+    public int? VendorId { get; set; }
+    public Vendor? Vendor { get; set; }
     public decimal HourlyRate { get; set; }
 }
 

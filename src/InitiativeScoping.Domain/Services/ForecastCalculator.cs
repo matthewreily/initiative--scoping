@@ -36,7 +36,8 @@ public sealed record ForecastResult(IReadOnlyList<ForecastLine> Lines, IReadOnly
 public static class ForecastCalculator
 {
     /// <summary>
-    /// Hours = Quantity x EstimatedHours; rate resolved against the rate card in effect at the phase planned start.
+    /// Hours = Quantity x EstimatedHours; rate resolved against the rate card in effect at the phase planned start,
+    /// keyed by the allocation's own resourcing business unit (and vendor, for vendor resources).
     /// </summary>
     public static ForecastResult Calculate(Initiative initiative, IReadOnlyCollection<RateCard> rateCards)
     {
@@ -45,7 +46,7 @@ public static class ForecastCalculator
         {
             var asOf = phases.TryGetValue(a.PhaseId, out var phase) ? phase.PlannedStart : initiative.TargetStart;
             var rate = RateResolver.Resolve(rateCards,
-                new RateKey(a.ResourceTypeId, initiative.BusinessUnitId, a.Seniority, a.Location, a.ResourcingClass),
+                new RateKey(a.ResourceTypeId, a.BusinessUnitId, a.Seniority, a.Location, a.ResourcingClass, a.VendorId),
                 asOf);
             return new ForecastLine(a, a.Quantity * a.EstimatedHours, rate);
         }).ToList();

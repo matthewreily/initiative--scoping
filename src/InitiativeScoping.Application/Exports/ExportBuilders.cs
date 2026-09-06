@@ -26,10 +26,17 @@ public static class PortfolioExport
         return
         [
             initiatives,
-            Groups("By business unit", portfolio.ByBusinessUnit),
-            Groups("By status", portfolio.ByStatus)
+            Groups("By sponsor business unit", portfolio.ByBusinessUnit),
+            Groups("By status", portfolio.ByStatus),
+            LaborSplit("By resourcing business unit", "Business unit", portfolio.ByResourcingBusinessUnit),
+            LaborSplit("By vendor", "Vendor", portfolio.ByVendor)
         ];
     }
+
+    private static ExportTable LaborSplit(string name, string keyHeader, IReadOnlyList<LaborSplitGroup> groups) =>
+        new(name,
+            [keyHeader, "Initiatives", "Hours", "Forecast labor cost", "Has unpriced"],
+            groups.Select(g => (IReadOnlyList<object?>)[g.Label, g.Initiatives, g.Hours, g.ForecastCost, g.HasUnpriced]).ToList());
 
     private static ExportTable Groups(string name, IReadOnlyList<PortfolioGroup> groups) =>
         new(name,
@@ -45,7 +52,9 @@ public static class InitiativeExport
         VarianceResult variance,
         IReadOnlyList<ActualEntry> entries,
         IReadOnlyList<ActualAdjustment> adjustments,
-        IReadOnlyDictionary<int, string> resourceTypeNames)
+        IReadOnlyDictionary<int, string> resourceTypeNames,
+        IReadOnlyDictionary<int, string> businessUnitNames,
+        IReadOnlyDictionary<int, string> vendorNames)
     {
         var phases = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
         var baseline = variance.Baseline;
@@ -54,6 +63,7 @@ public static class InitiativeExport
         [
             ["Initiative", initiative.Name],
             ["Business unit", initiative.BusinessUnit?.Name],
+            ["Participating business units", string.Join("; ", initiative.ParticipatingBusinessUnits.Select(p => p.BusinessUnit?.Name).Prepend(initiative.BusinessUnit?.Name).Where(n => n is not null).Distinct())],
             ["Status", initiative.Status.ToString()],
             ["Sizing", initiative.SizingMethod == Domain.Enums.SizingMethod.Direct ? "Direct" : $"{initiative.SizingMethod} {initiative.SizeKey}"],
             ["Planning mode", initiative.PlanningMode.ToString()],
@@ -84,11 +94,11 @@ public static class InitiativeExport
         ]);
 
         var forecastLines = new ExportTable("Forecast",
-            ["Phase", "Resource type", "Seniority", "Location", "Class", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Contract", "Cost center"],
+            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Contract", "Cost center"],
             forecast.Lines.Select(l => (IReadOnlyList<object?>)
             [
-                phases.GetValueOrDefault(l.Allocation.PhaseId), resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
-                l.Allocation.Seniority.ToString(), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(),
+                phases.GetValueOrDefault(l.Allocation.PhaseId), l.Allocation.BusinessUnit?.Name, resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
+                l.Allocation.Seniority.ToString(), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
                 l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
                 l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
@@ -103,11 +113,11 @@ public static class InitiativeExport
             ]).ToList());
 
         var baselineLines = new ExportTable("Baseline",
-            ["Version", "Phase", "Resource type", "Seniority", "Location", "Class", "Hours", "Hourly rate", "Cost"],
+            ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Hours", "Hourly rate", "Cost"],
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
-                baseline!.Version, phases.GetValueOrDefault(l.PhaseId), resourceTypeNames.GetValueOrDefault(l.ResourceTypeId),
-                l.Seniority.ToString(), l.Location, l.ResourcingClass.ToString(), l.Hours, l.HourlyRate, l.Cost
+                baseline!.Version, phases.GetValueOrDefault(l.PhaseId), businessUnitNames.GetValueOrDefault(l.BusinessUnitId), resourceTypeNames.GetValueOrDefault(l.ResourceTypeId),
+                l.Seniority.ToString(), l.Location, l.ResourcingClass.ToString(), l.VendorId is { } vid ? vendorNames.GetValueOrDefault(vid) : null, l.Hours, l.HourlyRate, l.Cost
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",

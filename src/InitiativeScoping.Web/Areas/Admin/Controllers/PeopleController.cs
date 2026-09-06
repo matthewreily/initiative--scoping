@@ -19,7 +19,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Index(string? search, CancellationToken ct)
     {
-        var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).AsQueryable();
+        var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
@@ -59,6 +59,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             Seniority = model.Seniority,
             Location = model.Location.Trim(),
             ResourcingClass = model.ResourcingClass,
+            VendorId = VendorFor(model),
             IsActive = model.IsActive
         };
         db.People.Add(person);
@@ -87,6 +88,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             Seniority = person.Seniority,
             Location = person.Location,
             ResourcingClass = person.ResourcingClass,
+            VendorId = person.VendorId,
             IsActive = person.IsActive
         });
     }
@@ -116,6 +118,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         person.Seniority = model.Seniority;
         person.Location = model.Location.Trim();
         person.ResourcingClass = model.ResourcingClass;
+        person.VendorId = VendorFor(model);
         person.IsActive = model.IsActive;
         audit.Record(nameof(Person), person.Id, AuditActions.Update, new { Before = before, After = Snapshot(person) });
         await db.SaveChangesAsync(ct);
@@ -144,10 +147,10 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Export(CancellationToken ct)
     {
-        var people = await db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit)
+        var people = await db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor)
             .OrderBy(p => p.DisplayName).ToListAsync(ct);
         var rows = people.Select(p => new PeopleCsvRow(p.DisplayName, SplitIds(p.ExternalIds), p.ResourceType!.Name, p.BusinessUnit!.Name,
-            p.Seniority, p.Location, p.ResourcingClass, p.IsActive));
+            p.Seniority, p.Location, p.ResourcingClass, p.IsActive, p.Vendor?.Name));
         return Csv(rows, "people.csv");
     }
 
@@ -155,7 +158,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         Csv(
         [
             new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, true),
-            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", Seniority.Mid, "Offshore", ResourcingClass.Vendor, true)
+            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", Seniority.Mid, "Offshore", ResourcingClass.Vendor, true, "Acme Consulting")
         ], "people-template.csv");
 
     /// <summary>
@@ -184,6 +187,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
         var resourceTypes = await db.ResourceTypes.ToDictionaryAsync(t => t.Name, t => t.Id, StringComparer.OrdinalIgnoreCase, ct);
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name, b => b.Id, StringComparer.OrdinalIgnoreCase, ct);
+        var vendors = await db.Vendors.ToDictionaryAsync(v => v.Name, v => v.Id, StringComparer.OrdinalIgnoreCase, ct);
 
         var errors = parsed.Errors.Select(e => e.Line > 0 ? $"Line {e.Line}: {e.Message}" : e.Message).ToList();
         var unknownTypes = parsed.Rows.Select(r => r.ResourceType).Where(n => !resourceTypes.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -195,6 +199,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         if (unknownUnits.Count > 0)
         {
             errors.Add("Unknown business unit(s): " + string.Join(", ", unknownUnits));
+        }
+        var unknownVendors = parsed.Rows.Select(r => r.Vendor).Where(n => n is not null && !vendors.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (unknownVendors.Count > 0)
+        {
+            errors.Add("Unknown vendor(s): " + string.Join(", ", unknownVendors!) + ". Add them under Admin → Vendors first.");
         }
 
         var people = await db.People.ToListAsync(ct);
@@ -240,7 +249,8 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
                 var person = new Person
                 {
                     DisplayName = row.DisplayName, ExternalIds = ids, ResourceTypeId = resourceTypes[row.ResourceType], BusinessUnitId = businessUnits[row.BusinessUnit],
-                    Seniority = row.Seniority, Location = row.Location, ResourcingClass = row.ResourcingClass, IsActive = row.IsActive
+                    Seniority = row.Seniority, Location = row.Location, ResourcingClass = row.ResourcingClass, IsActive = row.IsActive,
+                    VendorId = row.Vendor is null ? null : vendors[row.Vendor]
                 };
                 db.People.Add(person);
                 people.Add(person);
@@ -256,6 +266,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             existing.Seniority = row.Seniority;
             existing.Location = row.Location;
             existing.ResourcingClass = row.ResourcingClass;
+            existing.VendorId = row.Vendor is null ? null : vendors[row.Vendor];
             existing.IsActive = row.IsActive;
             if (db.Entry(existing).State == EntityState.Modified)
             {
@@ -296,6 +307,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             ModelState.AddModelError(nameof(model.BusinessUnitId), "Choose a business unit.");
         }
 
+        if (model.ResourcingClass == ResourcingClass.Vendor && model.VendorId is { } vendorId && !await db.Vendors.AnyAsync(v => v.Id == vendorId, ct))
+        {
+            ModelState.AddModelError(nameof(model.VendorId), "Choose a vendor from the catalog.");
+        }
+
         var ids = (NormalizeIds(model.ExternalIds) ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries);
         if (ids.Length == 0)
         {
@@ -328,8 +344,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
     {
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.BusinessUnits = new SelectList(await db.BusinessUnits.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name");
+        ViewBag.Vendors = new SelectList(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");
     }
 
+    private static int? VendorFor(PersonEditModel model) => model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;
+
     private static object Snapshot(Person p) =>
-        new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.Seniority, p.Location, p.ResourcingClass, p.IsActive };
+        new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.Seniority, p.Location, p.ResourcingClass, p.VendorId, p.IsActive };
 }

@@ -1,0 +1,46 @@
+@model IReadOnlyList<VendorListItem>
+@{
+    ViewData["Title"] = "Vendors";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="h5 mb-0">Vendors</h2>
+    <a class="btn btn-primary btn-sm" asp-action="Create">New vendor</a>
+</div>
+<p class="text-muted small">Vendors identify who supplies vendor-classed resources. Rate card rows, allocations and people with class = Vendor reference one, so different vendors can be priced separately within the same business unit.</p>
+<div class="table-responsive">
+<table class="table table-sm align-middle">
+    <thead><tr><th>Name</th><th>Status</th><th>Rate card rows</th><th>Allocations</th><th>People</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var item in Model)
+    {
+        var referenced = item.RateCardEntries + item.Allocations + item.People > 0;
+        <tr>
+            <td>@item.Vendor.Name</td>
+            <td>@(item.Vendor.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
+            <td>@item.RateCardEntries</td>
+            <td>@item.Allocations</td>
+            <td>@item.People</td>
+            <td class="text-end">
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@item.Vendor.Id">Edit</a>
+                @if (!referenced)
+                {
+                    <form asp-action="Delete" asp-route-id="@item.Vendor.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @item.Vendor.Name?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                    </form>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled title="Referenced; deactivate instead">Delete</button>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Count == 0)
+    {
+        <tr><td colspan="6" class="text-muted">No vendors yet.</td></tr>
+    }
+    </tbody>
+</table>
+</div>

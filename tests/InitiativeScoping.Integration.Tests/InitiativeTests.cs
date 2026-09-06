@@ -169,7 +169,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
 
         var html = await client.GetStringAsync(details);
-        Assert.Contains("Business unit: <strong>Boarding</strong>", html);
+        Assert.Matches("<select name=\"BusinessUnitId\" id=\"businessunitid\"[^>]*>\\s*<option selected=\"selected\" value=\"\\d+\">Boarding</option>", html);
         Assert.Contains("<select name=\"Location\" id=\"location\"", html);
         Assert.Contains("<option selected=\"selected\">Onshore</option>", html);
         Assert.Contains("id=\"rate-preview-new\"", html);
@@ -218,7 +218,8 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
 
         var edit = $"/Initiatives/EditAllocation/{allocationId}";
         var page = await client.GetStringAsync(edit);
-        Assert.Contains("Business unit: <strong>Boarding</strong>", page);
+        Assert.Contains("Participating business units: <strong>Boarding</strong>", page);
+        Assert.Matches("<select[^>]*id=\"BusinessUnitId\"[^>]*name=\"BusinessUnitId\"", page);
         Assert.Matches("<select[^>]*id=\"Location\"[^>]*name=\"Location\"", page);
         Assert.DoesNotMatch("<input[^>]*name=\"Location\"", page);
 
@@ -246,6 +247,15 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         var details = $"/Initiatives/Details/{id}";
         await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
         var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "QA Analyst");
+        int vendorId;
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var vendor = new Vendor { Name = $"Vendor {Guid.NewGuid():N}" };
+            seedDb.Vendors.Add(vendor);
+            await seedDb.SaveChangesAsync();
+            vendorId = vendor.Id;
+        }
 
         var edit = await PostFormAsync(client, $"/Initiatives/EditPhase/{phaseId}", $"/Initiatives/EditPhase/{phaseId}", new()
         {
@@ -263,7 +273,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Mid),
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.Vendor), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.Vendor), ["VendorId"] = vendorId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         await PostFormAsync(client, details, $"/Initiatives/DeletePhase/{phaseId}", new());
 

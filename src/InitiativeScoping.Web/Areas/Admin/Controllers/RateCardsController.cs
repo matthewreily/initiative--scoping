@@ -81,6 +81,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         var card = await db.RateCards
             .Include(c => c.Entries).ThenInclude(e => e.ResourceType)
             .Include(c => c.Entries).ThenInclude(e => e.BusinessUnit)
+            .Include(c => c.Entries).ThenInclude(e => e.Vendor)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
         if (card is null)
         {
@@ -90,7 +91,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         card.Entries = card.Entries
             .Where(e => string.IsNullOrEmpty(resourceType) || e.ResourceType!.Name == resourceType)
             .OrderBy(e => e.ResourceType!.Name).ThenBy(e => e.BusinessUnit!.Name)
-            .ThenBy(e => e.ResourcingClass).ThenBy(e => e.Location).ThenBy(e => e.Seniority)
+            .ThenBy(e => e.ResourcingClass).ThenBy(e => e.Vendor?.Name).ThenBy(e => e.Location).ThenBy(e => e.Seniority)
             .ToList();
 
         return View(new RateCardDetailsModel
@@ -99,6 +100,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             NewEntry = new RateCardEntryEditModel { RateCardId = id },
             ResourceTypes = await ResourceTypeSelect(ct),
             BusinessUnits = await BusinessUnitSelect(ct),
+            Vendors = await VendorSelect(ct),
             FilterResourceType = resourceType
         });
     }
@@ -118,12 +120,18 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         var location = model.Location.Trim();
+        var vendorId = model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;
+        if (vendorId is not null && !await db.Vendors.AnyAsync(v => v.Id == vendorId, ct))
+        {
+            return RedirectWithError("Select a vendor from the catalog.", "Details", new { id });
+        }
+
         var duplicate = await db.RateCardEntries.AnyAsync(e =>
             e.RateCardId == id && e.ResourceTypeId == model.ResourceTypeId && e.BusinessUnitId == model.BusinessUnitId &&
-            e.Seniority == model.Seniority && e.ResourcingClass == model.ResourcingClass && e.Location == location, ct);
+            e.Seniority == model.Seniority && e.ResourcingClass == model.ResourcingClass && e.VendorId == vendorId && e.Location == location, ct);
         if (duplicate)
         {
-            return RedirectWithError("An entry with the same resource type / business unit / seniority / location / class already exists.", "Details", new { id });
+            return RedirectWithError("An entry with the same resource type / business unit / seniority / location / class / vendor already exists.", "Details", new { id });
         }
 
         if (!ModelState.IsValid)
@@ -139,11 +147,12 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             Seniority = model.Seniority,
             Location = location,
             ResourcingClass = model.ResourcingClass,
+            VendorId = vendorId,
             HourlyRate = model.HourlyRate
         };
         db.RateCardEntries.Add(entry);
         await db.SaveChangesAsync(ct);
-        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Create, new { entry.RateCardId, entry.ResourceTypeId, entry.BusinessUnitId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.HourlyRate });
+        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Create, new { entry.RateCardId, entry.ResourceTypeId, entry.BusinessUnitId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Entry added.", "Details", new { id });
     }
@@ -189,7 +198,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         db.RateCardEntries.Remove(entry);
-        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.BusinessUnitId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.HourlyRate });
+        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.BusinessUnitId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Entry removed.", "Details", new { id });
     }
@@ -264,6 +273,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         var card = await db.RateCards
             .Include(c => c.Entries).ThenInclude(e => e.ResourceType)
             .Include(c => c.Entries).ThenInclude(e => e.BusinessUnit)
+            .Include(c => c.Entries).ThenInclude(e => e.Vendor)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
         if (card is null)
         {
@@ -272,7 +282,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
 
         var rows = card.Entries
             .OrderBy(e => e.ResourceType!.Name).ThenBy(e => e.BusinessUnit!.Name).ThenBy(e => e.Seniority)
-            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.BusinessUnit!.Name, e.Seniority, e.Location, e.ResourcingClass, e.HourlyRate));
+            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.BusinessUnit!.Name, e.Seniority, e.Location, e.ResourcingClass, e.HourlyRate, e.Vendor?.Name));
 
         var sb = new StringBuilder();
         using (var writer = new StringWriter(sb))
@@ -292,7 +302,8 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             RateCardCsv.Write(writer,
             [
                 new RateCardCsvRow("Software Engineer", "Boarding", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, 120m),
-                new RateCardCsvRow("Software Engineer", "Boarding", Seniority.Senior, "Offshore", ResourcingClass.Vendor, 75m)
+                new RateCardCsvRow("Software Engineer", "Boarding", Seniority.Senior, "Offshore", ResourcingClass.Vendor, 75m),
+                new RateCardCsvRow("Software Engineer", "Boarding", Seniority.Senior, "Offshore", ResourcingClass.Vendor, 82m, "Acme Consulting")
             ]);
         }
 
@@ -327,10 +338,12 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
 
         var resourceTypes = ToLookup(await db.ResourceTypes.Select(t => new { t.Name, t.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
         var businessUnits = ToLookup(await db.BusinessUnits.Select(b => new { b.Name, b.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
+        var vendors = ToLookup(await db.Vendors.Select(v => new { v.Name, v.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
 
         var errors = parsed.Errors.Select(e => e.Line > 0 ? $"Line {e.Line}: {e.Message}" : e.Message).ToList();
         var unknownTypes = parsed.Rows.Select(r => r.ResourceType).Where(n => !resourceTypes.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var unknownUnits = parsed.Rows.Select(r => r.BusinessUnit).Where(n => !businessUnits.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var unknownVendors = parsed.Rows.Select(r => r.Vendor).Where(n => n is not null && !vendors.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (unknownTypes.Count > 0)
         {
             errors.Add("Unknown resource type(s): " + string.Join(", ", unknownTypes));
@@ -338,6 +351,10 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         if (unknownUnits.Count > 0)
         {
             errors.Add("Unknown business unit(s): " + string.Join(", ", unknownUnits));
+        }
+        if (unknownVendors.Count > 0)
+        {
+            errors.Add("Unknown vendor(s): " + string.Join(", ", unknownVendors!) + ". Add them under Admin → Vendors first.");
         }
 
         if (errors.Count > 0)
@@ -359,15 +376,16 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         {
             var typeId = resourceTypes[row.ResourceType];
             var unitId = businessUnits[row.BusinessUnit];
+            int? vendorId = row.Vendor is null ? null : vendors[row.Vendor];
             var existing = card.Entries.FirstOrDefault(e =>
                 e.ResourceTypeId == typeId && e.BusinessUnitId == unitId && e.Seniority == row.Seniority &&
-                e.ResourcingClass == row.ResourcingClass && string.Equals(e.Location, row.Location, StringComparison.OrdinalIgnoreCase));
+                e.ResourcingClass == row.ResourcingClass && e.VendorId == vendorId && string.Equals(e.Location, row.Location, StringComparison.OrdinalIgnoreCase));
             if (existing is null)
             {
                 card.Entries.Add(new RateCardEntry
                 {
                     ResourceTypeId = typeId, BusinessUnitId = unitId, Seniority = row.Seniority,
-                    Location = row.Location, ResourcingClass = row.ResourcingClass, HourlyRate = row.HourlyRate
+                    Location = row.Location, ResourcingClass = row.ResourcingClass, VendorId = vendorId, HourlyRate = row.HourlyRate
                 });
                 added++;
             }
@@ -392,4 +410,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
 
     private async Task<SelectList> BusinessUnitSelect(CancellationToken ct) =>
         new(await db.BusinessUnits.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name");
+
+    private async Task<SelectList> VendorSelect(CancellationToken ct) =>
+        new(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");
 }

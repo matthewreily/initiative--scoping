@@ -44,6 +44,9 @@ public sealed record PortfolioGroup(string Label, int Count, decimal ForecastCos
     public decimal? CostVariancePct => BaselineCost == 0 ? null : Math.Round(CostVariance / BaselineCost * 100m, 1);
 }
 
+/// <summary>Labor forecast split by who supplies the resources; an initiative contributes to every group it draws from.</summary>
+public sealed record LaborSplitGroup(string Label, int Initiatives, decimal Hours, decimal ForecastCost, bool HasUnpriced);
+
 public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
 {
     public int Count => Rows.Count;
@@ -65,6 +68,22 @@ public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
 
     public IReadOnlyList<PortfolioGroup> ByBusinessUnit =>
         Group(r => r.Initiative.BusinessUnit?.Name ?? "?").OrderByDescending(g => g.ForecastCost).ToList();
+
+    /// <summary>Labor forecast by the allocation's resourcing BU (sponsor rollup above attributes the whole initiative to its sponsor).</summary>
+    public IReadOnlyList<LaborSplitGroup> ByResourcingBusinessUnit =>
+        SplitLabor(l => l.Allocation.BusinessUnit?.Name ?? "?", _ => true);
+
+    /// <summary>Labor forecast for vendor resources, by vendor.</summary>
+    public IReadOnlyList<LaborSplitGroup> ByVendor =>
+        SplitLabor(l => l.Allocation.Vendor?.Name ?? "(no vendor)", l => l.Allocation.ResourcingClass == ResourcingClass.Vendor);
+
+    private IReadOnlyList<LaborSplitGroup> SplitLabor(Func<ForecastLine, string> key, Func<ForecastLine, bool> filter) =>
+        Rows.SelectMany(r => r.Forecast.Lines.Where(filter).Select(l => (Row: r, Line: l)))
+            .GroupBy(x => key(x.Line))
+            .Select(g => new LaborSplitGroup(g.Key, g.Select(x => x.Row.Initiative.Id).Distinct().Count(),
+                g.Sum(x => x.Line.Hours), g.Sum(x => x.Line.Cost), g.Any(x => x.Line.IsUnpriced)))
+            .OrderByDescending(g => g.ForecastCost)
+            .ToList();
 
     public IReadOnlyList<PortfolioGroup> ByStatus =>
         Rows.GroupBy(r => r.Initiative.Status).OrderBy(g => g.Key).Select(g => ToGroup(g.Key.ToString(), g)).ToList();

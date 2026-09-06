@@ -73,7 +73,9 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
         var forecast = ForecastCalculator.Calculate(initiative, cards);
         var actuals = await db.LoadActualsAsync(initiative, DefaultThreshold, ct);
         var typeNames = await db.ResourceTypeNamesAsync(ct);
-        var bytes = writer.Write(InitiativeExport.Build(initiative, forecast, actuals.Variance, actuals.Entries, actuals.Adjustments, typeNames));
+        var businessUnitNames = await db.BusinessUnits.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.Name, ct);
+        var vendorNames = await db.Vendors.AsNoTracking().ToDictionaryAsync(v => v.Id, v => v.Name, ct);
+        var bytes = writer.Write(InitiativeExport.Build(initiative, forecast, actuals.Variance, actuals.Entries, actuals.Adjustments, typeNames, businessUnitNames, vendorNames));
 
         audit.Record(nameof(Initiative), id, AuditActions.Export, new { Format = writer.Extension, Rows = actuals.Entries.Count });
         await db.SaveChangesAsync(ct);

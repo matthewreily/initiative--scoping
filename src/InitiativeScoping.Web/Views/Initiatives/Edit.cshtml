@@ -4,6 +4,7 @@
     ViewData["Title"] = isNew ? "New Initiative" : "Edit Initiative";
     var businessUnits = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.BusinessUnits;
     var sizeOptions = (IReadOnlyList<SizeOption>)ViewBag.SizeOptions;
+    var allBusinessUnits = (IReadOnlyList<NamedId>)ViewBag.AllBusinessUnits;
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li><li class="breadcrumb-item active">@ViewData["Title"]</li></ol></nav>
 <h1 class="h3">@ViewData["Title"]</h1>
@@ -31,6 +32,21 @@
             <span asp-validation-for="SponsoringTeam" class="text-danger"></span>
         </div>
     </div>
+    <fieldset class="mb-3" id="participants">
+        <legend class="form-label fs-6">Participating business units</legend>
+        <div class="form-text mb-1" id="participants-help">Business units that may supply resources to this initiative. The sponsoring business unit is always included; allocations can only draw from the units ticked here.</div>
+        <div class="d-flex flex-wrap gap-3" aria-describedby="participants-help">
+            @foreach (var bu in allBusinessUnits)
+            {
+                var checkedNow = Model.ParticipatingBusinessUnitIds.Contains(bu.Id) || bu.Id == Model.BusinessUnitId;
+                <div class="form-check">
+                    <input class="form-check-input participant" type="checkbox" name="ParticipatingBusinessUnitIds" value="@bu.Id" id="participant-@bu.Id" checked="@checkedNow" />
+                    <label class="form-check-label" for="participant-@bu.Id">@bu.Name</label>
+                </div>
+            }
+        </div>
+        <span asp-validation-for="ParticipatingBusinessUnitIds" class="text-danger"></span>
+    </fieldset>
     <div class="row g-3 mb-3">
         <div class="col-md-4">
             <label asp-for="SizingMethod" class="form-label"></label>
@@ -142,6 +158,20 @@
             start.addEventListener('change', syncMode);
             end.addEventListener('change', syncMode);
             syncMode();
+
+            // The sponsor is always a participant: keep its box ticked and read-only as the sponsor changes.
+            const sponsor = document.getElementById('BusinessUnitId');
+            const participants = Array.from(document.querySelectorAll('input.participant'));
+            function syncSponsor() {
+                for (const box of participants) {
+                    const isSponsor = box.value === sponsor.value;
+                    if (isSponsor) { box.checked = true; }
+                    box.setAttribute('aria-readonly', isSponsor);
+                    box.onclick = isSponsor ? (e => e.preventDefault()) : null;
+                }
+            }
+            sponsor.addEventListener('change', syncSponsor);
+            syncSponsor();
         })();
     </script>
 }

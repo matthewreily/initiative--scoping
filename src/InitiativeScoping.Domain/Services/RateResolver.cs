@@ -3,12 +3,17 @@ using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Domain.Services;
 
+/// <summary>
+/// <paramref name="VendorId"/> is ignored for internal resources. For vendor resources a rate row naming the same vendor wins;
+/// a vendor-class row with no vendor is a generic "any vendor" rate that applies when no vendor-specific row exists.
+/// </summary>
 public readonly record struct RateKey(
     int ResourceTypeId,
     int BusinessUnitId,
     Seniority Seniority,
     string Location,
-    ResourcingClass ResourcingClass);
+    ResourcingClass ResourcingClass,
+    int? VendorId = null);
 
 public static class RateResolver
 {
@@ -17,13 +22,21 @@ public static class RateResolver
     /// and returns the exact-match entry rate, or null if the allocation is unpriced.
     /// </summary>
     public static decimal? Resolve(IEnumerable<RateCard> rateCards, RateKey key, DateOnly asOf) =>
-        EffectiveCard(rateCards, asOf)?.Entries.FirstOrDefault(e =>
+        EffectiveCard(rateCards, asOf)?.Entries
+            .Where(e =>
                 e.ResourceTypeId == key.ResourceTypeId &&
                 e.BusinessUnitId == key.BusinessUnitId &&
                 e.Seniority == key.Seniority &&
                 e.ResourcingClass == key.ResourcingClass &&
+                VendorMatches(e.ResourcingClass, e.VendorId, key.VendorId) &&
                 string.Equals(e.Location, key.Location, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(e => e.VendorId.HasValue)
+            .FirstOrDefault()
             ?.HourlyRate;
+
+    /// <summary>True when the row prices the vendor: internal rows always, vendor rows when they name the vendor or name none.</summary>
+    public static bool VendorMatches(ResourcingClass cls, int? entryVendorId, int? vendorId) =>
+        cls != ResourcingClass.Vendor || entryVendorId is null || entryVendorId == vendorId;
 
     public static RateCard? EffectiveCard(IEnumerable<RateCard> rateCards, DateOnly asOf) =>
         rateCards
@@ -32,7 +45,10 @@ public static class RateResolver
             .ThenByDescending(c => c.Id)
             .FirstOrDefault();
 
-    /// <summary>Entries that price <paramref name="businessUnitId"/> on <paramref name="asOf"/>; empty when nothing is published for that BU yet.</summary>
-    public static IReadOnlyList<RateCardEntry> PricedEntries(IEnumerable<RateCard> rateCards, int businessUnitId, DateOnly asOf) =>
-        EffectiveCard(rateCards, asOf)?.Entries.Where(e => e.BusinessUnitId == businessUnitId).ToList() ?? [];
+    /// <summary>Entries that price any of <paramref name="businessUnitIds"/> on <paramref name="asOf"/>; empty when nothing is published for them yet.</summary>
+    public static IReadOnlyList<RateCardEntry> PricedEntries(IEnumerable<RateCard> rateCards, IEnumerable<int> businessUnitIds, DateOnly asOf)
+    {
+        var ids = businessUnitIds.ToHashSet();
+        return EffectiveCard(rateCards, asOf)?.Entries.Where(e => ids.Contains(e.BusinessUnitId)).ToList() ?? [];
+    }
 }

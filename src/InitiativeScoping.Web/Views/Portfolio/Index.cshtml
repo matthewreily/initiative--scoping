@@ -152,7 +152,7 @@ else
 
     <div class="row g-3">
         <div class="col-md-6">
-            <div class="card"><div class="card-header">By business unit</div>
+            <div class="card"><div class="card-header">By sponsor business unit</div>
                 <div class="table-responsive">
                 <table class="table table-sm mb-0">
                     <thead><tr><th>Business unit</th><th class="text-end">#</th><th class="text-end">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Var %</th></tr></thead>
@@ -190,6 +190,48 @@ else
                             <td class="text-end @VarianceClass(g.CostVariancePct, false)">@(g.CostVariancePct is null ? "—" : Signed(g.CostVariancePct.Value, "N1") + "%")</td>
                         </tr>
                     }
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" id="by-resourcing-bu"><div class="card-header">Labor by resourcing business unit</div>
+                <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Business unit</th><th class="text-end">#</th><th class="text-end">Hours</th><th class="text-end">Forecast labor</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in p.ByResourcingBusinessUnit)
+                    {
+                        <tr>
+                            <td>@g.Label</td>
+                            <td class="text-end">@g.Initiatives</td>
+                            <td class="text-end">@g.Hours.ToString("N1")</td>
+                            <td class="text-end">@g.ForecastCost.ToString("C0") @if (g.HasUnpriced) { <span class="text-warning" title="Includes unpriced allocations">&#9888;</span> }</td>
+                        </tr>
+                    }
+                    @if (p.ByResourcingBusinessUnit.Count == 0) { <tr><td colspan="4" class="text-muted">Nothing allocated.</td></tr> }
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" id="by-vendor"><div class="card-header">Labor by vendor</div>
+                <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Vendor</th><th class="text-end">#</th><th class="text-end">Hours</th><th class="text-end">Forecast labor</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in p.ByVendor)
+                    {
+                        <tr>
+                            <td>@g.Label</td>
+                            <td class="text-end">@g.Initiatives</td>
+                            <td class="text-end">@g.Hours.ToString("N1")</td>
+                            <td class="text-end">@g.ForecastCost.ToString("C0") @if (g.HasUnpriced) { <span class="text-warning" title="Includes unpriced allocations">&#9888;</span> }</td>
+                        </tr>
+                    }
+                    @if (p.ByVendor.Count == 0) { <tr><td colspan="4" class="text-muted">No vendor allocations.</td></tr> }
                     </tbody>
                 </table>
                 </div>

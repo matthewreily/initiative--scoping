@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
     public DbSet<Discipline> Disciplines => Set<Discipline>();
+    public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<ResourceType> ResourceTypes => Set<ResourceType>();
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<RateCardEntry> RateCardEntries => Set<RateCardEntry>();
@@ -20,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AllocationTemplateLine> AllocationTemplateLines => Set<AllocationTemplateLine>();
     public DbSet<Initiative> Initiatives => Set<Initiative>();
     public DbSet<InitiativeMember> InitiativeMembers => Set<InitiativeMember>();
+    public DbSet<InitiativeBusinessUnit> InitiativeBusinessUnits => Set<InitiativeBusinessUnit>();
     public DbSet<Phase> Phases => Set<Phase>();
     public DbSet<PhaseDateHistory> PhaseDateHistories => Set<PhaseDateHistory>();
     public DbSet<InitiativeAllocation> InitiativeAllocations => Set<InitiativeAllocation>();
@@ -59,6 +61,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Name).IsUnique();
         });
 
+        b.Entity<Vendor>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
         b.Entity<ResourceType>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
@@ -77,10 +85,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Location).HasMaxLength(100).UseCollation(ciCollation);
             e.Property(x => x.HourlyRate).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.BusinessUnitId, x.Seniority, x.Location, x.ResourcingClass })
+            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.BusinessUnitId, x.Seniority, x.Location, x.ResourcingClass, x.VendorId })
                 .IsUnique();
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<SizingConversion>(e =>
@@ -129,6 +138,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.VarianceThresholdPct).HasPrecision(5, 2);
             e.HasIndex(x => x.Status);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.ParticipatingBusinessUnits).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Phases).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Allocations).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.NonLaborCosts).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
@@ -140,6 +150,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasKey(x => new { x.InitiativeId, x.UserId });
             e.Property(x => x.UserId).HasMaxLength(200);
+        });
+
+        b.Entity<InitiativeBusinessUnit>(e =>
+        {
+            e.HasKey(x => new { x.InitiativeId, x.BusinessUnitId });
+            e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Phase>(e =>
@@ -157,6 +173,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.AllocationPercent).HasPrecision(6, 2);
             e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<InitiativeNonLaborCost>(e =>
@@ -213,6 +231,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Location).HasMaxLength(100);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<InitiativeSourceMapping>(e =>
