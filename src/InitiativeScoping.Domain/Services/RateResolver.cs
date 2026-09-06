@@ -29,6 +29,7 @@ public static class RateResolver
         rateCards
             .Where(c => c.Status == RateCardStatus.Published && c.EffectiveStart <= asOf)
             .OrderByDescending(c => c.EffectiveStart)
+            .ThenByDescending(c => c.Id)
             .FirstOrDefault();
 
     /// <summary>Entries that price <paramref name="businessUnitId"/> on <paramref name="asOf"/>; empty when nothing is published for that BU yet.</summary>

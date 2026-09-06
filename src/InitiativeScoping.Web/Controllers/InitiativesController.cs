@@ -1211,8 +1211,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var typeNames = types.ToDictionary(t => t.Id, t => t.Name);
         var cardOptions = cards
             .Where(c => c.Status == RateCardStatus.Published)
-            .OrderBy(c => c.EffectiveStart)
-            .Select(c => new RateCardOptions(c.EffectiveStart, c.Entries
+            .OrderBy(c => c.EffectiveStart).ThenBy(c => c.Id)
+            .Select(c => new RateCardOptions(c.Id, c.EffectiveStart, c.Entries
                 .Where(e => e.BusinessUnitId == initiative.BusinessUnitId && typeNames.ContainsKey(e.ResourceTypeId))
                 .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => e.Seniority).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass)
                 .Select(e => new RateOption(e.ResourceTypeId, typeNames[e.ResourceTypeId], e.Seniority, e.Location, e.ResourcingClass, e.HourlyRate))

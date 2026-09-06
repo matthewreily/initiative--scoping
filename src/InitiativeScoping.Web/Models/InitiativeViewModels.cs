@@ -166,7 +166,7 @@ public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 /// <summary>One priced (resource type, seniority, location, class) combination from a published rate card.</summary>
 public sealed record RateOption(int ResourceTypeId, string ResourceType, Seniority Seniority, string Location, ResourcingClass ResourcingClass, decimal Rate);
 
-public sealed record RateCardOptions(DateOnly EffectiveStart, IReadOnlyList<RateOption> Options);
+public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, IReadOnlyList<RateOption> Options);
 
 /// <summary>Data for the allocation form: priced combinations per published card for the initiative's BU, and phase start dates to pick the effective card.</summary>
 public sealed record RateOptionsScriptModel(

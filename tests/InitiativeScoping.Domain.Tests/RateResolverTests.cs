@@ -28,6 +28,19 @@ public class RateResolverTests
     }
 
     [Fact]
+    public void EffectiveCard_breaks_equal_effective_dates_by_highest_id()
+    {
+        RateCard[] cards =
+        [
+            new() { Id = 7, Name = "later-published", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published },
+            new() { Id = 3, Name = "earlier-published", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published }
+        ];
+
+        Assert.Equal("later-published", RateResolver.EffectiveCard(cards, new DateOnly(2026, 6, 1))?.Name);
+        Assert.Equal("later-published", RateResolver.EffectiveCard(cards.Reverse(), new DateOnly(2026, 6, 1))?.Name);
+    }
+
+    [Fact]
     public void PricedEntries_are_filtered_to_the_business_unit_of_the_effective_card()
     {
         var bu1In2026 = RateResolver.PricedEntries(Cards, 1, new DateOnly(2026, 7, 1));
