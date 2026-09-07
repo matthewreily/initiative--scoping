@@ -11,8 +11,11 @@
         return raw.trim();
     }
 
+    // Numbers rendered with any currency symbol / percent / thousands separators; cells that also
+    // contain words (e.g. "480 h") are treated as text unless they carry data-sort.
     function numeric(value) {
-        const n = value.replace(/[$,%+\s]/g, '');
+        if (/[A-Za-z]/.test(value)) return null;
+        const n = value.replace(/[^\d.\-]/g, '');
         return n !== '' && /^-?\d+(\.\d+)?$/.test(n) ? parseFloat(n) : null;
     }
 

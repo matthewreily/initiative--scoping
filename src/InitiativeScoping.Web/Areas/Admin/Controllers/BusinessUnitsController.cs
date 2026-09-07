@@ -18,6 +18,8 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
                 Unit = b,
                 ReferenceCount = db.RateCardEntries.Count(e => e.BusinessUnitId == b.Id)
                                  + db.Initiatives.Count(i => i.BusinessUnitId == b.Id)
+                                 + db.InitiativeBusinessUnits.Count(i => i.BusinessUnitId == b.Id)
+                                 + db.InitiativeAllocations.Count(a => a.BusinessUnitId == b.Id)
                                  + db.People.Count(p => p.BusinessUnitId == b.Id)
             })
             .ToListAsync(ct);
@@ -89,6 +91,8 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
 
         var referenced = await db.RateCardEntries.AnyAsync(e => e.BusinessUnitId == id, ct)
                          || await db.Initiatives.AnyAsync(i => i.BusinessUnitId == id, ct)
+                         || await db.InitiativeBusinessUnits.AnyAsync(i => i.BusinessUnitId == id, ct)
+                         || await db.InitiativeAllocations.AnyAsync(a => a.BusinessUnitId == id, ct)
                          || await db.People.AnyAsync(p => p.BusinessUnitId == id, ct);
         if (referenced)
         {

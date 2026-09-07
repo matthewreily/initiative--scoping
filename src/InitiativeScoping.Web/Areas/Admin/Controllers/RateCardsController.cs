@@ -177,9 +177,9 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return RedirectWithError("Enter an hourly rate.", "Details", new { id });
         }
 
-        if (rate < 0)
+        if (!IsValidRate(rate.Value))
         {
-            return RedirectWithError("Hourly rate must be zero or greater.", "Details", new { id });
+            return RedirectWithError(RateRangeMessage, "Details", new { id });
         }
 
         SetRate(entry, rate.Value);
@@ -204,9 +204,9 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return RedirectWithError($"{missing} selected entr{(missing == 1 ? "y has" : "ies have")} no hourly rate.", "Details", new { id });
         }
 
-        if (entries.Any(e => rates[e.Id] < 0))
+        if (entries.Any(e => !IsValidRate(rates[e.Id])))
         {
-            return RedirectWithError("Hourly rates must be zero or greater.", "Details", new { id });
+            return RedirectWithError(RateRangeMessage, "Details", new { id });
         }
 
         var changed = 0;
@@ -240,9 +240,30 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         var factor = 1 + adjustPercent.Value / 100m;
+        var adjusted = new Dictionary<int, decimal>();
         foreach (var entry in entries)
         {
-            SetRate(entry, Math.Round(entry.HourlyRate * factor, 2, MidpointRounding.AwayFromZero));
+            decimal value;
+            try
+            {
+                value = Math.Round(entry.HourlyRate * factor, 2, MidpointRounding.AwayFromZero);
+            }
+            catch (OverflowException)
+            {
+                return RedirectWithError(RateRangeMessage, "Details", new { id });
+            }
+
+            if (!IsValidRate(value))
+            {
+                return RedirectWithError(RateRangeMessage, "Details", new { id });
+            }
+
+            adjusted[entry.Id] = value;
+        }
+
+        foreach (var entry in entries.Where(e => e.HourlyRate != adjusted[e.Id]))
+        {
+            SetRate(entry, adjusted[entry.Id]);
         }
 
         await db.SaveChangesAsync(ct);
@@ -267,6 +288,10 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"{entries.Count} entr{(entries.Count == 1 ? "y" : "ies")} removed.", "Details", new { id });
     }
+
+    private const string RateRangeMessage = "Hourly rates must be between 0 and 100,000.";
+
+    private static bool IsValidRate(decimal rate) => rate is >= 0 and <= 100_000;
 
     private void SetRate(RateCardEntry entry, decimal rate)
     {

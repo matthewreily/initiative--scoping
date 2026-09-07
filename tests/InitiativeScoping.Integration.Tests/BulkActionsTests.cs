@@ -65,7 +65,7 @@ public class BulkActionsTests(WebAppFactory factory) : IClassFixture<WebAppFacto
             new("entryIds", ids[0].ToString()), new("entryIds", ids[1].ToString()),
             new($"rates[{ids[0]}]", "150"), new($"rates[{ids[1]}]", "-1")
         ]);
-        Assert.Contains("zero or greater", await client.GetStringAsync(details));
+        Assert.Contains("between 0 and 100,000", await client.GetStringAsync(details));
         Assert.All(await RatesAsync(cardId), r => Assert.Equal(100m, r));
 
         // Save selected: only the selected/changed rows are updated and audited.

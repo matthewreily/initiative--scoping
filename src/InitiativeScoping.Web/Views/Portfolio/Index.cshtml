@@ -5,6 +5,7 @@
     var maxCost = p.Rows.Count == 0 ? 0m : p.Rows.Max(r => Math.Max(Math.Max(r.ForecastCost, r.BaselineCost), r.ActualCost));
     string Pct(decimal value) => maxCost <= 0 ? "0" : Math.Round(value / maxCost * 100m, 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
     string Signed(decimal v, string fmt) => (v > 0 ? "+" : "") + v.ToString(fmt);
+    string Inv(decimal? v) => v?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
     string VarianceClass(decimal? pct, bool over) => over ? "text-danger fw-semibold" : pct is null ? "text-muted" : pct > 0 ? "text-warning-emphasis" : "text-success";
 }
 
@@ -107,19 +108,19 @@ else
                 <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@i.Id">@i.Name</a></td>
                 <td class="d-none d-md-table-cell">@i.BusinessUnit?.Name</td>
                 <td class="d-none d-md-table-cell"><partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="i.Status" /></td>
-                <td class="text-end d-none d-lg-table-cell">@r.ForecastCost.ToString("C0")<div class="small text-muted">@r.ForecastHours.ToString("N0") h</div></td>
-                <td class="text-end">
+                <td class="text-end d-none d-lg-table-cell" data-sort="@Inv(r.ForecastCost)">@r.ForecastCost.ToString("C0")<div class="small text-muted">@r.ForecastHours.ToString("N0") h</div></td>
+                <td class="text-end" data-sort="@(r.HasBaseline ? Inv(r.BaselineCost) : "")">
                     @if (r.HasBaseline) { @r.BaselineCost.ToString("C0") <div class="small text-muted">v@(r.BaselineVersion) &middot; @r.BaselineHours.ToString("N0") h</div> }
                     else { <span class="text-muted">—</span> }
                 </td>
-                <td class="text-end">@r.ActualCost.ToString("C0")<div class="small text-muted">@r.ActualHours.ToString("N0") h</div></td>
-                <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)">@(r.HasBaseline ? Signed(r.CostVariance, "C0") : "—")</td>
-                <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)">@(r.CostVariancePct is null ? "—" : Signed(r.CostVariancePct.Value, "N1") + "%")</td>
-                <td class="text-end" title="Actual + estimate to complete (schedule-based)">
+                <td class="text-end" data-sort="@Inv(r.ActualCost)">@r.ActualCost.ToString("C0")<div class="small text-muted">@r.ActualHours.ToString("N0") h</div></td>
+                <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)" data-sort="@(r.HasBaseline ? Inv(r.CostVariance) : "")">@(r.HasBaseline ? Signed(r.CostVariance, "C0") : "—")</td>
+                <td class="text-end @VarianceClass(r.CostVariancePct, r.ExceedsThreshold)" data-sort="@Inv(r.CostVariancePct)">@(r.CostVariancePct is null ? "—" : Signed(r.CostVariancePct.Value, "N1") + "%")</td>
+                <td class="text-end" title="Actual + estimate to complete (schedule-based)" data-sort="@(r.HasBaseline ? Inv(r.EacCost) : "")">
                     @if (r.HasBaseline) { @r.EacCost.ToString("C0") <div class="small @VarianceClass(r.Variance.EacCostVariancePct, r.Variance.EacExceedsThreshold)">@(r.Variance.EacCostVariancePct is null ? "" : Signed(r.Variance.EacCostVariancePct.Value, "N1") + "%")</div> }
                     else { <span class="text-muted">—</span> }
                 </td>
-                <td>
+                <td data-sort="@Inv(r.BurnPct)">
                     <div class="progress" style="height: 8px" title="@r.BurnPct% of @(r.HasBaseline ? "baseline" : "forecast") spent">
                         <div class="progress-bar @(r.ExceedsThreshold ? "bg-danger" : r.BurnPct >= 90 ? "bg-warning" : "bg-success")" style="width: @r.BurnPct.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div>
                     </div>
