@@ -79,7 +79,14 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 
 `Audit` lists every create/update/delete/publish/activate/import/export event with actor, timestamp and entity link. Filter by entity type and id.
 
-## 7. Troubleshooting
+## 7. Working with tables
+
+- **Sort**: click a column header (or focus it and press Enter/Space) to sort ascending; click again for descending. Numbers, currency, percentages and dates sort numerically/chronologically; text sorts case-insensitively. Sorting is presentation-level – it re-orders the rows currently on the page only, so on filtered pages (e.g. Audit, Actuals) apply the filter first. Portfolio is sortable but read-only.
+- **Select rows**: tables with a checkbox column (rate-card entries, People, Business units, Resource types, Disciplines, Vendors, Cost catalog, Holidays, Actuals entries, an initiative's Allocations and Non-labor costs) have a header *select all* that applies to the rows currently shown; the action bar shows *N selected* and its buttons are disabled until something is selected. Destructive actions ask for one confirmation.
+- **Bulk actions**: *Save selected* / *Adjust by %* / *Delete selected* on rate-card entries (draft and published cards only; retired cards are read-only; rates must be ≥ 0); *Activate* / *Deactivate* / *Delete selected* on admin catalogs; *Assign selected* to an initiative and/or person on Actuals entries; *Delete selected* on allocations and non-labor costs (draft/unlocked initiatives only). Each changed or deleted row is audited individually.
+- **Skipped rows**: guarded rows are never silently deleted – a catalog row that is still referenced (e.g. a BU used by initiatives, a person with imported actuals) is skipped and the result message says how many were deleted and how many were skipped and why. Deactivate instead to hide them from new selections. A single invalid value in a bulk save (e.g. a negative rate) rejects the whole save so nothing is half-applied.
+
+## 8. Troubleshooting
 
 | Symptom | Cause / fix |
 |---------|-------------|

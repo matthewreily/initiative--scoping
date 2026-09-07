@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace InitiativeScoping.Web.Areas.Admin.Models;
 
+public sealed record BulkBarOptions(string PluralNoun, string DeleteAction = "BulkDelete", string? ActivateAction = "BulkActivate", string? DeactivateAction = "BulkDeactivate");
+
 public class BusinessUnitEditModel
 {
     public int Id { get; set; }

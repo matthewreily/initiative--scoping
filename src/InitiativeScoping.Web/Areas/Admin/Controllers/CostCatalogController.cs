@@ -133,4 +133,24 @@ public class CostCatalogController(AppDbContext db, IAuditLog audit) : AdminCont
             ModelState.AddModelError(nameof(model.Name), "An item with this name already exists in this category.");
         }
     }
+
+    [HttpPost]
+    public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
+        db, db.CostCatalogItems, ids, x => i => x.Contains(i.Id),
+        async (i, c) => !await db.InitiativeNonLaborCosts.AnyAsync(l => l.CostCatalogItemId == i.Id, c),
+        i => i.Name,
+        i => audit.Record(nameof(CostCatalogItem), i.Id, AuditActions.Delete, Snapshot(i)),
+        "catalog item", "catalog items", "referenced by initiative cost lines; deactivate instead", ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkActivate(int[] ids, CancellationToken ct) => SetActive(ids, true, ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkDeactivate(int[] ids, CancellationToken ct) => SetActive(ids, false, ct);
+
+    private Task<IActionResult> SetActive(int[] ids, bool active, CancellationToken ct) => BulkSetActive(
+        db, db.CostCatalogItems, ids, x => i => x.Contains(i.Id),
+        i => i.IsActive, (i, a) => i.IsActive = a,
+        (i, a) => audit.Record(nameof(CostCatalogItem), i.Id, AuditActions.Update, new { Before = new { IsActive = !a }, After = new { IsActive = a } }),
+        active, "catalog item", "catalog items", ct);
 }

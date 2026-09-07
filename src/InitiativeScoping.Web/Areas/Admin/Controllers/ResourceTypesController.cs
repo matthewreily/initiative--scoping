@@ -144,4 +144,27 @@ public class ResourceTypesController(AppDbContext db, IAuditLog audit) : AdminCo
             ModelState.AddModelError(nameof(model.Name), "A resource type with this name already exists.");
         }
     }
+
+    [HttpPost]
+    public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
+        db, db.ResourceTypes, ids, x => t => x.Contains(t.Id),
+        async (t, c) => !(await db.RateCardEntries.AnyAsync(e => e.ResourceTypeId == t.Id, c)
+                          || await db.InitiativeAllocations.AnyAsync(a => a.ResourceTypeId == t.Id, c)
+                          || await db.People.AnyAsync(p => p.ResourceTypeId == t.Id, c)
+                          || await db.AllocationTemplateLines.AnyAsync(l => l.ResourceTypeId == t.Id, c)),
+        t => t.Name,
+        t => audit.Record(nameof(ResourceType), t.Id, AuditActions.Delete, new { t.Name }),
+        "resource type", "resource types", "referenced; deactivate instead", ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkActivate(int[] ids, CancellationToken ct) => SetActive(ids, true, ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkDeactivate(int[] ids, CancellationToken ct) => SetActive(ids, false, ct);
+
+    private Task<IActionResult> SetActive(int[] ids, bool active, CancellationToken ct) => BulkSetActive(
+        db, db.ResourceTypes, ids, x => t => x.Contains(t.Id),
+        t => t.IsActive, (t, a) => t.IsActive = a,
+        (t, a) => audit.Record(nameof(ResourceType), t.Id, AuditActions.Update, new { Before = new { IsActive = !a }, After = new { IsActive = a } }),
+        active, "resource type", "resource types", ct);
 }

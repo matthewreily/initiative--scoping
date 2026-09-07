@@ -48,3 +48,8 @@ body {
     white-space: nowrap;
   }
 }
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable::after { content: "\2195"; opacity: .35; margin-left: .25rem; font-size: .75em; }
+th.sortable.sorted-asc::after { content: "\2191"; opacity: 1; }
+th.sortable.sorted-desc::after { content: "\2193"; opacity: 1; }
+.bulk-bar { position: sticky; bottom: 0; z-index: 2; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); }

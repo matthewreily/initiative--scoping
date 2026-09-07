@@ -109,4 +109,26 @@ public class VendorsController(AppDbContext db, IAuditLog audit) : AdminControll
             ModelState.AddModelError(nameof(model.Name), "A vendor with this name already exists.");
         }
     }
+
+    [HttpPost]
+    public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
+        db, db.Vendors, ids, x => v => x.Contains(v.Id),
+        async (v, c) => !(await db.RateCardEntries.AnyAsync(e => e.VendorId == v.Id, c)
+                          || await db.InitiativeAllocations.AnyAsync(a => a.VendorId == v.Id, c)
+                          || await db.People.AnyAsync(p => p.VendorId == v.Id, c)),
+        v => v.Name,
+        v => audit.Record(nameof(Vendor), v.Id, AuditActions.Delete, new { v.Name }),
+        "vendor", "vendors", "referenced; deactivate instead", ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkActivate(int[] ids, CancellationToken ct) => SetActive(ids, true, ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkDeactivate(int[] ids, CancellationToken ct) => SetActive(ids, false, ct);
+
+    private Task<IActionResult> SetActive(int[] ids, bool active, CancellationToken ct) => BulkSetActive(
+        db, db.Vendors, ids, x => v => x.Contains(v.Id),
+        v => v.IsActive, (v, a) => v.IsActive = a,
+        (v, a) => audit.Record(nameof(Vendor), v.Id, AuditActions.Update, new { Before = new { IsActive = !a }, After = new { IsActive = a } }),
+        active, "vendor", "vendors", ct);
 }

@@ -351,4 +351,24 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     private static object Snapshot(Person p) =>
         new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.Seniority, p.Location, p.ResourcingClass, p.VendorId, p.IsActive };
+
+    [HttpPost]
+    public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
+        db, db.People, ids, x => p => x.Contains(p.Id),
+        async (p, c) => !await db.ActualEntries.AnyAsync(e => e.PersonId == p.Id, c),
+        p => p.DisplayName,
+        p => audit.Record(nameof(Person), p.Id, AuditActions.Delete, new { p.DisplayName }),
+        "person", "people", "has imported actuals; deactivate instead", ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkActivate(int[] ids, CancellationToken ct) => SetActive(ids, true, ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkDeactivate(int[] ids, CancellationToken ct) => SetActive(ids, false, ct);
+
+    private Task<IActionResult> SetActive(int[] ids, bool active, CancellationToken ct) => BulkSetActive(
+        db, db.People, ids, x => p => x.Contains(p.Id),
+        p => p.IsActive, (p, a) => p.IsActive = a,
+        (p, a) => audit.Record(nameof(Person), p.Id, AuditActions.Update, new { Before = new { IsActive = !a }, After = new { IsActive = a } }),
+        active, "person", "people", ct);
 }

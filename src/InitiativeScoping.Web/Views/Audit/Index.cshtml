@@ -33,7 +33,7 @@
 </form>
 <p class="small text-muted">@Model.Total event(s) &middot; page @Model.Page of @Model.PageCount</p>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
+<table data-sortable class="table table-sm align-middle">
     <thead><tr><th>When (UTC)</th><th>Entity</th><th>Id</th><th>Action</th><th>User</th><th>Details</th></tr></thead>
     <tbody>
     @foreach (var e in Model.Events)
@@ -58,7 +58,7 @@
     }
     @if (Model.Events.Count == 0)
     {
-        <tr><td colspan="6" class="text-muted">No audit events match.</td></tr>
+        <tr data-nosort><td colspan="6" class="text-muted">No audit events match.</td></tr>
     }
     </tbody>
 </table>

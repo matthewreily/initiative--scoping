@@ -8,13 +8,15 @@
     <h2 class="h5 mb-0">Business Units</h2>
     <a class="btn btn-primary btn-sm" asp-action="Create">New business unit</a>
 </div>
+<form asp-action="BulkDelete" method="post" data-bulk>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
-    <thead><tr><th>Name</th><th>Status</th><th>References</th><th></th></tr></thead>
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>Status</th><th>References</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var item in Model)
     {
         <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@item.Unit.Id" data-bulk-item aria-label="Select row" /></td>
             <td>@item.Unit.Name</td>
             <td>@(item.Unit.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
             <td>@item.ReferenceCount</td>
@@ -22,9 +24,7 @@
                 <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@item.Unit.Id">Edit</a>
                 @if (item.ReferenceCount == 0)
                 {
-                    <form asp-action="Delete" asp-route-id="@item.Unit.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @item.Unit.Name?');">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                    </form>
+                    <button type="submit" formaction="@Url.Action("Delete", new { id = item.Unit.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @item.Unit.Name?');">Delete</button>
                 }
                 else
                 {
@@ -35,8 +35,10 @@
     }
     @if (Model.Count == 0)
     {
-        <tr><td colspan="4" class="text-muted">No business units yet.</td></tr>
+        <tr data-nosort><td colspan="5" class="text-muted">No business units yet.</td></tr>
     }
     </tbody>
 </table>
 </div>
+<partial name="_BulkBar" model='new BulkBarOptions("business units")' />
+</form>

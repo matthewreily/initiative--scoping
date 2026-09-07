@@ -233,6 +233,59 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
         return RedirectBack(returnUrl, success: $"Entry '{entry.SourceReference}' updated: {state}.");
     }
 
+    [HttpPost("Actuals/Entries/BulkRemap")]
+    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    public async Task<IActionResult> BulkRemap(int[] entryIds, int? initiativeId, int? personId, string? returnUrl, CancellationToken ct)
+    {
+        var ids = entryIds.Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return RedirectBack(returnUrl, error: "Select at least one entry.");
+        }
+
+        if (initiativeId is null && personId is null)
+        {
+            return RedirectBack(returnUrl, error: "Choose an initiative and/or a person to assign to the selected entries.");
+        }
+
+        if (initiativeId is not null && !await db.Initiatives.AnyAsync(i => i.Id == initiativeId, ct))
+        {
+            return RedirectBack(returnUrl, error: "Unknown initiative.");
+        }
+
+        if (personId is not null && !await db.People.AnyAsync(p => p.Id == personId, ct))
+        {
+            return RedirectBack(returnUrl, error: "Unknown person.");
+        }
+
+        var entries = await db.ActualEntries.Include(e => e.ActualsImport).Where(e => ids.Contains(e.Id)).ToListAsync(ct);
+        if (entries.Count == 0)
+        {
+            return RedirectBack(returnUrl, error: "The selected entries no longer exist; refresh and try again.");
+        }
+
+        foreach (var entry in entries)
+        {
+            await importer.RemapAsync(entry, initiativeId, personId, ct);
+        }
+
+        await db.SaveChangesAsync(ct);
+        var stillUnmapped = entries.Count(e => e.IsUnmapped);
+        var unpriced = entries.Count(e => !e.IsUnmapped && e.EffectiveCost is null);
+        var summary = $"{entries.Count} entr{(entries.Count == 1 ? "y" : "ies")} updated";
+        if (stillUnmapped > 0)
+        {
+            summary += $"; {stillUnmapped} still unmapped";
+        }
+
+        if (unpriced > 0)
+        {
+            summary += $"; {unpriced} mapped but unpriced (no matching rate)";
+        }
+
+        return RedirectBack(returnUrl, success: summary + ".");
+    }
+
     [HttpPost("Actuals/Unmapped/ApplyMappings")]
     [Authorize(Policy = AppPolicies.CanManageActuals)]
     public async Task<IActionResult> ApplyMappings(string? returnUrl, CancellationToken ct)

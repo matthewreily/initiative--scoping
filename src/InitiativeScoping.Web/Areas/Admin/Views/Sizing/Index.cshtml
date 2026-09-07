@@ -13,7 +13,7 @@
         </div>
         <p class="text-muted small">Maps a relative size (T-shirt or story points) to total estimated hours.</p>
         <div class="table-responsive">
-        <table class="table table-sm align-middle">
+        <table data-sortable class="table table-sm align-middle">
             <thead><tr><th>Method</th><th>Key</th><th class="text-end">Hours</th><th></th></tr></thead>
             <tbody>
             @foreach (var c in Model.Conversions)
@@ -32,7 +32,7 @@
             }
             @if (Model.Conversions.Count == 0)
             {
-                <tr><td colspan="4" class="text-muted">No conversions yet.</td></tr>
+                <tr data-nosort><td colspan="4" class="text-muted">No conversions yet.</td></tr>
             }
             </tbody>
         </table>

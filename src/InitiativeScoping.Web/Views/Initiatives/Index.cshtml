@@ -32,7 +32,7 @@
 </form>
 
 <div class="table-responsive">
-<table class="table table-sm align-middle">
+<table data-sortable class="table table-sm align-middle">
     <thead>
     <tr>
         <th>Name</th><th class="d-none d-md-table-cell">Business unit</th><th>Status</th><th class="d-none d-lg-table-cell">Sizing</th><th class="d-none d-md-table-cell">Schedule</th>
@@ -62,7 +62,7 @@
     }
     @if (Model.Items.Count == 0)
     {
-        <tr><td colspan="8" class="text-muted">No initiatives match.</td></tr>
+        <tr data-nosort><td colspan="8" class="text-muted">No initiatives match.</td></tr>
     }
     </tbody>
 </table>

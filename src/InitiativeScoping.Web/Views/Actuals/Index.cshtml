@@ -10,7 +10,7 @@
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="table-responsive">
-        <table class="table table-sm align-middle">
+        <table data-sortable class="table table-sm align-middle">
             <thead><tr><th>#</th><th>Source</th><th>File</th><th>Started</th><th>By</th><th>Status</th><th class="text-end">Records</th><th class="text-end">Unmapped</th><th class="text-end">Skipped</th><th></th></tr></thead>
             <tbody>
             @foreach (var i in Model.Imports)
@@ -34,7 +34,7 @@
             }
             @if (Model.Imports.Count == 0)
             {
-                <tr><td colspan="10" class="text-muted">No imports yet.</td></tr>
+                <tr data-nosort><td colspan="10" class="text-muted">No imports yet.</td></tr>
             }
             </tbody>
         </table>

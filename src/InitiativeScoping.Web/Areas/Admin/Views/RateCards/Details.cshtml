@@ -52,29 +52,39 @@ else if (card.Status == RateCardStatus.Retired)
                 </select>
             </div>
         </form>
+        <form asp-action="BulkUpdateEntries" asp-route-id="@card.Id" method="post" data-bulk id="entries-form">
         <div class="table-responsive">
-        <table class="table table-sm align-middle">
+        <table class="table table-sm align-middle" data-sortable>
             <thead>
-                <tr><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th class="text-end">Hourly rate</th><th></th></tr>
+                <tr>
+                    @if (Model.IsEditable)
+                    {
+                        <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all entries" /></th>
+                    }
+                    <th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th class="text-end">Hourly rate</th><th data-nosort></th>
+                </tr>
             </thead>
             <tbody>
             @foreach (var e in card.Entries)
             {
                 <tr>
+                    @if (Model.IsEditable)
+                    {
+                        <td><input type="checkbox" class="form-check-input" name="entryIds" value="@e.Id" data-bulk-item aria-label="Select entry" /></td>
+                    }
                     <td>@e.ResourceType!.Name</td>
                     <td>@e.BusinessUnit!.Name</td>
                     <td>@e.Seniority</td>
                     <td>@e.Location</td>
                     <td>@(e.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
                     <td>@(e.ResourcingClass == ResourcingClass.Vendor ? e.Vendor?.Name ?? "(any vendor)" : "—")</td>
-                    <td class="text-end">
+                    <td class="text-end" data-sort="@e.HourlyRate">
                         @if (Model.IsEditable)
                         {
-                            <form asp-action="UpdateEntry" asp-route-id="@card.Id" method="post" class="d-inline-flex gap-1 justify-content-end">
-                                <input type="hidden" name="entryId" value="@e.Id" />
-                                <input type="number" name="hourlyRate" value="@e.HourlyRate" step="0.01" min="0" class="form-control form-control-sm text-end" style="width: 7rem" />
-                                <button type="submit" class="btn btn-outline-primary btn-sm">Save</button>
-                            </form>
+                            <div class="d-inline-flex gap-1 justify-content-end">
+                                <input type="number" name="rates[@e.Id]" value="@e.HourlyRate" step="0.01" min="0" class="form-control form-control-sm text-end" style="width: 7rem" aria-label="Hourly rate" />
+                                <button type="submit" formaction="@Url.Action("UpdateEntry", new { id = card.Id })" name="entryId" value="@e.Id" class="btn btn-outline-primary btn-sm">Save</button>
+                            </div>
                         }
                         else
                         {
@@ -84,21 +94,31 @@ else if (card.Status == RateCardStatus.Retired)
                     <td class="text-end">
                         @if (Model.IsEditable)
                         {
-                            <form asp-action="DeleteEntry" asp-route-id="@card.Id" method="post" class="d-inline" onsubmit="return confirm('Remove this entry?');">
-                                <input type="hidden" name="entryId" value="@e.Id" />
-                                <button type="submit" class="btn btn-outline-danger btn-sm">&times;</button>
-                            </form>
+                            <button type="submit" formaction="@Url.Action("DeleteEntry", new { id = card.Id })" name="entryId" value="@e.Id" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remove this entry?');" aria-label="Remove entry">&times;</button>
                         }
                     </td>
                 </tr>
             }
             @if (card.Entries.Count == 0)
             {
-                <tr><td colspan="7" class="text-muted">No entries. Add one below or import a CSV.</td></tr>
+                <tr data-nosort><td colspan="9" class="text-muted">No entries. Add one below or import a CSV.</td></tr>
             }
             </tbody>
         </table>
         </div>
+        @if (Model.IsEditable && card.Entries.Count > 0)
+        {
+            <div class="bulk-bar d-flex flex-wrap align-items-center gap-2 py-2" data-bulk-bar>
+                <span class="small text-muted me-auto" data-bulk-count>None selected</span>
+                <button type="submit" class="btn btn-outline-primary btn-sm">Save selected</button>
+                <div class="input-group input-group-sm" style="width: 12rem">
+                    <input type="number" name="adjustPercent" step="0.1" class="form-control" placeholder="e.g. 5 or -3" aria-label="Adjust selected rates by percent" />
+                    <button type="submit" formaction="@Url.Action("BulkAdjustEntries", new { id = card.Id })" class="btn btn-outline-secondary">Adjust %</button>
+                </div>
+                <button type="submit" formaction="@Url.Action("BulkDeleteEntries", new { id = card.Id })" class="btn btn-outline-danger btn-sm" data-confirm="Remove {n} selected entries?">Delete selected</button>
+            </div>
+        }
+        </form>
     </div>
 
     @if (Model.IsEditable)

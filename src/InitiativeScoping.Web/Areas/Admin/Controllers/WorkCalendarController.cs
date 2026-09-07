@@ -130,4 +130,12 @@ public class WorkCalendarController(AppDbContext db, IAuditLog audit) : AdminCon
             ModelState.AddModelError(nameof(model.Date), "A holiday already exists on this date.");
         }
     }
+
+    [HttpPost]
+    public Task<IActionResult> BulkDeleteHolidays(int[] ids, CancellationToken ct) => BulkDeleteRows(
+        db, db.Holidays, ids, x => h => x.Contains(h.Id),
+        (_, _) => Task.FromResult(true),
+        h => h.Name,
+        h => audit.Record(nameof(Holiday), h.Id, AuditActions.Delete, new { h.Date, h.Name }),
+        "holiday", "holidays", "", ct);
 }

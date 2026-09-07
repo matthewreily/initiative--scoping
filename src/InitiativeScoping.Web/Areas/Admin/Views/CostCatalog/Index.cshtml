@@ -12,13 +12,15 @@
     </div>
     <a class="btn btn-primary btn-sm" asp-action="Create">New catalog item</a>
 </div>
+<form asp-action="BulkDelete" method="post" data-bulk>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
-    <thead><tr><th>Category</th><th>Name</th><th>Vendor</th><th>Billing</th><th class="text-end">Unit cost</th><th>Status</th><th>References</th><th></th></tr></thead>
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Category</th><th>Name</th><th>Vendor</th><th>Billing</th><th class="text-end">Unit cost</th><th>Status</th><th>References</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var row in Model)
     {
         <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@row.Item.Id" data-bulk-item aria-label="Select row" /></td>
             <td>@VarianceCalculator.CategoryLabel(row.Item.Category)</td>
             <td>@row.Item.Name</td>
             <td>@row.Item.Vendor</td>
@@ -30,9 +32,7 @@
                 <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@row.Item.Id">Edit</a>
                 @if (row.ReferenceCount == 0)
                 {
-                    <form asp-action="Delete" asp-route-id="@row.Item.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @row.Item.Name?');">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                    </form>
+                    <button type="submit" formaction="@Url.Action("Delete", new { id = row.Item.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @row.Item.Name?');">Delete</button>
                 }
                 else
                 {
@@ -43,8 +43,10 @@
     }
     @if (Model.Count == 0)
     {
-        <tr><td colspan="8" class="text-muted">No catalog items yet.</td></tr>
+        <tr data-nosort><td colspan="9" class="text-muted">No catalog items yet.</td></tr>
     }
     </tbody>
 </table>
 </div>
+<partial name="_BulkBar" model='new BulkBarOptions("catalog items")' />
+</form>

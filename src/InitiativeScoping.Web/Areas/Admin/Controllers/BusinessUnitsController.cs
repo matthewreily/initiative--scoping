@@ -101,6 +101,30 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
         return RedirectWithSuccess($"Business unit '{unit.Name}' deleted.");
     }
 
+    [HttpPost]
+    public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
+        db, db.BusinessUnits, ids, x => u => x.Contains(u.Id),
+        async (u, c) => !(await db.RateCardEntries.AnyAsync(e => e.BusinessUnitId == u.Id, c)
+                          || await db.Initiatives.AnyAsync(i => i.BusinessUnitId == u.Id, c)
+                          || await db.InitiativeBusinessUnits.AnyAsync(i => i.BusinessUnitId == u.Id, c)
+                          || await db.InitiativeAllocations.AnyAsync(a => a.BusinessUnitId == u.Id, c)
+                          || await db.People.AnyAsync(p => p.BusinessUnitId == u.Id, c)),
+        u => u.Name,
+        u => audit.Record(nameof(BusinessUnit), u.Id, AuditActions.Delete, new { u.Name }),
+        "business unit", "business units", "referenced; deactivate instead", ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkActivate(int[] ids, CancellationToken ct) => SetActive(ids, true, ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkDeactivate(int[] ids, CancellationToken ct) => SetActive(ids, false, ct);
+
+    private Task<IActionResult> SetActive(int[] ids, bool active, CancellationToken ct) => BulkSetActive(
+        db, db.BusinessUnits, ids, x => u => x.Contains(u.Id),
+        u => u.IsActive, (u, a) => u.IsActive = a,
+        (u, a) => audit.Record(nameof(BusinessUnit), u.Id, AuditActions.Update, new { Before = new { IsActive = !a }, After = new { IsActive = a } }),
+        active, "business unit", "business units", ct);
+
     private async Task ValidateUniqueName(BusinessUnitEditModel model, CancellationToken ct)
     {
         var name = model.Name.Trim().ToLowerInvariant();

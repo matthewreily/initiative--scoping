@@ -28,14 +28,16 @@
         <p class="text-muted small mt-2 mb-0">Columns: DisplayName, ExternalIds (';'-separated), ResourceType, BusinessUnit, Seniority, Location, ResourcingClass (Internal/Vendor), IsActive (optional), Vendor (optional; catalog vendor name for Vendor rows). Rows update an existing person matched by external ID, else by name; otherwise a new person is added. The whole file is rejected if any row is invalid.</p>
     </div>
 </div>
+<form asp-action="BulkDelete" method="post" data-bulk>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
-    <thead><tr><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th>Status</th><th>Actuals</th><th></th></tr></thead>
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th>Status</th><th>Actuals</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var item in Model)
     {
         var p = item.Person;
         <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@p.Id" data-bulk-item aria-label="Select row" /></td>
             <td>@p.DisplayName</td>
             <td class="small text-muted">@p.ExternalIds</td>
             <td>@p.ResourceType?.Name</td>
@@ -50,9 +52,7 @@
                 <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@p.Id">Edit</a>
                 @if (item.EntryCount == 0)
                 {
-                    <form asp-action="Delete" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @p.DisplayName?');">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                    </form>
+                    <button type="submit" formaction="@Url.Action("Delete", new { id = p.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @p.DisplayName?');">Delete</button>
                 }
                 else
                 {
@@ -63,8 +63,10 @@
     }
     @if (Model.Count == 0)
     {
-        <tr><td colspan="10" class="text-muted">No people yet.</td></tr>
+        <tr data-nosort><td colspan="12" class="text-muted">No people yet.</td></tr>
     }
     </tbody>
 </table>
 </div>
+<partial name="_BulkBar" model='new BulkBarOptions("people")' />
+</form>

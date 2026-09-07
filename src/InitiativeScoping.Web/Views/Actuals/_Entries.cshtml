@@ -3,23 +3,24 @@
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }
 <p class="small text-muted">@Model.Total entr@(Model.Total == 1 ? "y" : "ies") &middot; page @Model.Page of @Model.PageCount</p>
-<div class="table-responsive">
-<table class="table table-sm align-middle">
-    <thead><tr><th>Reference</th><th>Import</th><th>Project</th><th>Person</th><th>Date</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th>Initiative</th><th style="min-width: 24rem"></th></tr></thead>
+<div class="table-responsive" id="entries-table">
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all entries on this page" /></th><th>Reference</th><th>Import</th><th>Project</th><th>Person</th><th>Date</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th>Initiative</th><th style="min-width: 24rem" data-nosort></th></tr></thead>
     <tbody>
     @foreach (var e in Model.Entries)
     {
         <tr class="@(e.IsUnmapped ? "table-warning" : "")">
+            <td><input type="checkbox" class="form-check-input" name="entryIds" value="@e.Id" form="bulk-remap" data-bulk-item aria-label="Select entry" /></td>
             <td class="small">@e.SourceReference</td>
-            <td class="small"><a asp-action="Details" asp-route-id="@e.ActualsImportId">#@e.ActualsImportId</a> @e.ActualsImport?.Source</td>
+            <td class="small" data-sort="@e.ActualsImportId"><a asp-action="Details" asp-route-id="@e.ActualsImportId">#@e.ActualsImportId</a> @e.ActualsImport?.Source</td>
             <td class="small">@e.ExternalProjectId</td>
             <td class="small">
                 @if (e.Person is not null) { <text>@e.Person.DisplayName</text> }
                 else { <span class="text-danger">@(e.ExternalPersonId ?? "(blank)")</span> }
             </td>
             <td class="small">@e.WorkDate.ToString("yyyy-MM-dd")</td>
-            <td class="text-end">@e.Hours.ToString("N1")</td>
-            <td class="text-end">
+            <td class="text-end" data-sort="@e.Hours">@e.Hours.ToString("N1")</td>
+            <td class="text-end" data-sort="@(e.EffectiveCost ?? -1)">
                 @if (e.EffectiveCost is null) { <span class="badge bg-warning text-dark" title="No matching published rate for this person on the work date">Unpriced</span> }
                 else { <text>@e.EffectiveCost.Value.ToString("C0")</text> @if (e.SourcedCost is not null) { <span class="text-muted small" title="Cost supplied by the source">(sourced)</span> } }
             </td>
@@ -39,8 +40,18 @@
     }
     @if (Model.Entries.Count == 0)
     {
-        <tr><td colspan="9" class="text-muted">No entries.</td></tr>
+        <tr data-nosort><td colspan="10" class="text-muted">No entries.</td></tr>
     }
     </tbody>
 </table>
 </div>
+@if (Model.Entries.Count > 0)
+{
+    <form asp-action="BulkRemap" method="post" id="bulk-remap" data-bulk="entries-table" class="bulk-bar d-flex flex-wrap align-items-center gap-2 py-2" data-bulk-bar>
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+        <span class="small text-muted me-auto" data-bulk-count>None selected</span>
+        <select name="initiativeId" aria-label="Initiative for selected entries" asp-items="Model.Initiatives" class="form-select form-select-sm w-auto"><option value="">Initiative… (keep)</option></select>
+        <select name="personId" aria-label="Person for selected entries" asp-items="Model.People" class="form-select form-select-sm w-auto"><option value="">Person… (keep)</option></select>
+        <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Assign selected</button>
+    </form>
+}
