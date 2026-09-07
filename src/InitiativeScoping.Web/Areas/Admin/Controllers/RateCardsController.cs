@@ -158,7 +158,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
     }
 
     [HttpPost]
-    public async Task<IActionResult> UpdateEntry(int id, int entryId, decimal hourlyRate, CancellationToken ct)
+    public async Task<IActionResult> UpdateEntry(int id, int entryId, Dictionary<int, decimal> rates, decimal? hourlyRate, CancellationToken ct)
     {
         var entry = await db.RateCardEntries.Include(e => e.RateCard).FirstOrDefaultAsync(e => e.Id == entryId && e.RateCardId == id, ct);
         if (entry is null)
@@ -171,16 +171,175 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return RedirectWithError("Retired rate cards cannot be edited.", "Details", new { id });
         }
 
-        if (hourlyRate < 0)
+        var rate = hourlyRate ?? (rates.TryGetValue(entryId, out var r) ? r : (decimal?)null);
+        if (rate is null)
         {
-            return RedirectWithError("Hourly rate must be zero or greater.", "Details", new { id });
+            return RedirectWithError("Enter an hourly rate.", "Details", new { id });
         }
 
-        var before = entry.HourlyRate;
-        entry.HourlyRate = hourlyRate;
-        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Update, new { Before = before, After = hourlyRate });
+        if (!IsValidRate(rate.Value))
+        {
+            return RedirectWithError(RateRangeMessage, "Details", new { id });
+        }
+
+        SetRate(entry, rate.Value);
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Rate updated.", "Details", new { id });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> BulkUpdateEntries(int id, int[] entryIds, CancellationToken ct)
+    {
+        var (entries, error) = await SelectedEntries(id, entryIds, ct);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        var rates = PostedRates();
+
+        var missing = entries.Where(e => !rates.ContainsKey(e.Id)).Count();
+        if (missing > 0)
+        {
+            return RedirectWithError($"{missing} selected entr{(missing == 1 ? "y has" : "ies have")} no hourly rate.", "Details", new { id });
+        }
+
+        if (entries.Any(e => !IsValidRate(rates[e.Id])))
+        {
+            return RedirectWithError(RateRangeMessage, "Details", new { id });
+        }
+
+        var changed = 0;
+        foreach (var entry in entries.Where(e => e.HourlyRate != rates[e.Id]))
+        {
+            SetRate(entry, rates[entry.Id]);
+            changed++;
+        }
+
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"{changed} of {entries.Count} selected rate{(entries.Count == 1 ? "" : "s")} changed.", "Details", new { id });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> BulkAdjustEntries(int id, int[] entryIds, decimal? adjustPercent, CancellationToken ct)
+    {
+        if (adjustPercent is null)
+        {
+            return RedirectWithError("Enter a percentage to adjust the selected rates by (e.g. 5 or -3).", "Details", new { id });
+        }
+
+        if (adjustPercent <= -100)
+        {
+            return RedirectWithError("Adjustment must be greater than -100 %.", "Details", new { id });
+        }
+
+        var (entries, error) = await SelectedEntries(id, entryIds, ct);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        var factor = 1 + adjustPercent.Value / 100m;
+        var adjusted = new Dictionary<int, decimal>();
+        foreach (var entry in entries)
+        {
+            decimal value;
+            try
+            {
+                value = Math.Round(entry.HourlyRate * factor, 2, MidpointRounding.AwayFromZero);
+            }
+            catch (OverflowException)
+            {
+                return RedirectWithError(RateRangeMessage, "Details", new { id });
+            }
+
+            if (!IsValidRate(value))
+            {
+                return RedirectWithError(RateRangeMessage, "Details", new { id });
+            }
+
+            adjusted[entry.Id] = value;
+        }
+
+        foreach (var entry in entries.Where(e => e.HourlyRate != adjusted[e.Id]))
+        {
+            SetRate(entry, adjusted[entry.Id]);
+        }
+
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"{entries.Count} rate{(entries.Count == 1 ? "" : "s")} adjusted by {adjustPercent:0.##} %.", "Details", new { id });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> BulkDeleteEntries(int id, int[] entryIds, CancellationToken ct)
+    {
+        var (entries, error) = await SelectedEntries(id, entryIds, ct);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        foreach (var entry in entries)
+        {
+            db.RateCardEntries.Remove(entry);
+            audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.BusinessUnitId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
+        }
+
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"{entries.Count} entr{(entries.Count == 1 ? "y" : "ies")} removed.", "Details", new { id });
+    }
+
+    private const string RateRangeMessage = "Hourly rates must be between 0 and 100,000.";
+
+    private static bool IsValidRate(decimal rate) => rate is >= 0 and <= 100_000;
+
+    private void SetRate(RateCardEntry entry, decimal rate)
+    {
+        var before = entry.HourlyRate;
+        entry.HourlyRate = rate;
+        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Update, new { Before = before, After = rate });
+    }
+
+    /// <summary>Reads the per-row <c>rates[entryId]</c> inputs; the default dictionary binder throws on an empty selection.</summary>
+    private Dictionary<int, decimal> PostedRates()
+    {
+        var rates = new Dictionary<int, decimal>();
+        foreach (var key in Request.Form.Keys)
+        {
+            if (key.StartsWith("rates[", StringComparison.Ordinal) && key.EndsWith(']')
+                && int.TryParse(key.AsSpan(6, key.Length - 7), out var entryId)
+                && decimal.TryParse(Request.Form[key], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var rate))
+            {
+                rates[entryId] = rate;
+            }
+        }
+
+        return rates;
+    }
+
+    private async Task<(List<RateCardEntry> Entries, IActionResult? Error)> SelectedEntries(int id, int[] entryIds, CancellationToken ct)
+    {
+        var card = await db.RateCards.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (card is null)
+        {
+            return ([], NotFound());
+        }
+
+        if (card.Status == RateCardStatus.Retired)
+        {
+            return ([], RedirectWithError("Retired rate cards cannot be edited.", "Details", new { id }));
+        }
+
+        if (entryIds.Length == 0)
+        {
+            return ([], RedirectWithError("Select at least one entry.", "Details", new { id }));
+        }
+
+        var ids = entryIds.Distinct().ToArray();
+        var entries = await db.RateCardEntries.Where(e => e.RateCardId == id && ids.Contains(e.Id)).ToListAsync(ct);
+        return entries.Count == ids.Length
+            ? (entries, null)
+            : ([], RedirectWithError("Some selected entries no longer exist; refresh and try again.", "Details", new { id }));
     }
 
     [HttpPost]

@@ -23,28 +23,30 @@
     <h3 class="h6 mb-0">Holidays</h3>
     <a class="btn btn-primary btn-sm" asp-action="CreateHoliday">New holiday</a>
 </div>
+<form asp-action="BulkDeleteHolidays" method="post" data-bulk>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
-    <thead><tr><th>Date</th><th>Name</th><th></th></tr></thead>
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Date</th><th>Name</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var h in Model.Holidays)
     {
         <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@h.Id" data-bulk-item aria-label="Select row" /></td>
             <td>@h.Date.ToString("yyyy-MM-dd") <span class="text-muted">(@h.Date.DayOfWeek)</span></td>
             <td>@h.Name</td>
             <td class="text-end">
                 <a class="btn btn-outline-secondary btn-sm" asp-action="EditHoliday" asp-route-id="@h.Id">Edit</a>
-                <form asp-action="DeleteHoliday" asp-route-id="@h.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @h.Name?');">
-                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                </form>
+                <button type="submit" formaction="@Url.Action("DeleteHoliday", new { id = h.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @h.Name?');">Delete</button>
             </td>
         </tr>
     }
     @if (Model.Holidays.Count == 0)
     {
-        <tr><td colspan="3" class="text-muted">No holidays configured; only weekends are excluded.</td></tr>
+        <tr data-nosort><td colspan="4" class="text-muted">No holidays configured; only weekends are excluded.</td></tr>
     }
     </tbody>
 </table>
 </div>
+<partial name="_BulkBar" model='new BulkBarOptions("holidays", DeleteAction: "BulkDeleteHolidays", ActivateAction: null, DeactivateAction: null)' />
+</form>
 @section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

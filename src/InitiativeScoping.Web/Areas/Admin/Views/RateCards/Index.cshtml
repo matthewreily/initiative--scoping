@@ -10,7 +10,7 @@
 </div>
 <p class="text-muted small">Forecasts use the latest <em>published</em> card whose effective start is on or before the phase start date.</p>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
+<table data-sortable class="table table-sm align-middle">
     <thead><tr><th>Name</th><th>Effective start</th><th>Status</th><th>Entries</th><th></th></tr></thead>
     <tbody>
     @foreach (var card in Model)
@@ -34,7 +34,7 @@
     }
     @if (Model.Count == 0)
     {
-        <tr><td colspan="5" class="text-muted">No rate cards yet.</td></tr>
+        <tr data-nosort><td colspan="5" class="text-muted">No rate cards yet.</td></tr>
     }
     </tbody>
 </table>

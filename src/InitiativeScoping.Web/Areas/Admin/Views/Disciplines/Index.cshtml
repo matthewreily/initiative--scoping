@@ -8,13 +8,15 @@
     <h2 class="h5 mb-0">Disciplines</h2>
     <a class="btn btn-primary btn-sm" asp-action="Create">New discipline</a>
 </div>
+<form asp-action="BulkDelete" method="post" data-bulk>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
-    <thead><tr><th>Name</th><th>Status</th><th>References</th><th></th></tr></thead>
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>Status</th><th>References</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var item in Model)
     {
         <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@item.Discipline.Id" data-bulk-item aria-label="Select row" /></td>
             <td>@item.Discipline.Name</td>
             <td>@(item.Discipline.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
             <td>@item.ReferenceCount</td>
@@ -22,9 +24,7 @@
                 <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@item.Discipline.Id">Edit</a>
                 @if (item.ReferenceCount == 0)
                 {
-                    <form asp-action="Delete" asp-route-id="@item.Discipline.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @item.Discipline.Name?');">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                    </form>
+                    <button type="submit" formaction="@Url.Action("Delete", new { id = item.Discipline.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @item.Discipline.Name?');">Delete</button>
                 }
                 else
                 {
@@ -35,8 +35,10 @@
     }
     @if (Model.Count == 0)
     {
-        <tr><td colspan="4" class="text-muted">No disciplines yet.</td></tr>
+        <tr data-nosort><td colspan="5" class="text-muted">No disciplines yet.</td></tr>
     }
     </tbody>
 </table>
 </div>
+<partial name="_BulkBar" model='new BulkBarOptions("disciplines")' />
+</form>

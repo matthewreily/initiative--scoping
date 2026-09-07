@@ -620,6 +620,53 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return RedirectWithSuccess("Allocation removed.", initiative.Id);
     }
 
+    [HttpPost]
+    public async Task<IActionResult> BulkDeleteAllocations(int id, int[] allocationIds, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        var guard = GuardBulkScopeEdit(initiative, allocationIds);
+        if (guard is not null)
+        {
+            return guard;
+        }
+
+        var ids = allocationIds.Distinct().ToHashSet();
+        var selected = initiative.Allocations.Where(a => ids.Contains(a.Id)).ToList();
+        if (selected.Count == 0)
+        {
+            return RedirectWithError("The selected allocations no longer exist; refresh and try again.", id);
+        }
+
+        foreach (var allocation in selected)
+        {
+            db.InitiativeAllocations.Remove(allocation);
+            audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Delete, AllocationSnapshot(allocation));
+        }
+
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"{selected.Count} allocation{(selected.Count == 1 ? "" : "s")} removed.", id);
+    }
+
+    private IActionResult? GuardBulkScopeEdit(Initiative initiative, int[] selectedIds)
+    {
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsScopeEditable(initiative))
+        {
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
+        }
+
+        return selectedIds.Length == 0 ? RedirectWithError("Select at least one row.", initiative.Id) : null;
+    }
+
     // ----- Non-labor costs -----
 
     [HttpPost]
@@ -739,6 +786,38 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         audit.Record(nameof(InitiativeNonLaborCost), line.Id, AuditActions.Delete, NonLaborSnapshot(line));
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Non-labor cost removed.", initiative.Id);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> BulkDeleteNonLaborCosts(int id, int[] lineIds, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        var guard = GuardBulkScopeEdit(initiative, lineIds);
+        if (guard is not null)
+        {
+            return guard;
+        }
+
+        var ids = lineIds.Distinct().ToHashSet();
+        var selected = initiative.NonLaborCosts.Where(c => ids.Contains(c.Id)).ToList();
+        if (selected.Count == 0)
+        {
+            return RedirectWithError("The selected cost lines no longer exist; refresh and try again.", id);
+        }
+
+        foreach (var line in selected)
+        {
+            db.InitiativeNonLaborCosts.Remove(line);
+            audit.Record(nameof(InitiativeNonLaborCost), line.Id, AuditActions.Delete, NonLaborSnapshot(line));
+        }
+
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"{selected.Count} non-labor cost{(selected.Count == 1 ? "" : "s")} removed.", id);
     }
 
     // ----- Relative sizing -----

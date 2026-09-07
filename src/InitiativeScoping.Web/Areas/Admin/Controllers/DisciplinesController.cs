@@ -104,4 +104,24 @@ public class DisciplinesController(AppDbContext db, IAuditLog audit) : AdminCont
             ModelState.AddModelError(nameof(model.Name), "A discipline with this name already exists.");
         }
     }
+
+    [HttpPost]
+    public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
+        db, db.Disciplines, ids, x => d => x.Contains(d.Id),
+        async (d, c) => !await db.ResourceTypes.AnyAsync(t => t.DisciplineId == d.Id, c),
+        d => d.Name,
+        d => audit.Record(nameof(Discipline), d.Id, AuditActions.Delete, new { d.Name }),
+        "discipline", "disciplines", "referenced by resource types; deactivate instead", ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkActivate(int[] ids, CancellationToken ct) => SetActive(ids, true, ct);
+
+    [HttpPost]
+    public Task<IActionResult> BulkDeactivate(int[] ids, CancellationToken ct) => SetActive(ids, false, ct);
+
+    private Task<IActionResult> SetActive(int[] ids, bool active, CancellationToken ct) => BulkSetActive(
+        db, db.Disciplines, ids, x => d => x.Contains(d.Id),
+        d => d.IsActive, (d, a) => d.IsActive = a,
+        (d, a) => audit.Record(nameof(Discipline), d.Id, AuditActions.Update, new { Before = new { IsActive = !a }, After = new { IsActive = a } }),
+        active, "discipline", "disciplines", ct);
 }

@@ -9,14 +9,16 @@
     <a class="btn btn-primary btn-sm" asp-action="Create">New vendor</a>
 </div>
 <p class="text-muted small">Vendors identify who supplies vendor-classed resources. Rate card rows, allocations and people with class = Vendor reference one, so different vendors can be priced separately within the same business unit.</p>
+<form asp-action="BulkDelete" method="post" data-bulk>
 <div class="table-responsive">
-<table class="table table-sm align-middle">
-    <thead><tr><th>Name</th><th>Status</th><th>Rate card rows</th><th>Allocations</th><th>People</th><th></th></tr></thead>
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>Status</th><th>Rate card rows</th><th>Allocations</th><th>People</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var item in Model)
     {
         var referenced = item.RateCardEntries + item.Allocations + item.People > 0;
         <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@item.Vendor.Id" data-bulk-item aria-label="Select row" /></td>
             <td>@item.Vendor.Name</td>
             <td>@(item.Vendor.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
             <td>@item.RateCardEntries</td>
@@ -26,9 +28,7 @@
                 <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@item.Vendor.Id">Edit</a>
                 @if (!referenced)
                 {
-                    <form asp-action="Delete" asp-route-id="@item.Vendor.Id" method="post" class="d-inline" onsubmit="return confirm('Delete @item.Vendor.Name?');">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                    </form>
+                    <button type="submit" formaction="@Url.Action("Delete", new { id = item.Vendor.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @item.Vendor.Name?');">Delete</button>
                 }
                 else
                 {
@@ -39,8 +39,10 @@
     }
     @if (Model.Count == 0)
     {
-        <tr><td colspan="6" class="text-muted">No vendors yet.</td></tr>
+        <tr data-nosort><td colspan="7" class="text-muted">No vendors yet.</td></tr>
     }
     </tbody>
 </table>
 </div>
+<partial name="_BulkBar" model='new BulkBarOptions("vendors")' />
+</form>

@@ -1,0 +1,10 @@
+@model BulkBarOptions
+<div class="bulk-bar d-flex flex-wrap align-items-center gap-2 py-2" data-bulk-bar>
+    <span class="small text-muted me-auto" data-bulk-count>None selected</span>
+    @if (Model.ActivateAction is not null)
+    {
+        <button type="submit" formaction="@Url.Action(Model.ActivateAction)" class="btn btn-outline-secondary btn-sm">Activate selected</button>
+        <button type="submit" formaction="@Url.Action(Model.DeactivateAction)" class="btn btn-outline-secondary btn-sm">Deactivate selected</button>
+    }
+    <button type="submit" formaction="@Url.Action(Model.DeleteAction)" class="btn btn-outline-danger btn-sm" data-confirm="Delete {n} selected @Model.PluralNoun? Referenced rows are skipped.">Delete selected</button>
+</div>
