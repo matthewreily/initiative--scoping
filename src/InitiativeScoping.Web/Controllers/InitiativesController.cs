@@ -525,7 +525,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     public async Task<IActionResult> EditAllocation(int id, CancellationToken ct)
     {
         var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
-            .Include(a => a.Initiative!).ThenInclude(i => i.Phases).FirstOrDefaultAsync(a => a.Id == id, ct);
+            .Include(a => a.Initiative!).ThenInclude(i => i.Phases).Include(a => a.Initiative!).ThenInclude(i => i.ParticipatingBusinessUnits).FirstOrDefaultAsync(a => a.Id == id, ct);
         if (allocation is null)
         {
             return NotFound();
@@ -550,7 +550,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     public async Task<IActionResult> EditAllocation(int id, AllocationEditModel model, CancellationToken ct)
     {
         var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
-            .Include(a => a.Initiative!).ThenInclude(i => i.Phases).FirstOrDefaultAsync(a => a.Id == id, ct);
+            .Include(a => a.Initiative!).ThenInclude(i => i.Phases).Include(a => a.Initiative!).ThenInclude(i => i.ParticipatingBusinessUnits).FirstOrDefaultAsync(a => a.Id == id, ct);
         if (allocation is null)
         {
             return NotFound();
@@ -1445,7 +1445,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             var location = model.Location.Trim();
             var vendorId = VendorFor(model);
             var unchanged = existing is not null
-                && existing.BusinessUnitId == model.BusinessUnitId && existing.ResourceTypeId == model.ResourceTypeId && existing.Seniority == model.Seniority
+                && existing.ResourceTypeId == model.ResourceTypeId && existing.Seniority == model.Seniority
                 && existing.ResourcingClass == model.ResourcingClass && existing.VendorId == vendorId
                 && string.Equals(existing.Location, location, StringComparison.OrdinalIgnoreCase);
             if (priced.Count > 0 && !unchanged && !priced.Any(e =>

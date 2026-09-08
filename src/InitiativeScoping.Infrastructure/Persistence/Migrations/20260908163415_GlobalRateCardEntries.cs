@@ -63,6 +63,13 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                 nullable: false,
                 defaultValue: 0);
 
+            // The original business unit is gone; re-home every global entry on the
+            // oldest business unit so the FK and unique index can be restored.
+            migrationBuilder.Sql("""
+                DELETE FROM "RateCardEntries" WHERE NOT EXISTS (SELECT 1 FROM "BusinessUnits");
+                UPDATE "RateCardEntries" SET "BusinessUnitId" = (SELECT MIN("Id") FROM "BusinessUnits");
+                """);
+
             migrationBuilder.CreateIndex(
                 name: "IX_RateCardEntries_BusinessUnitId",
                 table: "RateCardEntries",
