@@ -285,7 +285,7 @@ else
                     <td class="text-end">@a.Quantity</td>
                     @if (fixedDuration) { <td class="text-end">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
                     <td class="text-end" data-sort="@line.Hours">@line.Hours.ToString("N1")</td>
-                    <td class="text-end" data-sort="@(line.HourlyRate ?? -1)">@(line.HourlyRate is decimal r ? r.ToString("C2") : Html.Raw("<span class='text-danger' title='No exact rate-card match for this resource type / BU / seniority / location / class'>Unpriced</span>"))</td>
+                    <td class="text-end" data-sort="@(line.HourlyRate ?? -1)">@(line.HourlyRate is decimal r ? r.ToString("C2") : Html.Raw("<span class='text-danger' title='No exact rate-card match for this resource type / seniority / location / class (and vendor)'>Unpriced</span>"))</td>
                     <td class="text-end" data-sort="@line.Cost">@line.Cost.ToString("C0")</td>
                     <td class="text-end text-nowrap">
                         @if (Model.ScopeWritable)
