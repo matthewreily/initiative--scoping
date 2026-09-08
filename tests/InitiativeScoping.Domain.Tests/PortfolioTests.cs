@@ -13,7 +13,7 @@ public class PortfolioCalculatorTests
     private static RateCard Card() => new()
     {
         Id = 1, Name = "c", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, BusinessUnitId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m }]
     };
 
     private static Initiative Initiative(int id, string bu, InitiativeStatus status, ResourcingClass cls = ResourcingClass.InternalFte, decimal? baselineCost = null, decimal? threshold = null)

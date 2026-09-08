@@ -15,7 +15,7 @@ public class ForecastCalculatorTests
         [
             new RateCardEntry
             {
-                ResourceTypeId = 1, BusinessUnitId = 1, Seniority = Seniority.Senior, Location = "Onshore",
+                ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore",
                 ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate
             }
         ]

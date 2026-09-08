@@ -74,7 +74,7 @@ public class ActualsCostingTests
     private static RateCard Card(DateOnly effective, decimal rate) => new()
     {
         Id = (int)rate, Name = "c", EffectiveStart = effective, Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, BusinessUnitId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
     };
 
     private static ActualEntry Entry(DateOnly date, decimal hours = 8m) => new() { ExternalProjectId = "P", SourceReference = "r", WorkDate = date, Hours = hours };

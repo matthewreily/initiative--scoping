@@ -9,7 +9,6 @@ namespace InitiativeScoping.Domain.Services;
 /// </summary>
 public readonly record struct RateKey(
     int ResourceTypeId,
-    int BusinessUnitId,
     Seniority Seniority,
     string Location,
     ResourcingClass ResourcingClass,
@@ -25,7 +24,6 @@ public static class RateResolver
         EffectiveCard(rateCards, asOf)?.Entries
             .Where(e =>
                 e.ResourceTypeId == key.ResourceTypeId &&
-                e.BusinessUnitId == key.BusinessUnitId &&
                 e.Seniority == key.Seniority &&
                 e.ResourcingClass == key.ResourcingClass &&
                 VendorMatches(e.ResourcingClass, e.VendorId, key.VendorId) &&
@@ -45,10 +43,7 @@ public static class RateResolver
             .ThenByDescending(c => c.Id)
             .FirstOrDefault();
 
-    /// <summary>Entries that price any of <paramref name="businessUnitIds"/> on <paramref name="asOf"/>; empty when nothing is published for them yet.</summary>
-    public static IReadOnlyList<RateCardEntry> PricedEntries(IEnumerable<RateCard> rateCards, IEnumerable<int> businessUnitIds, DateOnly asOf)
-    {
-        var ids = businessUnitIds.ToHashSet();
-        return EffectiveCard(rateCards, asOf)?.Entries.Where(e => ids.Contains(e.BusinessUnitId)).ToList() ?? [];
-    }
+    /// <summary>Entries of the card effective on <paramref name="asOf"/>; empty when nothing is published yet.</summary>
+    public static IReadOnlyList<RateCardEntry> PricedEntries(IEnumerable<RateCard> rateCards, DateOnly asOf) =>
+        EffectiveCard(rateCards, asOf)?.Entries.ToList() ?? [];
 }

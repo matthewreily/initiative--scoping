@@ -16,8 +16,7 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
             .Select(b => new BusinessUnitListItem
             {
                 Unit = b,
-                ReferenceCount = db.RateCardEntries.Count(e => e.BusinessUnitId == b.Id)
-                                 + db.Initiatives.Count(i => i.BusinessUnitId == b.Id)
+                ReferenceCount = db.Initiatives.Count(i => i.BusinessUnitId == b.Id)
                                  + db.InitiativeBusinessUnits.Count(i => i.BusinessUnitId == b.Id)
                                  + db.InitiativeAllocations.Count(a => a.BusinessUnitId == b.Id)
                                  + db.People.Count(p => p.BusinessUnitId == b.Id)
@@ -89,14 +88,13 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
             return NotFound();
         }
 
-        var referenced = await db.RateCardEntries.AnyAsync(e => e.BusinessUnitId == id, ct)
-                         || await db.Initiatives.AnyAsync(i => i.BusinessUnitId == id, ct)
+        var referenced = await db.Initiatives.AnyAsync(i => i.BusinessUnitId == id, ct)
                          || await db.InitiativeBusinessUnits.AnyAsync(i => i.BusinessUnitId == id, ct)
                          || await db.InitiativeAllocations.AnyAsync(a => a.BusinessUnitId == id, ct)
                          || await db.People.AnyAsync(p => p.BusinessUnitId == id, ct);
         if (referenced)
         {
-            return RedirectWithError($"'{unit.Name}' is referenced by rate cards, initiatives or people and cannot be deleted. Deactivate it instead.");
+            return RedirectWithError($"'{unit.Name}' is referenced by initiatives or people and cannot be deleted. Deactivate it instead.");
         }
 
         db.BusinessUnits.Remove(unit);
@@ -108,8 +106,7 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
     [HttpPost]
     public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
         db, db.BusinessUnits, ids, x => u => x.Contains(u.Id),
-        async (u, c) => !(await db.RateCardEntries.AnyAsync(e => e.BusinessUnitId == u.Id, c)
-                          || await db.Initiatives.AnyAsync(i => i.BusinessUnitId == u.Id, c)
+        async (u, c) => !(await db.Initiatives.AnyAsync(i => i.BusinessUnitId == u.Id, c)
                           || await db.InitiativeBusinessUnits.AnyAsync(i => i.BusinessUnitId == u.Id, c)
                           || await db.InitiativeAllocations.AnyAsync(a => a.BusinessUnitId == u.Id, c)
                           || await db.People.AnyAsync(p => p.BusinessUnitId == u.Id, c)),

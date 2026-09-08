@@ -85,10 +85,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Location).HasMaxLength(100).UseCollation(ciCollation);
             e.Property(x => x.HourlyRate).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.BusinessUnitId, x.Seniority, x.Location, x.ResourcingClass, x.VendorId })
+            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.Seniority, x.Location, x.ResourcingClass, x.VendorId })
                 .IsUnique();
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 

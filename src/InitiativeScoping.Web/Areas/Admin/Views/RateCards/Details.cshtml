@@ -61,7 +61,7 @@ else if (card.Status == RateCardStatus.Retired)
                     {
                         <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all entries" /></th>
                     }
-                    <th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th class="text-end">Hourly rate</th><th data-nosort></th>
+                    <th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th class="text-end">Hourly rate</th><th data-nosort></th>
                 </tr>
             </thead>
             <tbody>
@@ -73,7 +73,6 @@ else if (card.Status == RateCardStatus.Retired)
                         <td><input type="checkbox" class="form-check-input" name="entryIds" value="@e.Id" data-bulk-item aria-label="Select entry" /></td>
                     }
                     <td>@e.ResourceType!.Name</td>
-                    <td>@e.BusinessUnit!.Name</td>
                     <td>@e.Seniority</td>
                     <td>@e.Location</td>
                     <td>@(e.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
@@ -101,7 +100,7 @@ else if (card.Status == RateCardStatus.Retired)
             }
             @if (card.Entries.Count == 0)
             {
-                <tr data-nosort><td colspan="9" class="text-muted">No entries. Add one below or import a CSV.</td></tr>
+                <tr data-nosort><td colspan="8" class="text-muted">No entries. Add one below or import a CSV.</td></tr>
             }
             </tbody>
         </table>
@@ -131,10 +130,6 @@ else if (card.Status == RateCardStatus.Retired)
                         <div class="mb-2">
                             <label asp-for="NewEntry.ResourceTypeId" class="form-label small"></label>
                             <select asp-for="NewEntry.ResourceTypeId" asp-items="Model.ResourceTypes" class="form-select form-select-sm" name="ResourceTypeId"></select>
-                        </div>
-                        <div class="mb-2">
-                            <label asp-for="NewEntry.BusinessUnitId" class="form-label small"></label>
-                            <select asp-for="NewEntry.BusinessUnitId" asp-items="Model.BusinessUnits" class="form-select form-select-sm" name="BusinessUnitId"></select>
                         </div>
                         <div class="row g-2 mb-2">
                             <div class="col">
@@ -192,7 +187,7 @@ else if (card.Status == RateCardStatus.Retired)
                         <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
                         <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
                     </form>
-                    <p class="text-muted small mt-2 mb-0">Columns: ResourceType, BusinessUnit, Seniority, Location, ResourcingClass (Internal/Vendor), HourlyRate, Vendor (optional; names a catalog vendor for Vendor rows, blank = generic vendor rate). The whole file is rejected if any row is invalid.</p>
+                    <p class="text-muted small mt-2 mb-0">Columns: ResourceType, Seniority, Location, ResourcingClass (Internal/Vendor), HourlyRate, Vendor (optional; names a catalog vendor for Vendor rows, blank = generic vendor rate). Rates apply to every business unit; a legacy BusinessUnit column is ignored. The whole file is rejected if any row is invalid.</p>
                 </div>
             </div>
         </div>

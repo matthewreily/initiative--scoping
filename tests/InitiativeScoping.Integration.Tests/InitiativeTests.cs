@@ -141,7 +141,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
-    public async Task Combination_without_published_rate_is_rejected_when_the_card_prices_the_business_unit()
+    public async Task Combination_without_published_rate_is_rejected_when_a_card_is_effective()
     {
         var client = factory.CreateClient(NoRedirect);
         var id = await CreateInitiativeAsync(client, "Unpriced test");
@@ -156,7 +156,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
 
         var html = await client.GetStringAsync(details);
         Assert.Contains("No published rate for that resource type", html);
-        Assert.Contains("business unit &#x27;Boarding&#x27;", html);
+        Assert.Contains("on 2026-03-01", html);
         Assert.Contains("No allocations yet.", html);
     }
 
@@ -173,7 +173,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         Assert.Contains("<select name=\"Location\" id=\"location\"", html);
         Assert.Contains("<option selected=\"selected\">Onshore</option>", html);
         Assert.Contains("id=\"rate-preview-new\"", html);
-        Assert.DoesNotContain("No published rate card prices this business unit yet", html);
+        Assert.DoesNotContain("No published rate card has any rates yet", html);
     }
 
     [Fact]
@@ -237,6 +237,57 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
             ["Location"] = "onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "3", ["EstimatedHours"] = "10"
         });
         Assert.Equal(HttpStatusCode.Redirect, unchanged.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unpriced_allocation_can_be_moved_to_another_participating_business_unit()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        int partnerId, allocationId, phaseId, typeId;
+        using (var seed = factory.Services.CreateScope())
+        {
+            var db = seed.ServiceProvider.GetRequiredService<AppDbContext>();
+            var partner = new BusinessUnit { Name = $"Partner {Guid.NewGuid():N}"[..20] };
+            db.BusinessUnits.Add(partner);
+            await db.SaveChangesAsync();
+            partnerId = partner.Id;
+        }
+
+        var create = await PostFormAsync(client, "/Initiatives/Create", "/Initiatives/Create", new()
+        {
+            ["Name"] = "Move BU test", ["BusinessUnitId"] = (await SeededBusinessUnitIdAsync()).ToString(),
+            ["ParticipatingBusinessUnitIds"] = partnerId.ToString(),
+            ["SizingMethod"] = nameof(SizingMethod.Direct), ["TargetStart"] = "2026-02-02"
+        });
+        var id = int.Parse(DetailsRegex.Match(create.Headers.Location!.ToString()).Groups[1].Value);
+        await PostFormAsync(client, $"/Initiatives/Details/{id}", $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
+
+        // Legacy allocation whose combination (Offshore internal) has no published rate.
+        using (var seed = factory.Services.CreateScope())
+        {
+            var db = seed.ServiceProvider.GetRequiredService<AppDbContext>();
+            var allocation = new InitiativeAllocation
+            {
+                InitiativeId = id, PhaseId = phaseId, BusinessUnitId = await SeededBusinessUnitIdAsync(), ResourceTypeId = typeId,
+                Seniority = Seniority.Senior, Location = "Offshore", ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 10m
+            };
+            db.InitiativeAllocations.Add(allocation);
+            await db.SaveChangesAsync();
+            allocationId = allocation.Id;
+        }
+
+        var edit = $"/Initiatives/EditAllocation/{allocationId}";
+        var moved = await PostFormAsync(client, edit, edit, new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = partnerId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+        });
+        Assert.True(moved.StatusCode == HttpStatusCode.Redirect, await moved.Content.ReadAsStringAsync());
+
+        using var verify = factory.Services.CreateScope();
+        var saved = await verify.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.SingleAsync(a => a.Id == allocationId);
+        Assert.Equal(partnerId, saved.BusinessUnitId);
     }
 
     [Fact]

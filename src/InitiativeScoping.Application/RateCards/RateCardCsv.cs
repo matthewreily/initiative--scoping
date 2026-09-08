@@ -7,7 +7,6 @@ namespace InitiativeScoping.Application.RateCards;
 
 public sealed record RateCardCsvRow(
     string ResourceType,
-    string BusinessUnit,
     Seniority Seniority,
     string Location,
     ResourcingClass ResourcingClass,
@@ -22,13 +21,14 @@ public sealed record RateCardCsvResult(IReadOnlyList<RateCardCsvRow> Rows, IRead
 }
 
 /// <summary>
-/// CSV format: ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate,Vendor
+/// CSV format: ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor
+/// A legacy BusinessUnit column is accepted and ignored.
 /// Seniority: Associate|Mid|Senior|Staff|Principal. ResourcingClass: InternalFte|Vendor.
 /// Vendor names a specific vendor for Vendor rows (blank = generic "any vendor" rate) and must be blank for InternalFte rows; the column may be omitted.
 /// </summary>
 public static class RateCardCsv
 {
-    public static readonly string[] RequiredHeaders = ["ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "HourlyRate"];
+    public static readonly string[] RequiredHeaders = ["ResourceType", "Seniority", "Location", "ResourcingClass", "HourlyRate"];
     public static readonly string[] Headers = [.. RequiredHeaders, "Vendor"];
 
     private static readonly CsvConfiguration Config = new(CultureInfo.InvariantCulture)
@@ -64,12 +64,11 @@ public static class RateCardCsv
         {
             var line = csv.Parser.Row;
             var resourceType = csv.GetField("ResourceType") ?? string.Empty;
-            var businessUnit = csv.GetField("BusinessUnit") ?? string.Empty;
             var location = csv.GetField("Location") ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(businessUnit) || string.IsNullOrWhiteSpace(location))
+            if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(location))
             {
-                errors.Add(new RateCardCsvError(line, "ResourceType, BusinessUnit and Location are required."));
+                errors.Add(new RateCardCsvError(line, "ResourceType and Location are required."));
                 continue;
             }
 
@@ -100,16 +99,16 @@ public static class RateCardCsv
                 continue;
             }
 
-            rows.Add(new RateCardCsvRow(resourceType, businessUnit, seniority, location, resourcingClass, rate, vendor));
+            rows.Add(new RateCardCsvRow(resourceType, seniority, location, resourcingClass, rate, vendor));
         }
 
         var duplicates = rows
-            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.BusinessUnit.ToLowerInvariant(), r.Seniority, r.Location.ToLowerInvariant(), r.ResourcingClass, r.Vendor?.ToLowerInvariant()))
+            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.Seniority, r.Location.ToLowerInvariant(), r.ResourcingClass, r.Vendor?.ToLowerInvariant()))
             .Where(g => g.Count() > 1)
             .Select(g => g.First());
         foreach (var d in duplicates)
         {
-            errors.Add(new RateCardCsvError(0, $"Duplicate entry for {d.ResourceType}/{d.BusinessUnit}/{d.Seniority}/{d.Location}/{d.ResourcingClass}{(d.Vendor is null ? string.Empty : "/" + d.Vendor)}."));
+            errors.Add(new RateCardCsvError(0, $"Duplicate entry for {d.ResourceType}/{d.Seniority}/{d.Location}/{d.ResourcingClass}{(d.Vendor is null ? string.Empty : "/" + d.Vendor)}."));
         }
 
         return new RateCardCsvResult(rows, errors);
@@ -126,7 +125,6 @@ public static class RateCardCsv
         foreach (var r in rows)
         {
             csv.WriteField(r.ResourceType);
-            csv.WriteField(r.BusinessUnit);
             csv.WriteField(r.Seniority.ToString());
             csv.WriteField(r.Location);
             csv.WriteField(r.ResourcingClass.ToString());

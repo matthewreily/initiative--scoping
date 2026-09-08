@@ -83,8 +83,6 @@ public class RateCardEntryEditModel
     public int RateCardId { get; set; }
     [Required, Display(Name = "Resource type")]
     public int ResourceTypeId { get; set; }
-    [Required, Display(Name = "Business unit")]
-    public int BusinessUnitId { get; set; }
     [Required]
     public Seniority Seniority { get; set; } = Seniority.Mid;
     [Required, StringLength(100)]
@@ -102,7 +100,6 @@ public class RateCardDetailsModel
     public required RateCard Card { get; init; }
     public required RateCardEntryEditModel NewEntry { get; init; }
     public required SelectList ResourceTypes { get; init; }
-    public required SelectList BusinessUnits { get; init; }
     public required SelectList Vendors { get; init; }
     public string? FilterResourceType { get; init; }
     public bool IsEditable => Card.Status != RateCardStatus.Retired;

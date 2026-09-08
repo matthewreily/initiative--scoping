@@ -14,10 +14,10 @@
 </ol></nav>
 <h1 class="h3">Edit allocation</h1>
 <p class="text-muted small">
-    Participating business units: <strong>@string.Join(", ", rateOptions.BusinessUnits.Select(b => b.Name))</strong>. Only combinations with a published rate for the chosen business unit on the phase start date are selectable.
+    Participating business units: <strong>@string.Join(", ", rateOptions.BusinessUnits.Select(b => b.Name))</strong>. Only combinations with a published rate on the phase start date are selectable; rates are shared by every business unit.
     @if (!rateOptions.HasAnyPricing)
     {
-        <span class="text-warning-emphasis">No published rate card prices these business units yet — allocations will be unpriced until an admin adds rates.</span>
+        <span class="text-warning-emphasis">No published rate card has any rates yet — allocations will be unpriced until an admin adds rates.</span>
     }
     @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
     {
