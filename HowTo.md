@@ -91,7 +91,7 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 | Symptom | Cause / fix |
 |---------|-------------|
 | Forecast line shows **Unpriced** | No published rate-card entry exactly matches resource type + seniority + location + class (+ vendor) on the phase start date; rates are global, so the allocation's business unit is irrelevant. Add the entry; there is no fallback pricing by design. |
-| New resource type / rate-card row not selectable on *Add allocation* | The rate card must be **Published** with an effective start on or before the phase start, the entry's BU must be the *initiative's* BU, and the resource type must be active. The allocation form narrows each dropdown as you pick the previous one – change phase / resource type first. |
+| New resource type / rate-card row not selectable on *Add allocation* | The rate card must be **Published** with an effective start on or before the phase start, and the resource type must be active. The allocation form narrows each dropdown as you pick the previous one – change phase / resource type first. |
 | **Activate** is disabled | Check the guard list on the page: phases, allocations, dates, unpriced lines. |
 | Import rejected | The error lists the first 10 offending lines. Fix the file and re-upload; nothing was written. |
 | Rows imported as **unmapped** | Add a source mapping for the project id and/or a person with that external id, then assign in *Unmapped* or re-import. |
