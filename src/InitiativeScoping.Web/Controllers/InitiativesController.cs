@@ -1376,7 +1376,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
     }
 
-    /// <summary>Priced (BU, type, seniority, location, class, vendor) combinations across the participating BUs per published card, plus fallbacks for when nothing is priced yet.</summary>
+    /// <summary>Priced (type, seniority, location, class, vendor) combinations per published card, plus fallbacks for when nothing is priced yet.</summary>
     private async Task<RateOptionsData> BuildRateOptionsAsync(Initiative initiative, IReadOnlyList<RateCard> cards, CancellationToken ct)
     {
         var types = await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).Select(t => new NamedId(t.Id, t.Name)).ToListAsync(ct);
@@ -1388,9 +1388,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Where(c => c.Status == RateCardStatus.Published)
             .OrderBy(c => c.EffectiveStart).ThenBy(c => c.Id)
             .Select(c => new RateCardOptions(c.Id, c.EffectiveStart, c.Entries
-                .Where(e => participantIds.Contains(e.BusinessUnitId) && typeNames.ContainsKey(e.ResourceTypeId))
+                .Where(e => typeNames.ContainsKey(e.ResourceTypeId))
                 .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => e.Seniority).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass).ThenBy(e => e.VendorId)
-                .Select(e => new RateOption(e.BusinessUnitId, e.ResourceTypeId, typeNames[e.ResourceTypeId], e.Seniority, e.Location, e.ResourcingClass, e.VendorId, e.HourlyRate))
+                .Select(e => new RateOption(e.ResourceTypeId, typeNames[e.ResourceTypeId], e.Seniority, e.Location, e.ResourcingClass, e.VendorId, e.HourlyRate))
                 .ToList()))
             .ToList();
         var locations = cards.SelectMany(c => c.Entries.Select(e => e.Location))
@@ -1441,7 +1441,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
         else if (phase is not null && participates && vendorError is null)
         {
-            var priced = RateResolver.PricedEntries(await LoadRateCardsAsync(ct), [model.BusinessUnitId], phase.PlannedStart);
+            var priced = RateResolver.PricedEntries(await LoadRateCardsAsync(ct), phase.PlannedStart);
             var location = model.Location.Trim();
             var vendorId = VendorFor(model);
             var unchanged = existing is not null
@@ -1453,9 +1453,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                     && RateResolver.VendorMatches(e.ResourcingClass, e.VendorId, vendorId)
                     && string.Equals(e.Location, location, StringComparison.OrdinalIgnoreCase)))
             {
-                var bu = await db.BusinessUnits.Where(b => b.Id == model.BusinessUnitId).Select(b => b.Name).FirstAsync(ct);
                 ModelState.AddModelError(nameof(model.ResourceTypeId),
-                    $"No published rate for that resource type / seniority / location / class{(vendorId is null ? string.Empty : " / vendor")} in business unit '{bu}' on {phase.PlannedStart:yyyy-MM-dd}. Pick a priced combination or add it to the rate card.");
+                    $"No published rate for that resource type / seniority / location / class{(vendorId is null ? string.Empty : " / vendor")} on {phase.PlannedStart:yyyy-MM-dd}. Pick a priced combination or add it to the rate card.");
             }
         }
 

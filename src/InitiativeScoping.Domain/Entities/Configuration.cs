@@ -33,6 +33,7 @@ public class ResourceType
     public bool IsActive { get; set; } = true;
 }
 
+/// <summary>Global price list shared by every business unit and initiative; entries are keyed by resource type, seniority, location, class and vendor.</summary>
 public class RateCard
 {
     public int Id { get; set; }
@@ -49,8 +50,6 @@ public class RateCardEntry
     public RateCard? RateCard { get; set; }
     public int ResourceTypeId { get; set; }
     public ResourceType? ResourceType { get; set; }
-    public int BusinessUnitId { get; set; }
-    public BusinessUnit? BusinessUnit { get; set; }
     public Seniority Seniority { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }

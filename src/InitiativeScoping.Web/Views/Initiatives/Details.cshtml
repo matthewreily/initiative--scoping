@@ -319,10 +319,10 @@ else
         @if (Model.ScopeWritable && i.Phases.Count > 0)
         {
             <p class="small text-muted mb-1" id="allocation-bu-hint">
-                Participating business units: <strong>@string.Join(", ", Model.RateOptions.BusinessUnits.Select(b => b.Name))</strong> (edit the initiative to change). Only resource type / seniority / location / class (and vendor) combinations with a published rate for the chosen business unit on the phase start date are selectable.
+                Participating business units: <strong>@string.Join(", ", Model.RateOptions.BusinessUnits.Select(b => b.Name))</strong> (edit the initiative to change). Only resource type / seniority / location / class (and vendor) combinations with a published rate on the phase start date are selectable; rates are shared by every business unit.
                 @if (!Model.RateOptions.HasAnyPricing)
                 {
-                    <span class="text-warning-emphasis">No published rate card prices these business units yet — allocations will be unpriced until an admin adds rates.</span>
+                    <span class="text-warning-emphasis">No published rate card has any rates yet — allocations will be unpriced until an admin adds rates.</span>
                 }
                 @if (Model.RateOptions.Vendors.Count == 0)
                 {
@@ -400,7 +400,7 @@ else
                 </div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
-            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { BusinessUnitSelectId = "businessunitid", VendorSelectId = "vendorid" })" />
+            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { VendorSelectId = "vendorid" })" />
             @if (fd is not null)
             {
                 <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />

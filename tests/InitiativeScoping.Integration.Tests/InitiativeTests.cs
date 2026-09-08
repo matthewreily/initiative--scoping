@@ -141,7 +141,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
-    public async Task Combination_without_published_rate_is_rejected_when_the_card_prices_the_business_unit()
+    public async Task Combination_without_published_rate_is_rejected_when_a_card_is_effective()
     {
         var client = factory.CreateClient(NoRedirect);
         var id = await CreateInitiativeAsync(client, "Unpriced test");
@@ -156,7 +156,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
 
         var html = await client.GetStringAsync(details);
         Assert.Contains("No published rate for that resource type", html);
-        Assert.Contains("business unit &#x27;Boarding&#x27;", html);
+        Assert.Contains("on 2026-03-01", html);
         Assert.Contains("No allocations yet.", html);
     }
 
@@ -173,7 +173,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         Assert.Contains("<select name=\"Location\" id=\"location\"", html);
         Assert.Contains("<option selected=\"selected\">Onshore</option>", html);
         Assert.Contains("id=\"rate-preview-new\"", html);
-        Assert.DoesNotContain("No published rate card prices this business unit yet", html);
+        Assert.DoesNotContain("No published rate card has any rates yet", html);
     }
 
     [Fact]

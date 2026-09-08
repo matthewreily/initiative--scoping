@@ -174,12 +174,12 @@ public sealed record RollupRow(string Label, decimal Hours, decimal Cost, bool H
 
 public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 
-/// <summary>One priced (BU, resource type, seniority, location, class, vendor) combination from a published rate card.</summary>
-public sealed record RateOption(int BusinessUnitId, int ResourceTypeId, string ResourceType, Seniority Seniority, string Location, ResourcingClass ResourcingClass, int? VendorId, decimal Rate);
+/// <summary>One priced (resource type, seniority, location, class, vendor) combination from a published rate card; rates are global across business units.</summary>
+public sealed record RateOption(int ResourceTypeId, string ResourceType, Seniority Seniority, string Location, ResourcingClass ResourcingClass, int? VendorId, decimal Rate);
 
 public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, IReadOnlyList<RateOption> Options);
 
-/// <summary>Data for the allocation form: priced combinations per published card for the initiative's BU, and phase start dates to pick the effective card.</summary>
+/// <summary>Data for the allocation form: priced combinations per published card, and phase start dates to pick the effective card.</summary>
 public sealed record RateOptionsScriptModel(
     string PhaseSelectId,
     string ResourceTypeSelectId,
@@ -190,11 +190,10 @@ public sealed record RateOptionsScriptModel(
     RateOptionsData Data,
     AllocationEditModel Current)
 {
-    public string BusinessUnitSelectId { get; init; } = "BusinessUnitId";
     public string VendorSelectId { get; init; } = "VendorId";
 }
 
-/// <summary>Priced combinations per published card across the initiative's participating BUs, plus the catalogs needed for the unpriced fallback.</summary>
+/// <summary>Global priced combinations per published card, the initiative's participating BUs (for allocation ownership), plus the catalogs needed for the unpriced fallback.</summary>
 public sealed record RateOptionsData(
     IReadOnlyList<NamedId> BusinessUnits,
     int SponsorBusinessUnitId,
@@ -205,7 +204,6 @@ public sealed record RateOptionsData(
     IReadOnlyList<NamedId> Vendors)
 {
     public bool HasAnyPricing => Cards.Any(c => c.Options.Count > 0);
-    public bool HasPricingFor(int businessUnitId) => Cards.Any(c => c.Options.Any(o => o.BusinessUnitId == businessUnitId));
 }
 
 public sealed record NamedId(int Id, string Name);

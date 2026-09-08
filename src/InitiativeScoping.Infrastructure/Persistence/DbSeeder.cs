@@ -22,8 +22,7 @@ public static class DbSeeder
             return;
         }
 
-        var bu = new BusinessUnit { Name = "Boarding" };
-        db.BusinessUnits.Add(bu);
+        db.BusinessUnits.Add(new BusinessUnit { Name = "Boarding" });
 
         var engineering = new Discipline { Name = "Engineering" };
         var qa = new Discipline { Name = "QA" };
@@ -65,12 +64,12 @@ public static class DbSeeder
             {
                 card.Entries.Add(new RateCardEntry
                 {
-                    ResourceType = t, BusinessUnit = bu, Seniority = s, Location = "Onshore",
+                    ResourceType = t, Seniority = s, Location = "Onshore",
                     ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 60 + 20 * (int)s
                 });
                 card.Entries.Add(new RateCardEntry
                 {
-                    ResourceType = t, BusinessUnit = bu, Seniority = s, Location = "Onshore",
+                    ResourceType = t, Seniority = s, Location = "Onshore",
                     ResourcingClass = ResourcingClass.Vendor, HourlyRate = 90 + 25 * (int)s
                 });
             }

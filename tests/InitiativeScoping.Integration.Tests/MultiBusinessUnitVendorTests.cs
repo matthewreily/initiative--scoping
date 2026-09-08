@@ -37,12 +37,11 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             vendorId = vendor.Id;
             Assert.True(await db.AuditEvents.AnyAsync(a => a.Entity == nameof(Vendor) && a.EntityId == vendorId.ToString() && a.Action == "Create"));
 
-            var bu = await db.BusinessUnits.FirstAsync();
             var type = await db.ResourceTypes.FirstAsync();
             var card = await db.RateCards.FirstAsync(c => c.Status == RateCardStatus.Published);
             db.RateCardEntries.Add(new RateCardEntry
             {
-                RateCardId = card.Id, ResourceTypeId = type.Id, BusinessUnitId = bu.Id, Seniority = Seniority.Associate,
+                RateCardId = card.Id, ResourceTypeId = type.Id, Seniority = Seniority.Associate,
                 Location = "Nearshore", ResourcingClass = ResourcingClass.Vendor, VendorId = vendorId, HourlyRate = 55m
             });
             await db.SaveChangesAsync();
@@ -60,7 +59,7 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
     }
 
     [Fact]
-    public async Task Initiative_can_span_business_units_and_vendors_with_separate_pricing_and_rollups()
+    public async Task Initiative_can_span_business_units_and_vendors_with_global_pricing_and_rollups()
     {
         var client = factory.CreateClient(NoRedirect);
         var (sponsorId, partnerId, outsiderId, acmeId, globexId, typeId) = await SeedCatalogAsync();
@@ -128,10 +127,10 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             var forecast = ForecastCalculator.Calculate(initiative, cards);
             var byKey = forecast.Lines.ToDictionary(l => (l.Allocation.BusinessUnitId, l.Allocation.ResourcingClass, l.Allocation.VendorId), l => l.HourlyRate);
             Assert.Equal(100m, byKey[(sponsorId, ResourcingClass.InternalFte, null)]);
-            Assert.Equal(70m, byKey[(partnerId, ResourcingClass.InternalFte, null)]);
+            Assert.Equal(100m, byKey[(partnerId, ResourcingClass.InternalFte, null)]);
             Assert.Equal(120m, byKey[(sponsorId, ResourcingClass.Vendor, acmeId)]);
             Assert.Equal(150m, byKey[(sponsorId, ResourcingClass.Vendor, globexId)]);
-            Assert.Equal(10m * (100m + 70m + 120m + 150m), forecast.LaborCost);
+            Assert.Equal(10m * (100m + 100m + 120m + 150m), forecast.LaborCost);
         }
 
         var html = await client.GetStringAsync(details);
@@ -174,9 +173,9 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
         db.AddRange(sponsor, partner, outsider, acme, globex);
         var type = await db.ResourceTypes.FirstAsync(t => t.Name == "Software Engineer");
 
-        RateCardEntry Entry(BusinessUnit bu, ResourcingClass cls, Vendor? vendor, decimal rate) => new()
+        RateCardEntry Entry(ResourcingClass cls, Vendor? vendor, decimal rate) => new()
         {
-            ResourceType = type, BusinessUnit = bu, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = cls, Vendor = vendor, HourlyRate = rate
+            ResourceType = type, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = cls, Vendor = vendor, HourlyRate = rate
         };
 
         db.RateCards.Add(new RateCard
@@ -184,11 +183,10 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             Name = $"Multi {suffix}", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
             Entries =
             [
-                Entry(sponsor, ResourcingClass.InternalFte, null, 100m),
-                Entry(partner, ResourcingClass.InternalFte, null, 70m),
-                Entry(sponsor, ResourcingClass.Vendor, null, 110m),
-                Entry(sponsor, ResourcingClass.Vendor, acme, 120m),
-                Entry(sponsor, ResourcingClass.Vendor, globex, 150m)
+                Entry(ResourcingClass.InternalFte, null, 100m),
+                Entry(ResourcingClass.Vendor, null, 110m),
+                Entry(ResourcingClass.Vendor, acme, 120m),
+                Entry(ResourcingClass.Vendor, globex, 150m)
             ]
         });
         await db.SaveChangesAsync();

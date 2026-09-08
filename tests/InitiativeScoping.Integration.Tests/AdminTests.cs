@@ -222,7 +222,10 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            seededId = await db.RateCardEntries.Select(e => e.BusinessUnitId).FirstAsync();
+            var unit = new BusinessUnit { Name = $"Referenced {Guid.NewGuid():N}"[..20] };
+            db.Initiatives.Add(new Initiative { Name = "Guard", BusinessUnit = unit, CreatedBy = "test", TargetStart = new DateOnly(2027, 1, 1) });
+            await db.SaveChangesAsync();
+            seededId = unit.Id;
         }
 
         var response = await PostFormAsync(client, "/Admin/BusinessUnits/Create", $"/Admin/BusinessUnits/Delete/{seededId}", new());
@@ -246,17 +249,16 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Publish/{id}", new());
         Assert.Equal(RateCardStatus.Draft, await StatusAsync(id));
 
-        int typeId, unitId;
+        int typeId;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             typeId = await db.ResourceTypes.Select(t => t.Id).FirstAsync();
-            unitId = await db.BusinessUnits.Select(b => b.Id).FirstAsync();
         }
 
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/AddEntry/{id}", new()
         {
-            ["ResourceTypeId"] = typeId.ToString(), ["BusinessUnitId"] = unitId.ToString(), ["Seniority"] = "Senior",
+            ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = "Senior",
             ["Location"] = "Onshore", ["ResourcingClass"] = "InternalFte", ["HourlyRate"] = "150"
         });
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Publish/{id}", new());
@@ -285,10 +287,11 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var detailsUrl = create.Headers.Location!.ToString();
         var id = int.Parse(detailsUrl.Split('/').Last());
 
-        var bad = "ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate\nNope,Boarding,Senior,Onshore,Internal,100\n";
+        var bad = "ResourceType,Seniority,Location,ResourcingClass,HourlyRate\nNope,Senior,Onshore,Internal,100\n";
         await PostCsvAsync(client, detailsUrl, $"/Admin/RateCards/Import/{id}", bad);
         Assert.Equal(0, await EntryCountAsync(id));
 
+        // Legacy BusinessUnit column is accepted and ignored.
         var good = "ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate\n" +
                    "Software Engineer,Boarding,Senior,Onshore,Internal,100\n" +
                    "Software Engineer,Boarding,Senior,Offshore,Vendor,60\n";
@@ -298,7 +301,8 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var export = await client.GetAsync($"/Admin/RateCards/Export/{id}");
         export.EnsureSuccessStatusCode();
         var csv = await export.Content.ReadAsStringAsync();
-        Assert.Contains("Software Engineer,Boarding,Senior,Offshore,Vendor,60", csv);
+        Assert.Contains("Software Engineer,Senior,Offshore,Vendor,60", csv);
+        Assert.DoesNotContain("BusinessUnit", csv);
     }
 
     [Fact]

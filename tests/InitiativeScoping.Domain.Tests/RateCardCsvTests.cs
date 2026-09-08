@@ -5,26 +5,38 @@ namespace InitiativeScoping.Domain.Tests;
 
 public class RateCardCsvTests
 {
-    private const string Header = "ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate\n";
+    private const string Header = "ResourceType,Seniority,Location,ResourcingClass,HourlyRate\n";
 
     [Fact]
     public void Parses_valid_rows_with_class_aliases_and_trimming()
     {
         var result = RateCardCsv.Parse(new StringReader(Header +
-            " Software Engineer , Boarding , senior , Onshore , Internal , 120.50\n" +
-            "QA Analyst,Boarding,Mid,Offshore,Contractor,$55\n"));
+            " Software Engineer , senior , Onshore , Internal , 120.50\n" +
+            "QA Analyst,Mid,Offshore,Contractor,$55\n"));
 
         Assert.True(result.IsValid);
         Assert.Equal(2, result.Rows.Count);
-        Assert.Equal(new RateCardCsvRow("Software Engineer", "Boarding", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, 120.50m), result.Rows[0]);
+        Assert.Equal(new RateCardCsvRow("Software Engineer", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, 120.50m), result.Rows[0]);
         Assert.Equal(ResourcingClass.Vendor, result.Rows[1].ResourcingClass);
         Assert.Equal(55m, result.Rows[1].HourlyRate);
     }
 
     [Fact]
+    public void Legacy_business_unit_column_is_ignored()
+    {
+        var result = RateCardCsv.Parse(new StringReader("ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate\n" +
+            "SE,Boarding,Senior,Onshore,Internal,100\n" +
+            "SE,Lending,Senior,Onshore,Internal,110\n"));
+
+        Assert.False(result.IsValid);
+        Assert.Contains("Duplicate", Assert.Single(result.Errors).Message);
+        Assert.Equal(2, result.Rows.Count);
+    }
+
+    [Fact]
     public void Reports_missing_columns()
     {
-        var result = RateCardCsv.Parse(new StringReader("ResourceType,BusinessUnit\nA,B\n"));
+        var result = RateCardCsv.Parse(new StringReader("ResourceType,Location\nA,B\n"));
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Message.Contains("Missing column"));
     }
@@ -33,10 +45,10 @@ public class RateCardCsvTests
     public void Reports_invalid_values_with_line_numbers()
     {
         var result = RateCardCsv.Parse(new StringReader(Header +
-            "SE,Boarding,Guru,Onshore,Internal,100\n" +
-            "SE,Boarding,Senior,Onshore,Freelance,100\n" +
-            "SE,Boarding,Senior,Onshore,Internal,-5\n" +
-            ",Boarding,Senior,Onshore,Internal,100\n"));
+            "SE,Guru,Onshore,Internal,100\n" +
+            "SE,Senior,Onshore,Freelance,100\n" +
+            "SE,Senior,Onshore,Internal,-5\n" +
+            ",Senior,Onshore,Internal,100\n"));
 
         Assert.False(result.IsValid);
         Assert.Empty(result.Rows);
@@ -47,8 +59,8 @@ public class RateCardCsvTests
     public void Detects_duplicate_dimension_tuples_case_insensitively()
     {
         var result = RateCardCsv.Parse(new StringReader(Header +
-            "SE,Boarding,Senior,Onshore,Internal,100\n" +
-            "se,boarding,SENIOR,onshore,Fte,110\n"));
+            "SE,Senior,Onshore,Internal,100\n" +
+            "se,SENIOR,onshore,Fte,110\n"));
 
         Assert.False(result.IsValid);
         Assert.Single(result.Errors);
@@ -60,8 +72,8 @@ public class RateCardCsvTests
     {
         var rows = new[]
         {
-            new RateCardCsvRow("Software Engineer", "Boarding", Seniority.Staff, "Onshore", ResourcingClass.InternalFte, 175m),
-            new RateCardCsvRow("UX Designer", "Boarding", Seniority.Associate, "Nearshore", ResourcingClass.Vendor, 42.25m)
+            new RateCardCsvRow("Software Engineer", Seniority.Staff, "Onshore", ResourcingClass.InternalFte, 175m),
+            new RateCardCsvRow("UX Designer", Seniority.Associate, "Nearshore", ResourcingClass.Vendor, 42.25m)
         };
         var sw = new StringWriter();
         RateCardCsv.Write(sw, rows);
