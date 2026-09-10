@@ -93,3 +93,23 @@ public class Holiday
     public DateOnly Date { get; set; }
     public required string Name { get; set; }
 }
+
+/// <summary>
+/// Who may use the application and with which role. Entra ID authenticates; this table authorizes.
+/// Created either by an Admin (by e-mail, before the person has signed in) or by the person requesting access.
+/// </summary>
+public class UserAccount
+{
+    public int Id { get; set; }
+    /// <summary>Entra object id; null until a row added by e-mail is matched at first sign-in.</summary>
+    public string? ObjectId { get; set; }
+    public required string Email { get; set; }
+    public required string DisplayName { get; set; }
+    public AppRole Role { get; set; } = AppRole.Viewer;
+    public UserAccountStatus Status { get; set; } = UserAccountStatus.Pending;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastSeenAt { get; set; }
+    public DateTimeOffset? DecidedAt { get; set; }
+    public string? DecidedBy { get; set; }
+    public string? Note { get; set; }
+}

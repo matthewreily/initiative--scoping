@@ -36,6 +36,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ActualEntry> ActualEntries => Set<ActualEntry>();
     public DbSet<ActualAdjustment> ActualAdjustments => Set<ActualAdjustment>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
 
     private const string CaseInsensitive = "case_insensitive";
 
@@ -59,6 +60,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Name).HasMaxLength(100).UseCollation(ciCollation);
             e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        b.Entity<UserAccount>(e =>
+        {
+            e.Property(x => x.ObjectId).HasMaxLength(64);
+            e.HasIndex(x => x.ObjectId).IsUnique();
+            e.Property(x => x.Email).HasMaxLength(320).UseCollation(ciCollation);
+            e.HasIndex(x => x.Email).IsUnique();
+            e.Property(x => x.DisplayName).HasMaxLength(200);
+            e.Property(x => x.DecidedBy).HasMaxLength(64);
+            e.Property(x => x.Note).HasMaxLength(1000);
+            e.HasIndex(x => x.Status);
         });
 
         b.Entity<Vendor>(e =>

@@ -146,9 +146,9 @@ else
             <tr>
                 <td>@r.Id</td>
                 <td><span class="badge @(r.Status switch { RebaselineStatus.Pending => "bg-warning text-dark", RebaselineStatus.Approved => "bg-info text-dark", RebaselineStatus.Completed => "bg-success", RebaselineStatus.Rejected => "bg-danger", _ => "bg-secondary" })">@r.Status</span></td>
-                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @r.RequestedBy</td>
+                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @Users.Display(r.RequestedBy)</td>
                 <td>@r.Reason</td>
-                <td class="small">@if (r.DecidedAt is not null) { <text>@r.DecidedAt.Value.ToString("yyyy-MM-dd") by @r.DecidedBy</text> @if (!string.IsNullOrEmpty(r.DecisionNote)) { <br /><span class="text-muted">@r.DecisionNote</span> } }</td>
+                <td class="small">@if (r.DecidedAt is not null) { <text>@r.DecidedAt.Value.ToString("yyyy-MM-dd") by @Users.Display(r.DecidedBy)</text> @if (!string.IsNullOrEmpty(r.DecisionNote)) { <br /><span class="text-muted">@r.DecisionNote</span> } }</td>
                 <td>@if (r.ResultingBaselineId is not null) { var rb = Model.Baselines.FirstOrDefault(b => b.Id == r.ResultingBaselineId); if (rb is not null) { <a asp-action="Baselines" asp-route-id="@i.Id" asp-route-version="@rb.Version">v@(rb.Version)</a> } }</td>
             </tr>
         }

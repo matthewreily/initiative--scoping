@@ -1,6 +1,7 @@
 using Google.Cloud.Kms.V1;
 using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Application.Exports;
+using InitiativeScoping.Infrastructure.Access;
 using InitiativeScoping.Infrastructure.Actuals;
 using InitiativeScoping.Infrastructure.DataProtection;
 using InitiativeScoping.Infrastructure.Exports;
@@ -54,6 +55,14 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuditLog, DbAuditLog>();
+        services.Configure<UserAccessOptions>(o =>
+            o.BootstrapAdmins = configuration.GetSection($"{UserAccessOptions.Section}:BootstrapAdmins").GetChildren()
+                .Select(c => c.Value)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v!)
+                .ToArray());
+        services.AddSingleton<IUserDirectory, DbUserDirectory>();
+        services.AddScoped<UserAccessService>();
         services.AddScoped<IWorkCalendar, DbWorkCalendar>();
         services.AddScoped<IActualsImporter, ActualsImporter>();
         services.AddSingleton<IExportWriter, CsvExportWriter>();

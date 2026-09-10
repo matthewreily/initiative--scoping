@@ -96,16 +96,18 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
     }
 
     [Fact]
-    public async Task Viewer_sees_portfolio_but_cannot_export()
+    public async Task Viewer_sees_portfolio_and_can_export_but_not_edit()
     {
         await using var viewerFactory = new ViewerOnlyFactory();
         var client = viewerFactory.CreateClient(NoRedirect);
 
         var page = await client.GetAsync("/Portfolio");
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
-        Assert.DoesNotContain("Export?format", await page.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Portfolio/Export?format=csv")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Initiatives/1/Export?format=csv")).StatusCode);
+        var csv = await client.GetAsync("/Portfolio/Export?format=csv");
+        Assert.Equal(HttpStatusCode.OK, csv.StatusCode);
+        Assert.Equal("text/csv", csv.Content.Headers.ContentType!.MediaType);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Initiatives/Create")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Admin/Users")).StatusCode);
     }
 
     private static async Task<List<string>> SheetNamesAsync(HttpResponseMessage response)

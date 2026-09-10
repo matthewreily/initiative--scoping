@@ -29,13 +29,13 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
             BusinessUnitId = businessUnitId,
             IncludeClosed = includeClosed,
             BusinessUnits = new SelectList(await db.BusinessUnits.OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name", businessUnitId),
-            CanExport = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.FinancePmo),
+            CanExport = true,
             Formats = writers.Select(w => w.Extension).ToList()
         });
     }
 
     [HttpGet("Portfolio/Export")]
-    [Authorize(Policy = AppPolicies.CanExport)]
+    [Authorize(Policy = AppPolicies.CanView)]
     public async Task<IActionResult> Export(string format, InitiativeStatus? status, int? businessUnitId, bool includeClosed, CancellationToken ct)
     {
         var writer = ResolveWriter(format);
@@ -54,7 +54,7 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
     }
 
     [HttpGet("Initiatives/{id:int}/Export")]
-    [Authorize(Policy = AppPolicies.CanExport)]
+    [Authorize(Policy = AppPolicies.CanView)]
     public async Task<IActionResult> ExportInitiative(int id, string format, CancellationToken ct)
     {
         var writer = ResolveWriter(format);

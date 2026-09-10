@@ -82,3 +82,19 @@ public enum BillingModel
     Monthly = 2,
     Annual = 3
 }
+
+/// <summary>Application role; higher values include every permission of lower ones.</summary>
+public enum AppRole
+{
+    Viewer = 1,
+    User = 2,
+    Admin = 3
+}
+
+public enum UserAccountStatus
+{
+    /// <summary>Signed in and asked for access; no role until an Admin approves.</summary>
+    Pending = 1,
+    Active = 2,
+    Disabled = 3
+}

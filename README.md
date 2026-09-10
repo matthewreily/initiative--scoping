@@ -25,7 +25,7 @@ dotnet test
 dotnet run --project src/InitiativeScoping.Web
 ```
 
-The `Development` environment uses SQLite (`initiative-scoping.dev.db`, created and seeded on startup) and a development auth scheme that signs every request in as `Dev User` with all roles (`appsettings.Development.json` → `Auth:Dev`). No Entra ID setup is needed locally.
+The `Development` environment uses SQLite (`initiative-scoping.dev.db`, created and seeded on startup) and a development auth scheme that signs every request in as `Dev User` with the `Admin` role (`appsettings.Development.json` → `Auth:Dev`: `UserId`, `DisplayName`, `Email`, `Roles`). No Entra ID setup is needed locally.
 
 CI enforces **≥ 80 % line coverage** (EF migrations excluded). Reproduce locally with:
 
@@ -38,7 +38,9 @@ The SQLite schema is created with `EnsureCreated` and is **not** migrated; after
 
 ### Administration
 
-Users in the `Administrator` role get an **Admin** nav link (`/Admin/...`) for configuration (spec §5.1):
+Users in the `Admin` role get an **Admin** nav link (`/Admin/...`) for configuration (spec §5.1):
+
+- **Users** – who may use the app. Rows in `UserAccounts` (object ID, e-mail, display name, role `Viewer`/`User`/`Admin`, status `Pending`/`Active`/`Disabled`) are the primary source of roles; the page lists/searches them, approves or rejects self-service access requests, adds people by e-mail ahead of their first sign-in, changes roles, disables/enables and removes. An Admin cannot lock themself out (no self-demote/disable/remove). Every change is audited.
 
 - **Business Units** and **Resource Types** – CRUD with active/inactive flag; deletion is blocked while referenced (deactivate instead).
 - **Rate Cards** – Draft → Published → Retired lifecycle with an effective start date. Entries are global (shared by every business unit) and keyed by resource type × seniority × location × internal/vendor (× vendor). Entries can be added inline or bulk-imported via CSV (`ResourceType,Seniority,Location,ResourcingClass,HourlyRate[,Vendor]`; a legacy `BusinessUnit` column is ignored; merge or replace; the file is rejected as a whole if any row is invalid). Export and a template download are available. Published cards cannot be deleted – retire them so historical baselines stay reproducible.
@@ -50,7 +52,7 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 
 ### Initiatives (scoping)
 
-`/Initiatives` (spec §5.2–5.3) is readable by every role; Administrators, Initiative Owners and Contributors can create initiatives. The creator becomes the initiative's **Owner** member; per-initiative editing is limited to Administrators and members with the Owner/Contributor role, and member management to Administrators/Owners.
+`/Initiatives` (spec §5.2–5.3) is readable by every role; Admins and Users can create initiatives. The creator becomes the initiative's **Owner** member; per-initiative editing is limited to Admins and members with the Owner/Contributor role, and member management to Admins/Owners. Members are picked from the known-user directory (people who have signed in or been added under Admin → Users) and every stored user ID is rendered as *Name (e-mail)* via `IUserDirectory`.
 
 - **Phases** – planned start/end with sequence; every date change is recorded in `PhaseDateHistory` (old/new dates, who, why).
 - **Allocations** – phase × resource type × seniority × location × internal/vendor × quantity × estimated hours (per person; forecast = quantity × hours × rate). Seniority lives on the allocation, not the resource type.
@@ -108,7 +110,7 @@ See [`deploy/gcp/README.md`](deploy/gcp/README.md): Terraform for Cloud Run + Cl
 
 ## Authentication (non-development)
 
-Microsoft Entra ID via OpenID Connect (`Microsoft.Identity.Web`). Configure `AzureAd:TenantId`/`ClientId` (+ `ClientSecret` via user secrets or environment) and assign app roles named `Administrator`, `InitiativeOwner`, `Contributor`, `Viewer`, `FinancePmo` in the app registration.
+Microsoft Entra ID via OpenID Connect (`Microsoft.Identity.Web`) authenticates; the app authorizes. Configure `AzureAd:TenantId`/`ClientId` (+ `ClientSecret` via user secrets or environment). On every request `AppClaimsTransformation` (`Web/Authorization`) resolves the effective role through `UserAccessService` as the highest of: an Entra app role on the token (`Admin`/`User`/`Viewer`; legacy `Administrator`→Admin, `InitiativeOwner`/`Contributor`/`FinancePmo`→User), `Auth:BootstrapAdmins` (object IDs or e-mails; Terraform `bootstrap_admins`), and the user's **Active** `UserAccounts` row. The sign-in also upserts the row's object ID, display name, e-mail and last-seen time (a row pre-created by e-mail is linked to the object ID here). Results are cached for one minute per user (`AccessCache`, invalidated on admin changes). Authenticated users with no role are redirected by `AccessGateMiddleware` to `/Access`, where they can file an access request (a `Pending` row). Policies: `Admin`, `CanEdit` (Admin, User), `CanView` (all three); exports are `CanView`. Note that Entra roles and bootstrap entries override a pending/disabled row by design (they exist to guarantee someone can always get in), so revoke both when removing a person.
 
 ## Configuration keys
 

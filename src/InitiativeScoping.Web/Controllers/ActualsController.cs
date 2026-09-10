@@ -118,7 +118,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     // ----- Imports (Finance/PMO, Admin) -----
 
     [HttpGet("Actuals")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var imports = await db.ActualsImports.OrderByDescending(i => i.Id).Take(50).AsNoTracking().ToListAsync(ct);
@@ -127,7 +127,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     }
 
     [HttpGet("Actuals/Template")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     public IActionResult Template()
     {
         var sb = new StringBuilder();
@@ -138,7 +138,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     }
 
     [HttpPost("Actuals/Import")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     [RequestSizeLimit(MaxImportRequestBytes)]
     public async Task<IActionResult> Import(ActualsImportModel model, CancellationToken ct)
     {
@@ -175,7 +175,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     }
 
     [HttpGet("Actuals/Imports/{id:int}")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     public async Task<IActionResult> Details(int id, bool unmappedOnly, int page = 1, CancellationToken ct = default)
     {
         var import = await db.ActualsImports.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id, ct);
@@ -195,7 +195,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     }
 
     [HttpGet("Actuals/Unmapped")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     public async Task<IActionResult> Unmapped(int page = 1, CancellationToken ct = default)
     {
         var model = await BuildEntriesModel(db.ActualEntries.Where(e => e.IsUnmapped), page, ct);
@@ -203,7 +203,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     }
 
     [HttpPost("Actuals/Entries/{id:int}/Remap")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     public async Task<IActionResult> Remap(int id, int? initiativeId, int? personId, string? returnUrl, CancellationToken ct)
     {
         var entry = await db.ActualEntries.Include(e => e.ActualsImport).FirstOrDefaultAsync(e => e.Id == id, ct);
@@ -234,7 +234,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     }
 
     [HttpPost("Actuals/Entries/BulkRemap")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     public async Task<IActionResult> BulkRemap(int[] entryIds, int? initiativeId, int? personId, string? returnUrl, CancellationToken ct)
     {
         var ids = entryIds.Distinct().ToArray();
@@ -287,7 +287,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
     }
 
     [HttpPost("Actuals/Unmapped/ApplyMappings")]
-    [Authorize(Policy = AppPolicies.CanManageActuals)]
+    [Authorize(Policy = AppPolicies.Admin)]
     public async Task<IActionResult> ApplyMappings(string? returnUrl, CancellationToken ct)
     {
         var unmapped = await db.ActualEntries.Include(e => e.ActualsImport).Where(e => e.IsUnmapped).ToListAsync(ct);

@@ -28,14 +28,11 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Portfolio" asp-action="Index">Portfolio</a>
                         </li>
-                        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator) || User.IsInRole(InitiativeScoping.Application.AppRoles.FinancePmo))
+                        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Admin))
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Actuals" asp-action="Index">Actuals</a>
                             </li>
-                        }
-                        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
-                        {
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="Admin" asp-controller="BusinessUnits" asp-action="Index">Admin</a>
                             </li>
@@ -45,8 +42,15 @@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Audit" asp-action="Index">Audit</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="Admin" asp-controller="Users" asp-action="Index">Users</a>
+                            </li>
                         }
                     </ul>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <span class="navbar-text small text-muted">@User.Identity.Name</span>
+                    }
                 </div>
             </div>
         </nav>

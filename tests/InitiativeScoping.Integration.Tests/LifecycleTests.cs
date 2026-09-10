@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace InitiativeScoping.Integration.Tests;
 
-/// <summary>Dev user holds only InitiativeOwner (no Administrator).</summary>
+/// <summary>Dev user holds only the legacy InitiativeOwner Entra role, which maps to User (no Admin).</summary>
 public class OwnerOnlyFactory : WebAppFactory
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -118,7 +118,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         await PostFormAsync(client, details, $"/Initiatives/{id}/RequestRebaseline", new() { ["reason"] = "Added QA" });
         var html = await client.GetStringAsync(details);
         Assert.Contains("Re-baseline requested", html);
-        Assert.Contains("awaiting Administrator approval", html);
+        Assert.Contains("awaiting Admin approval", html);
 
         // Duplicate request refused; scope still locked while Pending.
         await PostFormAsync(client, details, $"/Initiatives/{id}/RequestRebaseline", new() { ["reason"] = "Again" });
