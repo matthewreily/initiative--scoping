@@ -39,16 +39,13 @@
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit</a>
-        @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator) || User.IsInRole(InitiativeScoping.Application.AppRoles.FinancePmo))
-        {
-            <div class="btn-group">
-                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="xlsx">Excel (.xlsx)</a></li>
-                    <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="csv">CSV</a></li>
-                </ul>
-            </div>
-        }
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="xlsx">Excel (.xlsx)</a></li>
+                <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="csv">CSV</a></li>
+            </ul>
+        </div>
         @if (Model.CanEdit)
         {
             <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@i.Id">Edit</a>
@@ -116,11 +113,11 @@ else
         }
         else if (open.Status == RebaselineStatus.Pending)
         {
-            <div class="small"><strong>Re-baseline requested</strong> by @open.RequestedBy on @open.RequestedAt.ToString("yyyy-MM-dd"): &ldquo;@open.Reason&rdquo; &mdash; awaiting Administrator approval.</div>
+            <div class="small"><strong>Re-baseline requested</strong> by @Users.Display(open.RequestedBy) on @open.RequestedAt.ToString("yyyy-MM-dd"): &ldquo;@open.Reason&rdquo; &mdash; awaiting Admin approval.</div>
         }
         else
         {
-            <div class="small"><strong>Re-baseline approved</strong> by @open.DecidedBy &mdash; scope is unlocked. Finalize to capture baseline v@(current?.Version + 1 ?? 1) and lock scope again.</div>
+            <div class="small"><strong>Re-baseline approved</strong> by @Users.Display(open.DecidedBy) &mdash; scope is unlocked. Finalize to capture baseline v@(current?.Version + 1 ?? 1) and lock scope again.</div>
         }
         @if (Model.CanManage || Model.CanApproveRebaseline)
         {
@@ -328,7 +325,7 @@ else
                 {
                     <span class="text-warning-emphasis">No vendors are defined; vendor-supplied allocations need one in Admin → Vendors.</span>
                 }
-                @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
+                @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Admin))
                 {
                     <a asp-area="Admin" asp-controller="RateCards" asp-action="Index">Manage rate cards</a>
                 }
@@ -652,7 +649,7 @@ else
             @foreach (var m in i.Members.OrderBy(m => m.Role).ThenBy(m => m.UserId))
             {
                 <tr>
-                    <td>@m.UserId</td>
+                    <td title="@m.UserId">@Users.Display(m.UserId)</td>
                     <td>@m.Role</td>
                     <td class="text-end">
                         @if (Model.CanManage)
@@ -672,8 +669,24 @@ else
         {
             <form asp-action="AddMember" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
                 <div class="col-6">
-                    <label for="userid" class="form-label small mb-0">User id</label>
-                    <input name="UserId" id="userid" class="form-control form-control-sm" placeholder="user id / object id" required />
+                    <label for="userid" class="form-label small mb-0">User</label>
+                    @{
+                        var knownUsers = Users.ActiveUsers().Where(u => i.Members.All(m => m.UserId != u.UserId)).ToList();
+                    }
+                    @if (knownUsers.Count > 0)
+                    {
+                        <select name="UserId" id="userid" class="form-select form-select-sm" required>
+                            <option value="">Choose a user…</option>
+                            @foreach (var u in knownUsers)
+                            {
+                                <option value="@u.UserId">@u.DisplayName (@u.Email)</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input name="UserId" id="userid" class="form-control form-control-sm" placeholder="user id / object id" required />
+                    }
                 </div>
                 <div class="col-4">
                     <label for="role" class="form-label small mb-0">Role</label>
@@ -750,6 +763,6 @@ else
                 <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add</button></div>
             </form>
         }
-        <p class="small text-muted mt-2">Created by @i.CreatedBy on @i.CreatedAt.ToString("yyyy-MM-dd")</p>
+        <p class="small text-muted mt-2">Created by @Users.Display(i.CreatedBy) on @i.CreatedAt.ToString("yyyy-MM-dd")</p>
     </div>
 </div>

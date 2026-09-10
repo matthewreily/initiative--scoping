@@ -1,7 +1,9 @@
 # Microsoft Entra ID setup
 
-The app authenticates users with Entra ID (OpenID Connect) and authorizes them with **app roles**
-(`Administrator`, `InitiativeOwner`, `Contributor`, `Viewer`, `FinancePmo`). Each environment
+The app authenticates users with Entra ID (OpenID Connect); authorization lives **in the app**
+(`Admin → Users`, see [HowTo.md](../../HowTo.md#getting-access)). Entra **app roles** (`Admin`, `User`,
+`Viewer`, plus the legacy `Administrator`/`InitiativeOwner`/`Contributor`/`FinancePmo`) are an optional
+override that still works for existing assignments. Each environment
 (`dev`, `prod`) gets its own app registration so client IDs/secrets are never shared.
 
 ## 1. Get a tenant (once)
@@ -34,8 +36,8 @@ deploy/entra/register-app.sh prod
 The script is idempotent and, per environment:
 
 - creates (or reuses) the single-tenant app registration `Initiative Scoping (<env>)` with ID tokens enabled;
-- defines the five app roles with fixed IDs (re-runs update in place);
-- creates the enterprise application, sets **assignment required**, and assigns *you* the `Administrator` role;
+- defines the app roles with fixed IDs (re-runs update in place; legacy roles are kept so existing assignments keep working);
+- creates the enterprise application with **assignment not required** (anyone in the tenant can sign in and request access) and assigns *you* the `Admin` role, and prints your object ID for `bootstrap_admins`;
 - creates a 1-year client secret and prints it **once**;
 - prints the `entra_tenant_id` / `entra_client_id` lines for `deploy/gcp/env/<env>.tfvars` and the `gcloud secrets versions add` command for the secret.
 
@@ -53,9 +55,13 @@ This adds `<url>/signin-oidc` as a redirect URI and `<url>/signout-callback-oidc
 
 ## 4. Grant access to other people
 
-Entra admin center → **Enterprise applications** → `Initiative Scoping (<env>)` → **Users and groups** →
-Add user/group → pick a role. Because assignment is required, unassigned users get an Entra error
-before ever reaching the app. Use groups for anything beyond a handful of people.
+In the app: they sign in, click **Request access**, and an Admin approves them under `Admin → Users`
+(or adds them by e-mail in advance). No Entra change is needed.
+
+To guarantee an Admin can always get in, list object IDs or e-mails in `bootstrap_admins`
+(`deploy/gcp/env/<env>.tfvars` → `Auth__BootstrapAdmins__N`). Entra app-role assignments
+(Enterprise applications → `Initiative Scoping (<env>)` → **Users and groups**) remain an override
+that wins over the in-app role, including for disabled accounts — remove both when revoking someone.
 
 ## Rotating the secret
 

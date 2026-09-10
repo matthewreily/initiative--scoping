@@ -1,0 +1,95 @@
+@using InitiativeScoping.Web.Areas.Admin.Controllers
+@model UsersIndexModel
+@{
+    ViewData["Title"] = "Users";
+    var roles = new[] { AppRole.Viewer, AppRole.User, AppRole.Admin };
+    string Badge(UserAccountStatus s) => s switch
+    {
+        UserAccountStatus.Active => "bg-success",
+        UserAccountStatus.Pending => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="h5 mb-0">Users @if (Model.Pending > 0) { <span class="badge bg-warning text-dark">@Model.Pending pending</span> }</h2>
+    <form method="get" class="d-flex gap-2">
+        <input type="search" name="q" value="@Model.Query" class="form-control form-control-sm" placeholder="Search name, e-mail or id" aria-label="Search users" />
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Search</button>
+        <a class="btn btn-primary btn-sm" asp-action="Create">Add user</a>
+    </form>
+</div>
+<p class="text-muted small">
+    Anyone in the tenant can sign in; only people listed here as <strong>Active</strong> can use the app.
+    <strong>Admin</strong> manages this area and approves re-baselines and actuals imports; <strong>User</strong> creates and edits initiatives they are a member of; <strong>Viewer</strong> is read-only (exports allowed).
+    Roles carried in an Entra token and configured bootstrap admins are honoured in addition to this list.
+</p>
+<div class="table-responsive">
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th>Name</th><th>E-mail</th><th>Role</th><th>Status</th><th>Last seen</th><th>Requested / decided</th><th data-nosort></th></tr></thead>
+    <tbody>
+    @foreach (var u in Model.Users)
+    {
+        var self = u.ObjectId is not null && string.Equals(u.ObjectId, Model.CurrentUserId, StringComparison.OrdinalIgnoreCase);
+        <tr data-status="@u.Status">
+            <td>
+                @u.DisplayName
+                @if (self) { <span class="badge bg-info text-dark">you</span> }
+                @if (u.ObjectId is null) { <span class="badge bg-light text-muted border" title="Row added by e-mail; linked at first sign-in">not yet signed in</span> }
+                @if (!string.IsNullOrWhiteSpace(u.Note)) { <div class="small text-muted">@u.Note</div> }
+            </td>
+            <td>@u.Email</td>
+            <td>
+                @if (u.Status == UserAccountStatus.Pending)
+                {
+                    <form asp-action="Approve" asp-route-id="@u.Id" method="post" class="d-flex gap-1">
+                        <select name="role" class="form-select form-select-sm" aria-label="Role for @u.DisplayName">
+                            @foreach (var r in roles) { <option value="@r" selected="@(r == AppRole.User)">@r</option> }
+                        </select>
+                        <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                    </form>
+                }
+                else
+                {
+                    <form asp-action="ChangeRole" asp-route-id="@u.Id" method="post" class="d-flex gap-1">
+                        <select name="role" class="form-select form-select-sm" aria-label="Role for @u.DisplayName" disabled="@self">
+                            @foreach (var r in roles) { <option value="@r" selected="@(r == u.Role)">@r</option> }
+                        </select>
+                        @if (!self) { <button type="submit" class="btn btn-outline-secondary btn-sm">Set</button> }
+                    </form>
+                }
+            </td>
+            <td><span class="badge @Badge(u.Status)">@u.Status</span></td>
+            <td data-sort-value="@u.LastSeenAt?.UtcTicks">@(u.LastSeenAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+            <td data-sort-value="@u.CreatedAt.UtcTicks" class="small">
+                @u.CreatedAt.ToString("yyyy-MM-dd")
+                @if (u.DecidedAt is not null) { <span class="text-muted">/ @u.DecidedAt.Value.ToString("yyyy-MM-dd")</span> }
+            </td>
+            <td class="text-end text-nowrap">
+                @if (u.Status == UserAccountStatus.Pending)
+                {
+                    <form asp-action="Reject" asp-route-id="@u.Id" method="post" class="d-inline"><button type="submit" class="btn btn-outline-danger btn-sm">Reject</button></form>
+                }
+                else if (u.Status == UserAccountStatus.Active && !self)
+                {
+                    <form asp-action="Disable" asp-route-id="@u.Id" method="post" class="d-inline"><button type="submit" class="btn btn-outline-warning btn-sm">Disable</button></form>
+                }
+                else if (u.Status == UserAccountStatus.Disabled)
+                {
+                    <form asp-action="Enable" asp-route-id="@u.Id" method="post" class="d-inline"><button type="submit" class="btn btn-outline-success btn-sm">Enable</button></form>
+                }
+                @if (!self)
+                {
+                    <form asp-action="Delete" asp-route-id="@u.Id" method="post" class="d-inline"><button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remove @u.Email?');">Remove</button></form>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Users.Count == 0)
+    {
+        <tr data-nosort><td colspan="7" class="text-muted">No users@(string.IsNullOrWhiteSpace(Model.Query) ? "" : " match the search").</td></tr>
+    }
+    </tbody>
+</table>
+</div>

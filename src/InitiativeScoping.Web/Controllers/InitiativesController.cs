@@ -62,14 +62,14 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         });
     }
 
-    [Authorize(Policy = AppPolicies.CanEditInitiatives)]
+    [Authorize(Policy = AppPolicies.CanEdit)]
     public async Task<IActionResult> Create(CancellationToken ct)
     {
         await PopulateEditLists(ct);
         return View("Edit", new InitiativeEditModel());
     }
 
-    [HttpPost, Authorize(Policy = AppPolicies.CanEditInitiatives)]
+    [HttpPost, Authorize(Policy = AppPolicies.CanEdit)]
     public async Task<IActionResult> Create(InitiativeEditModel model, CancellationToken ct)
     {
         await ValidateInitiative(model, ct);

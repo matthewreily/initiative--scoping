@@ -312,6 +312,13 @@ resource "google_cloud_run_v2_service" "web" {
         name  = "AzureAd__ClientId"
         value = var.entra_client_id
       }
+      dynamic "env" {
+        for_each = { for i, a in var.bootstrap_admins : i => a }
+        content {
+          name  = "Auth__BootstrapAdmins__${env.key}"
+          value = env.value
+        }
+      }
       env {
         name = "ConnectionStrings__Default"
         value_source {

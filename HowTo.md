@@ -4,19 +4,30 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 
 ## Roles at a glance
 
-| Task | Administrator | InitiativeOwner | Contributor | FinancePmo | Viewer |
-|------|:-:|:-:|:-:|:-:|:-:|
-| View initiatives, portfolio, variance | x | x | x | x | x |
-| Create initiatives / edit scope (phases, allocations) | x | x* | x* | | |
-| Activate, change status, request re-baseline | x | x* | | | |
-| Approve / reject re-baseline | x | | | | |
-| Manage BUs, resource types, rate cards, sizing, people | x | | | | |
-| Import actuals, review unmapped, add adjustments | x | | | x | |
-| Export CSV / XLSX | x | | | x | |
+Three application roles, granted in-app at `Admin → Users`:
 
-`*` also requires being a member of the initiative with the matching membership role (Owner or Contributor).
+| Task | Admin | User | Viewer |
+|------|:-:|:-:|:-:|
+| View initiatives, portfolio, variance, audit log | x | x | x |
+| Export CSV / XLSX | x | x | x |
+| Create initiatives / edit scope (phases, allocations, non-labor costs) | x | x* | |
+| Activate, change status, request re-baseline, manage members | x | x* | |
+| Record actual adjustments on an initiative | x | x* | |
+| Approve / reject re-baseline | x | | |
+| Manage BUs, resource types, rate cards, sizing, vendors, cost catalog, people, work calendar | x | | |
+| Import actuals, review unmapped rows | x | | |
+| Manage users and access requests | x | | |
 
-## 1. First-time setup (Administrator)
+`*` also requires being a member of the initiative with the matching membership role (Owner for status/members, Owner or Contributor for scope).
+
+### Getting access
+
+- Anyone in the Entra tenant can sign in. Someone without a role lands on **Request access**: submit the (optional) note and wait; the page shows *pending* until an Admin decides.
+- Admins see a pending count on `Admin → Users` and **Approve** (choosing Viewer/User/Admin) or **Reject**. They can also **Add user** by e-mail before that person has ever signed in (the row is linked to their Entra account at first sign-in), change roles, **Disable**/**Enable**, or remove. An Admin cannot demote, disable or remove their own account.
+- Sign-in also records each person's display name and e-mail, which is why members, *Created by*, *Requested/Decided by* and the audit log show names instead of object IDs, and why *Add member* offers a picker of known users.
+- Two overrides exist for bootstrapping and compatibility: accounts listed in `Auth:BootstrapAdmins` (object ID or e-mail; `bootstrap_admins` in the Terraform tfvars) are always Admin, and Entra **app roles** (`Admin`/`User`/`Viewer`, plus the legacy `Administrator`→Admin, `InitiativeOwner`/`Contributor`/`FinancePmo`→User) still apply and win when higher than the in-app role — including for pending or disabled accounts, so remove the Entra assignment too when revoking someone.
+
+## 1. First-time setup (Admin)
 
 1. **Business Units** – `Admin → Business Units`. Create one per cost centre/BU. Deactivate rather than delete once initiatives reference a BU.
 2. **Disciplines** – `Admin → Disciplines` (e.g. *Engineering*, *QA*, *Product*, *Design*). Every resource type must belong to exactly one discipline, so create these first. Deactivate a discipline to hide it from new resource types; it can only be deleted once no resource type references it.
@@ -96,4 +107,5 @@ Task-oriented walkthroughs. Architecture, configuration keys and operational not
 | Import rejected | The error lists the first 10 offending lines. Fix the file and re-upload; nothing was written. |
 | Rows imported as **unmapped** | Add a source mapping for the project id and/or a person with that external id, then assign in *Unmapped* or re-import. |
 | Local dev DB errors after pulling | Development uses SQLite with `EnsureCreated`; delete `src/InitiativeScoping.Web/initiative-scoping.dev.db*` and restart. |
-| 403 *Access denied* | Your Entra app role (or `Auth:Dev:Roles` locally) lacks the permission – see the roles table above. |
+| 403 *Access denied* | Your role (`Admin → Users`; `Auth:Dev:Roles` locally) lacks the permission – see the roles table above. |
+| Redirected to *Request access* | You have no role yet (or your account is disabled/pending). Request access and ask an Admin to approve it under `Admin → Users`. |

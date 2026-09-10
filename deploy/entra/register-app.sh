@@ -17,7 +17,12 @@ ENV="${1:?usage: register-app.sh <dev|prod> [app-base-url | --add-url url]}"
 shift
 [[ "$ENV" == dev || "$ENV" == prod ]] || { echo "env must be dev or prod, got '$ENV'" >&2; exit 1; }
 APP_NAME="Initiative Scoping (${ENV})"
-ROLES=(Administrator InitiativeOwner Contributor Viewer FinancePmo)
+# Positions are fixed (they derive the role ids). Current roles: Admin, User, Viewer. The legacy
+# Administrator/InitiativeOwner/Contributor/FinancePmo roles are kept (the app maps them to
+# Admin/User) so existing assignments keep working. Roles are optional overrides: access is
+# normally granted in-app at Admin -> Users.
+ROLES=(Administrator InitiativeOwner Contributor Viewer FinancePmo Admin User)
+LEGACY=(Administrator InitiativeOwner Contributor FinancePmo)
 
 command -v az >/dev/null || { echo "az CLI not found: https://learn.microsoft.com/cli/azure/install-azure-cli" >&2; exit 1; }
 command -v jq >/dev/null || { echo "jq not found" >&2; exit 1; }
@@ -67,9 +72,14 @@ BASE_URL="${1:-}"
 # Fixed ids so re-running the script updates roles in place instead of duplicating them.
 ROLES_JSON=$(i=0; for r in "${ROLES[@]}"; do
   i=$((i + 1))
-  jq -n --arg r "$r" --arg id "$(printf '5a1e0c00-0000-4000-8000-%012d' "$i")" '{
+  if [[ " ${LEGACY[*]} " == *" $r "* ]]; then
+    desc="Legacy $r role for Initiative Scoping (prefer Admin/User/Viewer or in-app access)"
+  else
+    desc="$r role for Initiative Scoping (overrides the in-app role)"
+  fi
+  jq -n --arg r "$r" --arg d "$desc" --arg id "$(printf '5a1e0c00-0000-4000-8000-%012d' "$i")" '{
     allowedMemberTypes: ["User"],
-    description: ($r + " role for Initiative Scoping"),
+    description: $d,
     displayName: $r,
     id: $id,
     isEnabled: true,
@@ -95,17 +105,18 @@ if [[ -n "$BASE_URL" ]]; then
     --body "$(jq -n --arg l "$(logout_uri "$BASE_URL")" '{web: {logoutUrl: $l}}')"
 fi
 
-# Service principal (Enterprise application) so users/groups can be assigned to roles;
-# require assignment so only assigned users can sign in.
+# Service principal (Enterprise application). Assignment is NOT required: anyone in the tenant can
+# sign in and request access, which an Admin approves in-app (Admin -> Users).
 SP_ID=$(az ad sp list --filter "appId eq '$APP_ID'" --query '[0].id' -o tsv)
 if [[ -z "$SP_ID" ]]; then
   SP_ID=$(az ad sp create --id "$APP_ID" --query id -o tsv)
 fi
-az ad sp update --id "$SP_ID" --set appRoleAssignmentRequired=true >/dev/null
+az ad sp update --id "$SP_ID" --set appRoleAssignmentRequired=false >/dev/null
 
-# Assign the signed-in user as Administrator so someone can get in on day one.
+# Assign the signed-in user as Admin so someone can get in on day one
+# (alternatively list them in Auth:BootstrapAdmins / bootstrap_admins).
 ME=$(az ad signed-in-user show --query id -o tsv)
-ADMIN_ROLE_ID=$(echo "$ROLES_JSON" | jq -r '.[] | select(.value=="Administrator") | .id')
+ADMIN_ROLE_ID=$(echo "$ROLES_JSON" | jq -r '.[] | select(.value=="Admin") | .id')
 ALREADY=$(az rest --method GET \
   --url "https://graph.microsoft.com/v1.0/servicePrincipals/$SP_ID/appRoleAssignedTo" \
   --query "value[?principalId=='$ME' && appRoleId=='$ADMIN_ROLE_ID'] | length(@)" -o tsv)
@@ -114,7 +125,7 @@ if [[ "$ALREADY" == "0" ]]; then
     --url "https://graph.microsoft.com/v1.0/servicePrincipals/$SP_ID/appRoleAssignedTo" \
     --body "$(jq -n --arg p "$ME" --arg r "$SP_ID" --arg a "$ADMIN_ROLE_ID" \
       '{principalId:$p, resourceId:$r, appRoleId:$a}')" >/dev/null
-  echo "Assigned you the Administrator role."
+  echo "Assigned you the Admin role."
 fi
 
 # Client secret (value is shown once; 12 months).
@@ -131,8 +142,9 @@ entra_client_id = "${APP_ID}"
 printf '%s' '${SECRET}' | gcloud secrets versions add \$(terraform -chdir=deploy/gcp output -raw oidc_client_secret_id) --data-file=-
 Then roll a new Cloud Run revision so running instances pick it up (see deploy/gcp/README.md).
 
-Assign more users/groups to roles:
-  Entra admin center -> Enterprise applications -> "${APP_NAME}" -> Users and groups
+Grant access to other people in the app: Admin -> Users (approve requests or add by e-mail).
+Entra app roles (Enterprise applications -> "${APP_NAME}" -> Users and groups) remain an optional override.
+Your object id (for bootstrap_admins in tfvars): ${ME}
 EOF
 if [[ -z "$BASE_URL" ]]; then
   echo

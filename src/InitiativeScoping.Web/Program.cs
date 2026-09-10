@@ -98,6 +98,7 @@ app.UseStaticFiles();
 app.UseSerilogRequestLogging();
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<AccessGateMiddleware>();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health").AllowAnonymous();

@@ -56,6 +56,12 @@ variable "entra_client_id" {
   type = string
 }
 
+variable "bootstrap_admins" {
+  description = "Entra object IDs or e-mails that are always Admin in the app (Auth:BootstrapAdmins), so the first admin can sign in before any access rows exist."
+  type        = list(string)
+  default     = []
+}
+
 variable "github_repository" {
   type        = string
   description = "owner/repo allowed to deploy via Workload Identity Federation."

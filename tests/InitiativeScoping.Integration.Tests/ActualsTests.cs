@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace InitiativeScoping.Integration.Tests;
 
-/// <summary>Dev user holds only FinancePmo.</summary>
+/// <summary>Dev user holds only the legacy FinancePmo Entra role, which maps to User.</summary>
 public class FinanceOnlyFactory : WebAppFactory
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -303,18 +303,16 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     }
 
     [Fact]
-    public async Task Finance_can_import_but_not_admin_people_and_viewer_sees_nothing_writable()
+    public async Task Legacy_finance_role_is_a_user_who_cannot_import_and_viewer_sees_nothing_writable()
     {
         await using var finance = new FinanceOnlyFactory();
         var fin = finance.CreateClient(NoRedirect);
-        (await fin.GetAsync("/Actuals")).EnsureSuccessStatusCode();
-        (await fin.GetAsync("/Actuals/Unmapped")).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden, (await fin.GetAsync("/Actuals")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await fin.GetAsync("/Actuals/Unmapped")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await fin.GetAsync("/Admin/People")).StatusCode);
-        var tag = Guid.NewGuid().ToString("N")[..8];
-        var importId = await ImportAsync(fin, Header + $"X-{tag},Y,2026-03-10,1,,{tag}\n");
-        Assert.NotNull(importId);
+        (await fin.GetAsync("/Initiatives/Create")).EnsureSuccessStatusCode();
         var nav = await fin.GetStringAsync("/");
-        Assert.Contains("/Actuals", nav);
+        Assert.DoesNotContain("/Actuals", nav);
         Assert.DoesNotContain("/Admin/", nav);
 
         await using var viewerFactory = new ViewerOnlyFactory();

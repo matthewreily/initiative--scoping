@@ -38,7 +38,7 @@ values marked *Terraform output* can be re-derived with `terraform -chdir=deploy
 |---|---|
 | Tenant | `f0f37d2f-1252-4242-8058-8b307b86b0b5` |
 | App registration `Initiative Scoping (dev)` (client `488767c9-e55d-441f-962c-816cbc1f40fc`) | <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/488767c9-e55d-441f-962c-816cbc1f40fc> |
-| Assign users/groups to app roles | Entra admin center → Enterprise applications → *Initiative Scoping (dev)* → Users and groups |
+| Grant access (approve requests, roles) | In-app: Admin → Users. Entra app roles (Enterprise applications → *Initiative Scoping (dev)* → Users and groups) remain an optional override |
 | Script | `deploy/entra/register-app.sh dev` |
 
 ## prod

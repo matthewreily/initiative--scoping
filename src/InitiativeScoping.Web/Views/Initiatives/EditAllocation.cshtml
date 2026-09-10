@@ -19,7 +19,7 @@
     {
         <span class="text-warning-emphasis">No published rate card has any rates yet — allocations will be unpriced until an admin adds rates.</span>
     }
-    @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Administrator))
+    @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Admin))
     {
         <a asp-area="Admin" asp-controller="RateCards" asp-action="Index">Manage rate cards</a>
     }

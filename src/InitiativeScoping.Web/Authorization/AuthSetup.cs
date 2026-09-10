@@ -25,7 +25,8 @@ public static class AuthSetup
                 {
                     o.UserId = config["Auth:Dev:UserId"] ?? "dev-user";
                     o.DisplayName = config["Auth:Dev:DisplayName"] ?? "Dev User";
-                    o.Roles = config.GetSection("Auth:Dev:Roles").Get<string[]>() ?? AppRoles.All;
+                    o.Email = config["Auth:Dev:Email"];
+                    o.Roles = config.GetSection("Auth:Dev:Roles").Get<string[]>() ?? [AppRoles.Admin];
                 });
         }
         else
@@ -36,14 +37,15 @@ public static class AuthSetup
         }
 
         services.AddAuthorizationBuilder()
-            .AddPolicy(AppPolicies.Admin, p => p.RequireRole(AppRoles.Administrator))
-            .AddPolicy(AppPolicies.CanEditInitiatives, p => p.RequireRole(AppRoles.Administrator, AppRoles.InitiativeOwner, AppRoles.Contributor))
+            .AddPolicy(AppPolicies.Admin, p => p.RequireRole(AppRoles.Admin))
+            .AddPolicy(AppPolicies.CanEdit, p => p.RequireRole(AppRoles.Admin, AppRoles.User))
             .AddPolicy(AppPolicies.CanView, p => p.RequireRole(AppRoles.All))
-            .AddPolicy(AppPolicies.CanExport, p => p.RequireRole(AppRoles.Administrator, AppRoles.FinancePmo))
-            .AddPolicy(AppPolicies.CanManageActuals, p => p.RequireRole(AppRoles.Administrator, AppRoles.FinancePmo))
             .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
+        services.AddMemoryCache();
         services.AddHttpContextAccessor();
+        services.AddSingleton<AccessCache>();
+        services.AddScoped<IClaimsTransformation, AppClaimsTransformation>();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         return services;
     }
@@ -53,6 +55,7 @@ public class DevAuthOptions : AuthenticationSchemeOptions
 {
     public string UserId { get; set; } = "dev-user";
     public string DisplayName { get; set; } = "Dev User";
+    public string? Email { get; set; }
     public string[] Roles { get; set; } = [];
 }
 
@@ -67,6 +70,11 @@ public class DevAuthHandler(IOptionsMonitor<DevAuthOptions> options, ILoggerFact
             new(ClaimTypes.NameIdentifier, Options.UserId),
             new(ClaimTypes.Name, Options.DisplayName)
         };
+        if (!string.IsNullOrWhiteSpace(Options.Email))
+        {
+            claims.Add(new Claim(ClaimTypes.Email, Options.Email));
+        }
+
         claims.AddRange(Options.Roles.Select(r => new Claim(ClaimTypes.Role, r)));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme.Name));
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name)));
@@ -77,12 +85,32 @@ public class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUser
 {
     private ClaimsPrincipal? User => accessor.HttpContext?.User;
 
-    public string UserId =>
-        User?.FindFirstValue(ClaimConstants.ObjectId)
-        ?? User?.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? "anonymous";
+    public string UserId => User is null ? "anonymous" : PrincipalClaims.ObjectId(User);
 
-    public string DisplayName => User?.Identity?.Name ?? User?.FindFirstValue("name") ?? "Anonymous";
+    public string DisplayName => User is null ? "Anonymous" : PrincipalClaims.DisplayName(User);
 
     public bool IsInRole(string role) => User?.IsInRole(role) ?? false;
+}
+
+/// <summary>Reads the identity claims the app relies on, tolerant of the different claim names Entra and the dev scheme emit.</summary>
+public static class PrincipalClaims
+{
+    public static string ObjectId(ClaimsPrincipal user) =>
+        user.FindFirstValue(ClaimConstants.ObjectId)
+        ?? user.FindFirstValue(ClaimConstants.Oid)
+        ?? user.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? "anonymous";
+
+    public static string DisplayName(ClaimsPrincipal user) =>
+        user.Identity?.Name ?? user.FindFirstValue("name") ?? user.FindFirstValue(ClaimTypes.Name) ?? "Anonymous";
+
+    public static string? Email(ClaimsPrincipal user)
+    {
+        var value = user.FindFirstValue(ClaimConstants.PreferredUserName)
+            ?? user.FindFirstValue(ClaimTypes.Email)
+            ?? user.FindFirstValue("email")
+            ?? user.FindFirstValue(ClaimTypes.Upn)
+            ?? user.FindFirstValue("upn");
+        return string.IsNullOrWhiteSpace(value) || !value.Contains('@') ? null : value.Trim();
+    }
 }

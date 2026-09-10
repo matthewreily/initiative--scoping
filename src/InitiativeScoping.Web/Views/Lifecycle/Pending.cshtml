@@ -18,7 +18,7 @@ else
         {
             <tr>
                 <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@r.InitiativeId">@r.Initiative?.Name</a></td>
-                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @r.RequestedBy</td>
+                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @Users.Display(r.RequestedBy)</td>
                 <td>@r.Reason</td>
                 <td class="text-end">
                     <form asp-action="DecideRebaseline" asp-route-id="@r.InitiativeId" method="post" class="d-flex gap-2 justify-content-end">

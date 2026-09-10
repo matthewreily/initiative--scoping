@@ -1,0 +1,36 @@
+@using InitiativeScoping.Web.Controllers
+@model AccessViewModel
+@{
+    ViewData["Title"] = "Access";
+}
+<div class="col-md-7">
+    <h1 class="h3">Access to Initiative Scoping</h1>
+    @if (TempData["Success"] is string ok)
+    {
+        <div class="alert alert-success">@ok</div>
+    }
+    <p>You are signed in as <strong>@Model.DisplayName</strong>@if (Model.Email is not null) { <text> (@Model.Email)</text> }.</p>
+
+    @if (Model.Account is null)
+    {
+        <div class="alert alert-warning">Your account has not been granted access yet.</div>
+        <form asp-action="Submit" method="post">
+            <div class="mb-3">
+                <label for="note" class="form-label">Tell the administrators why you need access (optional)</label>
+                <textarea id="note" name="Note" class="form-control" rows="3" maxlength="1000"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Request access</button>
+        </form>
+    }
+    else if (Model.Account.Status == UserAccountStatus.Pending)
+    {
+        <div class="alert alert-info">
+            Your access request from <strong>@Model.Account.CreatedAt.ToString("yyyy-MM-dd")</strong> is waiting for an administrator to approve it.
+            Refresh this page once you have been told it was approved.
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-secondary">Your account is <strong>disabled</strong>. Contact an administrator if you believe this is a mistake.</div>
+    }
+</div>

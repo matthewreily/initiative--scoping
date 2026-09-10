@@ -121,7 +121,7 @@
     {
         <tr>
             <td class="small">@a.CreatedAt.ToString("yyyy-MM-dd")</td>
-            <td class="small">@a.CreatedBy</td>
+            <td class="small" title="@a.CreatedBy">@Users.Display(a.CreatedBy)</td>
             <td>@VarianceCalculator.CategoryLabel(a.Category)</td>
             <td>@a.Reason</td>
             <td class="text-end">@Signed(a.Hours, "N1")</td>
