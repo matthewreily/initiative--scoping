@@ -64,13 +64,14 @@ public class UserAccessService(AppDbContext db, IUserDirectory directory, TimePr
                 DecidedBy = bootstrap ? "bootstrap" : "entra-role",
                 Note = bootstrap ? "Bootstrap admin (Auth:BootstrapAdmins)." : "Created from Entra app role at first sign-in."
             };
-            db.UserAccounts.Add(account);
-            changed = true;
+            account = await InsertOrReloadAsync(account, user, ct);
+            directory.Invalidate();
         }
         else
         {
             if (account.ObjectId is null)
             {
+                await RelinkMembershipsAsync(account.Email, user.ObjectId, ct);
                 account.ObjectId = user.ObjectId;
                 changed = true;
             }
@@ -97,7 +98,17 @@ public class UserAccessService(AppDbContext db, IUserDirectory directory, TimePr
 
         if (changed)
         {
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Another request linked/updated the same row first; its values are as good as ours.
+                db.ChangeTracker.Clear();
+                account = await FindAsync(user, ct) ?? account;
+            }
+
             directory.Invalidate();
         }
 
@@ -132,8 +143,7 @@ public class UserAccessService(AppDbContext db, IUserDirectory directory, TimePr
             LastSeenAt = clock.GetUtcNow(),
             Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
         };
-        db.UserAccounts.Add(account);
-        await db.SaveChangesAsync(ct);
+        account = await InsertOrReloadAsync(account, user, ct);
         directory.Invalidate();
         return account;
     }
@@ -142,6 +152,55 @@ public class UserAccessService(AppDbContext db, IUserDirectory directory, TimePr
         db.UserAccounts.FirstOrDefaultAsync(
             a => a.ObjectId == user.ObjectId || (a.ObjectId == null && user.Email != null && a.Email == user.Email),
             ct);
+
+    /// <summary>Inserts the row; if a concurrent request created it first (unique ObjectId/Email), returns that row instead.</summary>
+    private async Task<UserAccount> InsertOrReloadAsync(UserAccount account, SignedInUser user, CancellationToken ct)
+    {
+        db.UserAccounts.Add(account);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return account;
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            var winner = await FindAsync(user, ct);
+            if (winner is null)
+            {
+                throw;
+            }
+
+            return winner;
+        }
+    }
+
+    /// <summary>
+    /// A row added by an Admin before first sign-in is keyed by e-mail in the member picker; once the object id is
+    /// known, memberships stored under the e-mail are moved to it so <c>InitiativeAccess</c> matches the signed-in user.
+    /// </summary>
+    private async Task RelinkMembershipsAsync(string email, string objectId, CancellationToken ct)
+    {
+        var members = await db.InitiativeMembers.Where(m => m.UserId == email).ToListAsync(ct);
+        if (members.Count == 0)
+        {
+            return;
+        }
+
+        var initiativeIds = members.Select(m => m.InitiativeId).ToList();
+        var already = await db.InitiativeMembers
+            .Where(m => m.UserId == objectId && initiativeIds.Contains(m.InitiativeId))
+            .Select(m => m.InitiativeId)
+            .ToListAsync(ct);
+        foreach (var m in members)
+        {
+            db.InitiativeMembers.Remove(m);
+            if (!already.Contains(m.InitiativeId))
+            {
+                db.InitiativeMembers.Add(new InitiativeMember { InitiativeId = m.InitiativeId, UserId = objectId, Role = m.Role });
+            }
+        }
+    }
 
     public bool IsBootstrapAdmin(SignedInUser user) =>
         options.Value.BootstrapAdmins.Any(b =>

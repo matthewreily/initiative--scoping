@@ -106,16 +106,33 @@ public class UserAccessTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     public async Task Row_added_by_email_is_linked_to_object_id_at_first_sign_in()
     {
         await using var f = new NoRoleFactory();
-        await Seed(f, new UserAccount { ObjectId = null, Email = "NO.ROLE@example.com", DisplayName = "Pre-added", Role = AppRole.Viewer, Status = UserAccountStatus.Active });
+        await Seed(f, new UserAccount { ObjectId = null, Email = "NO.ROLE@example.com", DisplayName = "Pre-added", Role = AppRole.User, Status = UserAccountStatus.Active });
+        int initiativeId;
+        using (var seed = f.Services.CreateScope())
+        {
+            // Admin made the pre-added user an Owner via the member picker, which stores the e-mail key until sign-in.
+            var db = seed.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bu = await db.BusinessUnits.FirstAsync();
+            var initiative = new Initiative { Name = "Pre-linked", BusinessUnit = bu, CreatedBy = "admin", TargetStart = new DateOnly(2027, 1, 1) };
+            initiative.Members.Add(new InitiativeMember { UserId = "NO.ROLE@example.com", Role = InitiativeMemberRole.Owner });
+            db.Initiatives.Add(initiative);
+            await db.SaveChangesAsync();
+            initiativeId = initiative.Id;
+        }
+
         var client = f.CreateClient(NoRedirect);
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/Portfolio")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Initiatives/Create")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Admin/Users")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/Initiatives/Edit/{initiativeId}")).StatusCode);
 
         using var scope = f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var row = await db.UserAccounts.SingleAsync();
+        var verify = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await verify.UserAccounts.SingleAsync();
         Assert.Equal("no-role-user", row.ObjectId);
+        var member = await verify.InitiativeMembers.SingleAsync(m => m.InitiativeId == initiativeId);
+        Assert.Equal("no-role-user", member.UserId);
+        Assert.Equal(InitiativeMemberRole.Owner, member.Role);
     }
 
     [Fact]

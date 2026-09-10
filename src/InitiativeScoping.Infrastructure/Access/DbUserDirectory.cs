@@ -72,6 +72,7 @@ public class DbUserDirectory(IServiceScopeFactory scopes, TimeProvider clock) : 
         {
             var summary = new UserSummary(r.ObjectId ?? r.Email, r.DisplayName, r.Email);
             byId[summary.UserId] = summary;
+            byId.TryAdd(r.Email, summary);
             if (r.Status == UserAccountStatus.Active)
             {
                 active.Add(summary);
