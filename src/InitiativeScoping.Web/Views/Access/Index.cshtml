@@ -14,7 +14,7 @@
     @if (Model.Account is null)
     {
         <div class="alert alert-warning">Your account has not been granted access yet.</div>
-        <form asp-action="Request" method="post">
+        <form asp-action="Submit" method="post">
             <div class="mb-3">
                 <label for="note" class="form-label">Tell the administrators why you need access (optional)</label>
                 <textarea id="note" name="Note" class="form-control" rows="3" maxlength="1000"></textarea>

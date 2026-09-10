@@ -25,8 +25,8 @@ public class AccessController(UserAccessService access, AccessCache accessCache)
         return View(new AccessViewModel { DisplayName = PrincipalClaims.DisplayName(User), Email = PrincipalClaims.Email(User), Account = account });
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Request(AccessRequestModel model, CancellationToken ct)
+    [HttpPost("/Access/Request")]
+    public async Task<IActionResult> Submit(AccessRequestModel model, CancellationToken ct)
     {
         if (AppRoles.All.Any(User.IsInRole))
         {
