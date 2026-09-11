@@ -184,6 +184,40 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task People_edit_redisplay_keeps_the_submitted_inactive_level()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var name = $"Retired ({Guid.NewGuid():N})";
+        int personId, levelId, resourceTypeId, businessUnitId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var level = new SeniorityLevel { Name = name, SortOrder = 50, IsActive = false };
+            db.SeniorityLevels.Add(level);
+            resourceTypeId = await db.ResourceTypes.Select(t => t.Id).FirstAsync();
+            businessUnitId = await db.BusinessUnits.Select(b => b.Id).FirstAsync();
+            var person = new Person
+            {
+                DisplayName = $"P {Guid.NewGuid():N}"[..20], ResourceTypeId = resourceTypeId, BusinessUnitId = businessUnitId,
+                SeniorityId = await db.SeniorityLevels.Where(s => s.IsActive).Select(s => s.Id).FirstAsync(), Location = "Onshore",
+                ResourcingClass = ResourcingClass.InternalFte
+            };
+            db.People.Add(person);
+            await db.SaveChangesAsync();
+            personId = person.Id;
+            levelId = level.Id;
+        }
+
+        var response = await PostFormAsync(client, $"/Admin/People/Edit/{personId}", $"/Admin/People/Edit/{personId}", new()
+        {
+            ["Id"] = personId.ToString(), ["DisplayName"] = "", ["ResourceTypeId"] = resourceTypeId.ToString(), ["BusinessUnitId"] = businessUnitId.ToString(),
+            ["SeniorityId"] = levelId.ToString(), ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["IsActive"] = "true"
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(name + " (inactive)", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Allocation_form_lists_catalog_levels_and_rejects_unknown_ids()
     {
         var client = factory.CreateClient(NoRedirect);
