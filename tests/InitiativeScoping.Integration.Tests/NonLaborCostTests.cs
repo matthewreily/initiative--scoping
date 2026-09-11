@@ -353,7 +353,7 @@ public class NonLaborCostTests(WebAppFactory factory) : IClassFixture<WebAppFact
         // Seeded rate: Senior internal Onshore = 120/h; 2 x 100h = 24,000.
         var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);

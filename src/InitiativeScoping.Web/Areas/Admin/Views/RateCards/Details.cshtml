@@ -73,7 +73,7 @@ else if (card.Status == RateCardStatus.Retired)
                         <td><input type="checkbox" class="form-check-input" name="entryIds" value="@e.Id" data-bulk-item aria-label="Select entry" /></td>
                     }
                     <td>@e.ResourceType!.Name</td>
-                    <td>@e.Seniority</td>
+                    <td data-sort="@e.Seniority!.SortOrder">@e.Seniority.Name</td>
                     <td>@e.Location</td>
                     <td>@(e.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
                     <td>@(e.ResourcingClass == ResourcingClass.Vendor ? e.Vendor?.Name ?? "(any vendor)" : "—")</td>
@@ -133,8 +133,8 @@ else if (card.Status == RateCardStatus.Retired)
                         </div>
                         <div class="row g-2 mb-2">
                             <div class="col">
-                                <label asp-for="NewEntry.Seniority" class="form-label small"></label>
-                                <select asp-for="NewEntry.Seniority" asp-items="Html.GetEnumSelectList<Seniority>()" class="form-select form-select-sm" name="Seniority"></select>
+                                <label asp-for="NewEntry.SeniorityId" class="form-label small"></label>
+                                <select asp-for="NewEntry.SeniorityId" asp-items="Model.Seniorities" class="form-select form-select-sm" name="SeniorityId"></select>
                             </div>
                             <div class="col">
                                 <label asp-for="NewEntry.ResourcingClass" class="form-label small"></label>
@@ -187,7 +187,7 @@ else if (card.Status == RateCardStatus.Retired)
                         <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
                         <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
                     </form>
-                    <p class="text-muted small mt-2 mb-0">Columns: ResourceType, Seniority, Location, ResourcingClass (Internal/Vendor), HourlyRate, Vendor (optional; names a catalog vendor for Vendor rows, blank = generic vendor rate). Rates apply to every business unit; a legacy BusinessUnit column is ignored. The whole file is rejected if any row is invalid.</p>
+                    <p class="text-muted small mt-2 mb-0">Columns: ResourceType, Seniority (any name; new names are added to Admin → Seniority), Location, ResourcingClass (Internal/Vendor), HourlyRate, Vendor (optional; names a catalog vendor for Vendor rows, blank = generic vendor rate). Rates apply to every business unit; a legacy BusinessUnit column is ignored. The whole file is rejected if any row is invalid.</p>
                 </div>
             </div>
         </div>

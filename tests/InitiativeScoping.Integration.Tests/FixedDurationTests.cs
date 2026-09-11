@@ -93,7 +93,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
 
         var noPercent = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, noPercent.StatusCode);
@@ -101,7 +101,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
 
         var half = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["AllocationPercent"] = "50", ["EstimatedHours"] = "999"
         });
         Assert.Equal(HttpStatusCode.Redirect, half.StatusCode);
@@ -169,7 +169,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
 
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = discoveryId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Mid),
+            ["PhaseId"] = discoveryId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "2",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["AllocationPercent"] = "100"
         });
 
@@ -329,7 +329,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
 
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Mid),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "2",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["AllocationPercent"] = "100"
         });
 

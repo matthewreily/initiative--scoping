@@ -46,7 +46,7 @@ public static class ForecastCalculator
         {
             var asOf = phases.TryGetValue(a.PhaseId, out var phase) ? phase.PlannedStart : initiative.TargetStart;
             var rate = RateResolver.Resolve(rateCards,
-                new RateKey(a.ResourceTypeId, a.Seniority, a.Location, a.ResourcingClass, a.VendorId),
+                new RateKey(a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId),
                 asOf);
             return new ForecastLine(a, a.Quantity * a.EstimatedHours, rate);
         }).ToList();

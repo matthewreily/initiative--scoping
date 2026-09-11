@@ -13,7 +13,7 @@ public class PortfolioCalculatorTests
     private static RateCard Card() => new()
     {
         Id = 1, Name = "c", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m }]
     };
 
     private static Initiative Initiative(int id, string bu, InitiativeStatus status, ResourcingClass cls = ResourcingClass.InternalFte, decimal? baselineCost = null, decimal? threshold = null)
@@ -24,7 +24,7 @@ public class PortfolioCalculatorTests
             TargetStart = new DateOnly(2026, 3, 1), CreatedBy = "u", VarianceThresholdPct = threshold
         };
         i.Phases.Add(new Phase { Id = id * 10, InitiativeId = id, Name = "Build", Sequence = 1, PlannedStart = new DateOnly(2026, 3, 1), PlannedEnd = new DateOnly(2026, 3, 31) });
-        i.Allocations.Add(new InitiativeAllocation { Id = id * 100, InitiativeId = id, PhaseId = id * 10, BusinessUnitId = 1, BusinessUnit = i.BusinessUnit, ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = cls, Quantity = 1, EstimatedHours = 100m });
+        i.Allocations.Add(new InitiativeAllocation { Id = id * 100, InitiativeId = id, PhaseId = id * 10, BusinessUnitId = 1, BusinessUnit = i.BusinessUnit, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = cls, Quantity = 1, EstimatedHours = 100m });
         if (baselineCost is not null)
         {
             i.Baselines.Add(new ForecastBaseline

@@ -112,7 +112,8 @@ public class InitiativeAllocation
     public BusinessUnit? BusinessUnit { get; set; }
     public int ResourceTypeId { get; set; }
     public ResourceType? ResourceType { get; set; }
-    public Seniority Seniority { get; set; }
+    public int SeniorityId { get; set; }
+    public SeniorityLevel? Seniority { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
     public int? VendorId { get; set; }
@@ -193,7 +194,7 @@ public class ForecastBaselineLine
     public int PhaseId { get; set; }
     public int BusinessUnitId { get; set; }
     public int ResourceTypeId { get; set; }
-    public Seniority Seniority { get; set; }
+    public int SeniorityId { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
     public int? VendorId { get; set; }

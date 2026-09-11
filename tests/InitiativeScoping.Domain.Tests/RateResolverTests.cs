@@ -8,7 +8,7 @@ public class RateResolverTests
 {
     private static RateCardEntry Entry(int typeId = 1, string location = "Onshore", decimal rate = 100m) => new()
     {
-        ResourceTypeId = typeId, Seniority = Seniority.Senior, Location = location,
+        ResourceTypeId = typeId, SeniorityId = 3, Location = location,
         ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate
     };
 
@@ -54,7 +54,7 @@ public class RateResolverTests
     [Fact]
     public void Rates_do_not_depend_on_a_business_unit()
     {
-        var key = new RateKey(1, Seniority.Senior, "Onshore", ResourcingClass.InternalFte);
+        var key = new RateKey(1, 3, "Onshore", ResourcingClass.InternalFte);
         Assert.Equal(100m, RateResolver.Resolve(Cards, key, new DateOnly(2026, 6, 1)));
         Assert.Null(RateResolver.Resolve(Cards, key with { ResourceTypeId = 3 }, new DateOnly(2026, 6, 1)));
         Assert.Null(RateResolver.Resolve(Cards, key with { Location = "Offshore" }, new DateOnly(2026, 6, 1)));
@@ -65,7 +65,7 @@ public class VendorRateResolverTests
 {
     private static RateCardEntry Vendor(int? vendorId, decimal rate) => new()
     {
-        ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore",
+        ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
         ResourcingClass = ResourcingClass.Vendor, VendorId = vendorId, HourlyRate = rate
     };
 
@@ -76,13 +76,13 @@ public class VendorRateResolverTests
             Id = 1, Name = "2026", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
             Entries =
             [
-                new() { ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 80m },
+                new() { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 80m },
                 Vendor(null, 100m), Vendor(10, 120m), Vendor(20, 150m)
             ]
         }
     ];
 
-    private static RateKey Key(ResourcingClass cls, int? vendorId) => new(1, Seniority.Senior, "Onshore", cls, vendorId);
+    private static RateKey Key(ResourcingClass cls, int? vendorId) => new(1, 3, "Onshore", cls, vendorId);
 
     [Fact]
     public void Vendor_specific_rate_beats_generic_vendor_rate()

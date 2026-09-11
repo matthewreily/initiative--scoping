@@ -11,7 +11,8 @@ public class Person
     public bool IsActive { get; set; } = true;
     public int ResourceTypeId { get; set; }
     public ResourceType? ResourceType { get; set; }
-    public Seniority Seniority { get; set; }
+    public int SeniorityId { get; set; }
+    public SeniorityLevel? Seniority { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
     public int? VendorId { get; set; }

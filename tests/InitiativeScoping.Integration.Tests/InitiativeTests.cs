@@ -128,7 +128,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
         var addAllocation = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, addAllocation.StatusCode);
@@ -150,7 +150,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
 
@@ -187,7 +187,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
         var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);
@@ -207,7 +207,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         int allocationId;
@@ -225,7 +225,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
 
         var rejected = await PostFormAsync(client, edit, edit, new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);
@@ -233,7 +233,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
 
         var unchanged = await PostFormAsync(client, edit, edit, new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "3", ["EstimatedHours"] = "10"
         });
         Assert.Equal(HttpStatusCode.Redirect, unchanged.StatusCode);
@@ -270,7 +270,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
             var allocation = new InitiativeAllocation
             {
                 InitiativeId = id, PhaseId = phaseId, BusinessUnitId = await SeededBusinessUnitIdAsync(), ResourceTypeId = typeId,
-                Seniority = Seniority.Senior, Location = "Offshore", ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 10m
+                SeniorityId = 3, Location = "Offshore", ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 10m
             };
             db.InitiativeAllocations.Add(allocation);
             await db.SaveChangesAsync();
@@ -280,7 +280,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         var edit = $"/Initiatives/EditAllocation/{allocationId}";
         var moved = await PostFormAsync(client, edit, edit, new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = partnerId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = partnerId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         Assert.True(moved.StatusCode == HttpStatusCode.Redirect, await moved.Content.ReadAsStringAsync());
@@ -323,7 +323,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
 
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Mid),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "2",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.Vendor), ["VendorId"] = vendorId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         await PostFormAsync(client, details, $"/Initiatives/DeletePhase/{phaseId}", new());

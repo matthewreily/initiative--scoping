@@ -68,13 +68,13 @@ public class ActualsCostingTests
     private static Person Jane(string? ids = "PV-42;jane@x.com") => new()
     {
         Id = 1, DisplayName = "Jane", ExternalIds = ids, ResourceTypeId = 1, BusinessUnitId = 1,
-        Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte
+        SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte
     };
 
     private static RateCard Card(DateOnly effective, decimal rate) => new()
     {
         Id = (int)rate, Name = "c", EffectiveStart = effective, Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
     };
 
     private static ActualEntry Entry(DateOnly date, decimal hours = 8m) => new() { ExternalProjectId = "P", SourceReference = "r", WorkDate = date, Hours = hours };

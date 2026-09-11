@@ -41,7 +41,7 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             var card = await db.RateCards.FirstAsync(c => c.Status == RateCardStatus.Published);
             db.RateCardEntries.Add(new RateCardEntry
             {
-                RateCardId = card.Id, ResourceTypeId = type.Id, Seniority = Seniority.Associate,
+                RateCardId = card.Id, ResourceTypeId = type.Id, SeniorityId = 1,
                 Location = "Nearshore", ResourcingClass = ResourcingClass.Vendor, VendorId = vendorId, HourlyRate = 55m
             });
             await db.SaveChangesAsync();
@@ -92,7 +92,7 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
         Dictionary<string, string> Allocation(int bu, ResourcingClass cls, int? vendor) => new()
         {
             ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = bu.ToString(), ["ResourceTypeId"] = typeId.ToString(),
-            ["Seniority"] = nameof(Seniority.Senior), ["Location"] = "Onshore", ["ResourcingClass"] = cls.ToString(),
+            ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClass"] = cls.ToString(),
             ["VendorId"] = vendor?.ToString() ?? string.Empty, ["Quantity"] = "1", ["EstimatedHours"] = "10"
         };
 
@@ -175,7 +175,7 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
 
         RateCardEntry Entry(ResourcingClass cls, Vendor? vendor, decimal rate) => new()
         {
-            ResourceType = type, Seniority = Seniority.Senior, Location = "Onshore", ResourcingClass = cls, Vendor = vendor, HourlyRate = rate
+            ResourceType = type, SeniorityId = 3, Location = "Onshore", ResourcingClass = cls, Vendor = vendor, HourlyRate = rate
         };
 
         db.RateCards.Add(new RateCard

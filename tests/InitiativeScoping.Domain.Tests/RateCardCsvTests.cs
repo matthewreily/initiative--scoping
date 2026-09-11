@@ -16,7 +16,7 @@ public class RateCardCsvTests
 
         Assert.True(result.IsValid);
         Assert.Equal(2, result.Rows.Count);
-        Assert.Equal(new RateCardCsvRow("Software Engineer", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, 120.50m), result.Rows[0]);
+        Assert.Equal(new RateCardCsvRow("Software Engineer", "senior", "Onshore", ResourcingClass.InternalFte, 120.50m), result.Rows[0]);
         Assert.Equal(ResourcingClass.Vendor, result.Rows[1].ResourcingClass);
         Assert.Equal(55m, result.Rows[1].HourlyRate);
     }
@@ -45,7 +45,7 @@ public class RateCardCsvTests
     public void Reports_invalid_values_with_line_numbers()
     {
         var result = RateCardCsv.Parse(new StringReader(Header +
-            "SE,Guru,Onshore,Internal,100\n" +
+            "SE,,Onshore,Internal,100\n" +
             "SE,Senior,Onshore,Freelance,100\n" +
             "SE,Senior,Onshore,Internal,-5\n" +
             ",Senior,Onshore,Internal,100\n"));
@@ -53,6 +53,15 @@ public class RateCardCsvTests
         Assert.False(result.IsValid);
         Assert.Empty(result.Rows);
         Assert.Equal([2, 3, 4, 5], result.Errors.Select(e => e.Line).ToArray());
+    }
+
+    [Fact]
+    public void Accepts_any_seniority_name()
+    {
+        var result = RateCardCsv.Parse(new StringReader(Header + "SE,Level 1 (0-2 Years),Onshore,Internal,100\n"));
+
+        Assert.True(result.IsValid);
+        Assert.Equal("Level 1 (0-2 Years)", Assert.Single(result.Rows).Seniority);
     }
 
     [Fact]
@@ -72,8 +81,8 @@ public class RateCardCsvTests
     {
         var rows = new[]
         {
-            new RateCardCsvRow("Software Engineer", Seniority.Staff, "Onshore", ResourcingClass.InternalFte, 175m),
-            new RateCardCsvRow("UX Designer", Seniority.Associate, "Nearshore", ResourcingClass.Vendor, 42.25m)
+            new RateCardCsvRow("Software Engineer", "Staff", "Onshore", ResourcingClass.InternalFte, 175m),
+            new RateCardCsvRow("UX Designer", "Level 1 (0-2 Years)", "Nearshore", ResourcingClass.Vendor, 42.25m)
         };
         var sw = new StringWriter();
         RateCardCsv.Write(sw, rows);

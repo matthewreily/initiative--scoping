@@ -7,7 +7,7 @@ namespace InitiativeScoping.Domain.Tests;
 public class SizingApplierTests
 {
     private static AllocationTemplateLine Line(string phase, int type, decimal percent) =>
-        new() { PhaseName = phase, ResourceTypeId = type, Seniority = Seniority.Mid, Percent = percent };
+        new() { PhaseName = phase, ResourceTypeId = type, SeniorityId = 2, Percent = percent };
 
     [Fact]
     public void Splits_hours_by_percent_and_sums_exactly_to_total()

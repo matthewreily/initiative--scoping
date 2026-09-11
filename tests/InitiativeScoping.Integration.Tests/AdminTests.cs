@@ -258,7 +258,7 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/AddEntry/{id}", new()
         {
-            ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = "Senior",
+            ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = "InternalFte", ["HourlyRate"] = "150"
         });
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Publish/{id}", new());
@@ -319,8 +319,8 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var form = new Dictionary<string, string>
         {
             ["Method"] = "TShirt", ["SizeKey"] = key, ["Name"] = "Test template",
-            ["Lines[0].PhaseName"] = "Build", ["Lines[0].ResourceTypeId"] = typeId.ToString(), ["Lines[0].Seniority"] = "Mid", ["Lines[0].Percent"] = "60",
-            ["Lines[1].PhaseName"] = "Test", ["Lines[1].ResourceTypeId"] = typeId.ToString(), ["Lines[1].Seniority"] = "Mid", ["Lines[1].Percent"] = "30"
+            ["Lines[0].PhaseName"] = "Build", ["Lines[0].ResourceTypeId"] = typeId.ToString(), ["Lines[0].SeniorityId"] = "2", ["Lines[0].Percent"] = "60",
+            ["Lines[1].PhaseName"] = "Test", ["Lines[1].ResourceTypeId"] = typeId.ToString(), ["Lines[1].SeniorityId"] = "2", ["Lines[1].Percent"] = "30"
         };
         var rejected = await PostFormAsync(client, "/Admin/Sizing/CreateTemplate", "/Admin/Sizing/CreateTemplate", form);
         Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);

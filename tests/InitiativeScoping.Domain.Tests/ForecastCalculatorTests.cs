@@ -15,7 +15,7 @@ public class ForecastCalculatorTests
         [
             new RateCardEntry
             {
-                ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore",
+                ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
                 ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate
             }
         ]
@@ -29,7 +29,7 @@ public class ForecastCalculatorTests
         [
             new InitiativeAllocation
             {
-                PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, Seniority = Seniority.Senior, Location = "Onshore",
+                PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
                 ResourcingClass = ResourcingClass.InternalFte, Quantity = quantity, EstimatedHours = hours
             }
         ]

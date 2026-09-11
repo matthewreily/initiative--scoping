@@ -14,13 +14,26 @@ public static class DbSeeder
         ("XL", "Extra-large feature - standard squad")
     ];
 
+    /// <summary>Default career ladder; the Seniority migration inserts the same rows (ids 1-5) into existing databases.</summary>
+    public static readonly string[] DefaultSeniorityLevels = ["Associate", "Mid", "Senior", "Staff", "Principal"];
+
     public static async Task SeedAsync(AppDbContext db, CancellationToken ct = default)
     {
+        if (!await db.SeniorityLevels.AnyAsync(ct))
+        {
+            db.SeniorityLevels.AddRange(DefaultSeniorityLevels.Select((n, i) => new SeniorityLevel { Name = n, SortOrder = i + 1 }));
+            await db.SaveChangesAsync(ct);
+        }
+
         if (await db.ResourceTypes.AnyAsync(ct))
         {
             await BackfillTemplatesAsync(db, ct);
             return;
         }
+
+        var levels = await db.SeniorityLevels.OrderBy(s => s.SortOrder).ToListAsync(ct);
+        var mid = levels.First(s => s.Name == "Mid");
+        var senior = levels.First(s => s.Name == "Senior");
 
         db.BusinessUnits.Add(new BusinessUnit { Name = "Boarding" });
 
@@ -49,7 +62,7 @@ public static class DbSeeder
 
         foreach (var (key, name) in TShirtTemplates)
         {
-            db.AllocationTemplates.Add(StandardSquadTemplate(key, name, types[0], types[1], types[2], types[3], types[4]));
+            db.AllocationTemplates.Add(StandardSquadTemplate(key, name, types[0], types[1], types[2], types[3], types[4], mid, senior));
         }
 
         var card = new RateCard
@@ -60,17 +73,17 @@ public static class DbSeeder
         };
         foreach (var t in types)
         {
-            foreach (var s in Enum.GetValues<Seniority>())
+            foreach (var s in levels)
             {
                 card.Entries.Add(new RateCardEntry
                 {
                     ResourceType = t, Seniority = s, Location = "Onshore",
-                    ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 60 + 20 * (int)s
+                    ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 60 + 20 * s.SortOrder
                 });
                 card.Entries.Add(new RateCardEntry
                 {
                     ResourceType = t, Seniority = s, Location = "Onshore",
-                    ResourcingClass = ResourcingClass.Vendor, HourlyRate = 90 + 25 * (int)s
+                    ResourcingClass = ResourcingClass.Vendor, HourlyRate = 90 + 25 * s.SortOrder
                 });
             }
         }
@@ -103,6 +116,12 @@ public static class DbSeeder
             return;
         }
 
+        var levels = await db.SeniorityLevels.ToDictionaryAsync(s => s.Name, StringComparer.OrdinalIgnoreCase, ct);
+        if (!levels.TryGetValue("Mid", out var mid) || !levels.TryGetValue("Senior", out var senior))
+        {
+            return;
+        }
+
         foreach (var (key, name) in missing)
         {
             if (!await db.SizingConversions.AnyAsync(c => c.Method == SizingMethod.TShirt && c.Key == key, ct))
@@ -110,24 +129,25 @@ public static class DbSeeder
                 continue;
             }
 
-            db.AllocationTemplates.Add(StandardSquadTemplate(key, name, eng, qa, product, pm, ux));
+            db.AllocationTemplates.Add(StandardSquadTemplate(key, name, eng, qa, product, pm, ux, mid, senior));
         }
 
         await db.SaveChangesAsync(ct);
     }
 
     private static AllocationTemplate StandardSquadTemplate(
-        string key, string name, ResourceType eng, ResourceType qa, ResourceType product, ResourceType pm, ResourceType ux) => new()
+        string key, string name, ResourceType eng, ResourceType qa, ResourceType product, ResourceType pm, ResourceType ux,
+        SeniorityLevel mid, SeniorityLevel senior) => new()
     {
         Method = SizingMethod.TShirt, SizeKey = key, Name = name,
         Lines =
         [
-            new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = product, Seniority = Seniority.Senior, Percent = 10 },
-            new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = ux, Seniority = Seniority.Mid, Percent = 10 },
-            new AllocationTemplateLine { PhaseName = "Build", ResourceType = eng, Seniority = Seniority.Senior, Percent = 45 },
-            new AllocationTemplateLine { PhaseName = "Build", ResourceType = qa, Seniority = Seniority.Mid, Percent = 15 },
-            new AllocationTemplateLine { PhaseName = "Build", ResourceType = pm, Seniority = Seniority.Mid, Percent = 10 },
-            new AllocationTemplateLine { PhaseName = "Launch", ResourceType = eng, Seniority = Seniority.Senior, Percent = 10 }
+            new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = product, Seniority = senior, Percent = 10 },
+            new AllocationTemplateLine { PhaseName = "Discovery", ResourceType = ux, Seniority = mid, Percent = 10 },
+            new AllocationTemplateLine { PhaseName = "Build", ResourceType = eng, Seniority = senior, Percent = 45 },
+            new AllocationTemplateLine { PhaseName = "Build", ResourceType = qa, Seniority = mid, Percent = 15 },
+            new AllocationTemplateLine { PhaseName = "Build", ResourceType = pm, Seniority = mid, Percent = 10 },
+            new AllocationTemplateLine { PhaseName = "Launch", ResourceType = eng, Seniority = senior, Percent = 10 }
         ]
     };
 }

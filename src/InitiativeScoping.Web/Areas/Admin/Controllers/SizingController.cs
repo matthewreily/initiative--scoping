@@ -15,7 +15,7 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
         return View(new SizingIndexModel
         {
             Conversions = (await db.SizingConversions.ToListAsync(ct)).OrderBy(c => c.Method).ThenBy(c => c.Hours).ToList(),
-            Templates = await db.AllocationTemplates.Include(t => t.Lines).ThenInclude(l => l.ResourceType)
+            Templates = await db.AllocationTemplates.Include(t => t.Lines).ThenInclude(l => l.ResourceType).Include(t => t.Lines).ThenInclude(l => l.Seniority)
                 .OrderBy(t => t.Method).ThenBy(t => t.SizeKey).ToListAsync(ct)
         });
     }
@@ -137,7 +137,7 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
             Name = template.Name,
             Lines = template.Lines.Select(l => new AllocationTemplateLineEditModel
             {
-                PhaseName = l.PhaseName, ResourceTypeId = l.ResourceTypeId, Seniority = l.Seniority, Percent = l.Percent
+                PhaseName = l.PhaseName, ResourceTypeId = l.ResourceTypeId, SeniorityId = l.SeniorityId, Percent = l.Percent
             }).ToList()
         });
     }
@@ -188,7 +188,7 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     private static AllocationTemplateLine ToEntity(AllocationTemplateLineEditModel l) => new()
     {
-        PhaseName = l.PhaseName.Trim(), ResourceTypeId = l.ResourceTypeId, Seniority = l.Seniority, Percent = l.Percent
+        PhaseName = l.PhaseName.Trim(), ResourceTypeId = l.ResourceTypeId, SeniorityId = l.SeniorityId, Percent = l.Percent
     };
 
     private static void NormalizeLines(AllocationTemplateEditModel model)
@@ -214,6 +214,13 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
         {
             ModelState.AddModelError(nameof(model.Lines), $"Line percentages must total 100% (currently {model.Lines.Sum(l => l.Percent):0.##}%).");
         }
+
+        var seniorityIds = model.Lines.Select(l => l.SeniorityId).Distinct().ToList();
+        var known = await db.SeniorityLevels.Where(s => seniorityIds.Contains(s.Id)).Select(s => s.Id).ToListAsync(ct);
+        if (seniorityIds.Count != known.Count)
+        {
+            ModelState.AddModelError(nameof(model.Lines), "Choose a seniority level from the catalog on every line.");
+        }
     }
 
     private async Task ValidateUniqueKey(SizingConversionEditModel model, CancellationToken ct)
@@ -228,5 +235,6 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
     private async Task PopulateResourceTypes(CancellationToken ct)
     {
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
+        ViewBag.Seniorities = new SelectList(await db.SeniorityLevels.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Name).ToListAsync(ct), "Id", "Name");
     }
 }

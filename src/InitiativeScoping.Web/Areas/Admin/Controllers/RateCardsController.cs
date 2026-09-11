@@ -81,6 +81,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         var card = await db.RateCards
             .Include(c => c.Entries).ThenInclude(e => e.ResourceType)
             .Include(c => c.Entries).ThenInclude(e => e.Vendor)
+            .Include(c => c.Entries).ThenInclude(e => e.Seniority)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
         if (card is null)
         {
@@ -90,7 +91,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         card.Entries = card.Entries
             .Where(e => string.IsNullOrEmpty(resourceType) || e.ResourceType!.Name == resourceType)
             .OrderBy(e => e.ResourceType!.Name)
-            .ThenBy(e => e.ResourcingClass).ThenBy(e => e.Vendor?.Name).ThenBy(e => e.Location).ThenBy(e => e.Seniority)
+            .ThenBy(e => e.ResourcingClass).ThenBy(e => e.Vendor?.Name).ThenBy(e => e.Location).ThenBy(e => e.Seniority!.SortOrder)
             .ToList();
 
         return View(new RateCardDetailsModel
@@ -98,6 +99,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             Card = card,
             NewEntry = new RateCardEntryEditModel { RateCardId = id },
             ResourceTypes = await ResourceTypeSelect(ct),
+            Seniorities = await SenioritySelect(ct),
             Vendors = await VendorSelect(ct),
             FilterResourceType = resourceType
         });
@@ -124,9 +126,14 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return RedirectWithError("Select a vendor from the catalog.", "Details", new { id });
         }
 
+        if (!await db.SeniorityLevels.AnyAsync(s => s.Id == model.SeniorityId, ct))
+        {
+            return RedirectWithError("Select a seniority level from the catalog.", "Details", new { id });
+        }
+
         var duplicate = await db.RateCardEntries.AnyAsync(e =>
             e.RateCardId == id && e.ResourceTypeId == model.ResourceTypeId &&
-            e.Seniority == model.Seniority && e.ResourcingClass == model.ResourcingClass && e.VendorId == vendorId && e.Location == location, ct);
+            e.SeniorityId == model.SeniorityId && e.ResourcingClass == model.ResourcingClass && e.VendorId == vendorId && e.Location == location, ct);
         if (duplicate)
         {
             return RedirectWithError("An entry with the same resource type / seniority / location / class / vendor already exists.", "Details", new { id });
@@ -141,7 +148,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         {
             RateCardId = id,
             ResourceTypeId = model.ResourceTypeId,
-            Seniority = model.Seniority,
+            SeniorityId = model.SeniorityId,
             Location = location,
             ResourcingClass = model.ResourcingClass,
             VendorId = vendorId,
@@ -149,7 +156,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         };
         db.RateCardEntries.Add(entry);
         await db.SaveChangesAsync(ct);
-        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Create, new { entry.RateCardId, entry.ResourceTypeId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
+        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Create, new { entry.RateCardId, entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Entry added.", "Details", new { id });
     }
@@ -279,7 +286,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         foreach (var entry in entries)
         {
             db.RateCardEntries.Remove(entry);
-            audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
+            audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
         }
 
         await db.SaveChangesAsync(ct);
@@ -354,7 +361,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         db.RateCardEntries.Remove(entry);
-        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.Seniority, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
+        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Entry removed.", "Details", new { id });
     }
@@ -429,6 +436,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         var card = await db.RateCards
             .Include(c => c.Entries).ThenInclude(e => e.ResourceType)
             .Include(c => c.Entries).ThenInclude(e => e.Vendor)
+            .Include(c => c.Entries).ThenInclude(e => e.Seniority)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
         if (card is null)
         {
@@ -436,8 +444,8 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         var rows = card.Entries
-            .OrderBy(e => e.ResourceType!.Name).ThenBy(e => e.Seniority)
-            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.Seniority, e.Location, e.ResourcingClass, e.HourlyRate, e.Vendor?.Name));
+            .OrderBy(e => e.ResourceType!.Name).ThenBy(e => e.Seniority!.SortOrder)
+            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.Seniority!.Name, e.Location, e.ResourcingClass, e.HourlyRate, e.Vendor?.Name));
 
         var sb = new StringBuilder();
         using (var writer = new StringWriter(sb))
@@ -456,9 +464,9 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         {
             RateCardCsv.Write(writer,
             [
-                new RateCardCsvRow("Software Engineer", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, 120m),
-                new RateCardCsvRow("Software Engineer", Seniority.Senior, "Offshore", ResourcingClass.Vendor, 75m),
-                new RateCardCsvRow("Software Engineer", Seniority.Senior, "Offshore", ResourcingClass.Vendor, 82m, "Acme Consulting")
+                new RateCardCsvRow("Software Engineer", "Senior", "Onshore", ResourcingClass.InternalFte, 120m),
+                new RateCardCsvRow("Software Engineer", "Senior", "Offshore", ResourcingClass.Vendor, 75m),
+                new RateCardCsvRow("Software Engineer", "Level 3 (5-8 Years)", "Offshore", ResourcingClass.Vendor, 82m, "Acme Consulting")
             ]);
         }
 
@@ -511,6 +519,9 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return RedirectWithError("Import rejected; no changes made. " + string.Join(" | ", errors.Take(10)) + (errors.Count > 10 ? $" (+{errors.Count - 10} more)" : string.Empty), "Details", new { id });
         }
 
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+
         var removed = 0;
         if (model.Replace)
         {
@@ -525,14 +536,15 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         {
             var typeId = resourceTypes[row.ResourceType];
             int? vendorId = row.Vendor is null ? null : vendors[row.Vendor];
+            var seniorityId = seniorities[row.Seniority].Id;
             var existing = card.Entries.FirstOrDefault(e =>
-                e.ResourceTypeId == typeId && e.Seniority == row.Seniority &&
+                e.ResourceTypeId == typeId && e.SeniorityId == seniorityId &&
                 e.ResourcingClass == row.ResourcingClass && e.VendorId == vendorId && string.Equals(e.Location, row.Location, StringComparison.OrdinalIgnoreCase));
             if (existing is null)
             {
                 card.Entries.Add(new RateCardEntry
                 {
-                    ResourceTypeId = typeId, Seniority = row.Seniority,
+                    ResourceTypeId = typeId, SeniorityId = seniorityId,
                     Location = row.Location, ResourcingClass = row.ResourcingClass, VendorId = vendorId, HourlyRate = row.HourlyRate
                 });
                 added++;
@@ -544,9 +556,11 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             }
         }
 
-        audit.Record(nameof(RateCard), card.Id, AuditActions.Import, new { model.File.FileName, model.Replace, Added = added, Updated = updated, Removed = removed });
+        audit.Record(nameof(RateCard), card.Id, AuditActions.Import, new { model.File.FileName, model.Replace, Added = added, Updated = updated, Removed = removed, NewSeniorityLevels = addedLevels });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated, {removed} removed.", "Details", new { id });
+        await tx.CommitAsync(ct);
+        var levelsNote = addedLevels.Count == 0 ? string.Empty : $" New seniority level(s) added to the catalog: {string.Join(", ", addedLevels)}.";
+        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated, {removed} removed.{levelsNote}", "Details", new { id });
     }
 
     private static Dictionary<string, int> ToLookup<T>(IEnumerable<T> items, Func<T, string> name, Func<T, int> id) =>
@@ -555,6 +569,9 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
 
     private async Task<SelectList> ResourceTypeSelect(CancellationToken ct) =>
         new(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
+
+    private async Task<SelectList> SenioritySelect(CancellationToken ct) =>
+        new(await db.SeniorityLevels.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Name).ToListAsync(ct), "Id", "Name");
 
     private async Task<SelectList> VendorSelect(CancellationToken ct) =>
         new(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");

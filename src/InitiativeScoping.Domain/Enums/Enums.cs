@@ -8,15 +8,6 @@ public enum ResourcingClass
     Vendor = 2
 }
 
-public enum Seniority
-{
-    Associate = 1,
-    Mid = 2,
-    Senior = 3,
-    Staff = 4,
-    Principal = 5
-}
-
 public enum RateCardStatus
 {
     Draft = 1,

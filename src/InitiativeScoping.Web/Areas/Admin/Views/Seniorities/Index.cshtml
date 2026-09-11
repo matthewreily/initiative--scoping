@@ -1,0 +1,50 @@
+@model IReadOnlyList<SeniorityListItem>
+@{
+    ViewData["Title"] = "Seniority levels";
+}
+<h1 class="h3">Administration</h1>
+<partial name="_AdminNav" />
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="h5 mb-0">Seniority levels</h2>
+    <a class="btn btn-primary btn-sm" asp-action="Create">New seniority level</a>
+</div>
+<p class="text-muted small">Career levels used on rate-card rows, allocations, people and templates. Importing a rate card or roster CSV with a new Seniority name adds it here automatically.</p>
+<form asp-action="BulkDelete" method="post" data-bulk>
+<div class="table-responsive">
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Order</th><th>Name</th><th>Status</th><th>Rate rows</th><th>Allocations</th><th>People</th><th>Templates</th><th data-nosort></th></tr></thead>
+    <tbody>
+    @foreach (var item in Model)
+    {
+        var referenced = item.RateCardEntries + item.Allocations + item.People + item.TemplateLines > 0;
+        <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@item.Level.Id" data-bulk-item aria-label="Select row" /></td>
+            <td>@item.Level.SortOrder</td>
+            <td>@item.Level.Name</td>
+            <td>@(item.Level.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
+            <td>@item.RateCardEntries</td>
+            <td>@item.Allocations</td>
+            <td>@item.People</td>
+            <td>@item.TemplateLines</td>
+            <td class="text-end">
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@item.Level.Id">Edit</a>
+                @if (!referenced)
+                {
+                    <button type="submit" formaction="@Url.Action("Delete", new { id = item.Level.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @item.Level.Name?');">Delete</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled title="Referenced; deactivate instead">Delete</button>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Count == 0)
+    {
+        <tr data-nosort><td colspan="9" class="text-muted">No seniority levels yet.</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+<partial name="_BulkBar" model='new BulkBarOptions("seniority levels")' />
+</form>

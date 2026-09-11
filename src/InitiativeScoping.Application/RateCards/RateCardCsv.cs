@@ -7,7 +7,7 @@ namespace InitiativeScoping.Application.RateCards;
 
 public sealed record RateCardCsvRow(
     string ResourceType,
-    Seniority Seniority,
+    string Seniority,
     string Location,
     ResourcingClass ResourcingClass,
     decimal HourlyRate,
@@ -23,7 +23,7 @@ public sealed record RateCardCsvResult(IReadOnlyList<RateCardCsvRow> Rows, IRead
 /// <summary>
 /// CSV format: ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor
 /// A legacy BusinessUnit column is accepted and ignored.
-/// Seniority: Associate|Mid|Senior|Staff|Principal. ResourcingClass: InternalFte|Vendor.
+/// Seniority is the name of a seniority level (unknown names are added to the catalog on import). ResourcingClass: InternalFte|Vendor.
 /// Vendor names a specific vendor for Vendor rows (blank = generic "any vendor" rate) and must be blank for InternalFte rows; the column may be omitted.
 /// </summary>
 public static class RateCardCsv
@@ -65,16 +65,11 @@ public static class RateCardCsv
             var line = csv.Parser.Row;
             var resourceType = csv.GetField("ResourceType") ?? string.Empty;
             var location = csv.GetField("Location") ?? string.Empty;
+            var seniority = (csv.GetField("Seniority") ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(location))
+            if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(seniority) || string.IsNullOrWhiteSpace(location))
             {
-                errors.Add(new RateCardCsvError(line, "ResourceType and Location are required."));
-                continue;
-            }
-
-            if (!Enum.TryParse<Seniority>(csv.GetField("Seniority"), true, out var seniority) || !Enum.IsDefined(seniority))
-            {
-                errors.Add(new RateCardCsvError(line, $"Unknown Seniority '{csv.GetField("Seniority")}'."));
+                errors.Add(new RateCardCsvError(line, "ResourceType, Seniority and Location are required."));
                 continue;
             }
 
@@ -103,7 +98,7 @@ public static class RateCardCsv
         }
 
         var duplicates = rows
-            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.Seniority, r.Location.ToLowerInvariant(), r.ResourcingClass, r.Vendor?.ToLowerInvariant()))
+            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.Seniority.ToLowerInvariant(), r.Location.ToLowerInvariant(), r.ResourcingClass, r.Vendor?.ToLowerInvariant()))
             .Where(g => g.Count() > 1)
             .Select(g => g.First());
         foreach (var d in duplicates)
@@ -125,7 +120,7 @@ public static class RateCardCsv
         foreach (var r in rows)
         {
             csv.WriteField(r.ResourceType);
-            csv.WriteField(r.Seniority.ToString());
+            csv.WriteField(r.Seniority);
             csv.WriteField(r.Location);
             csv.WriteField(r.ResourcingClass.ToString());
             csv.WriteField(r.HourlyRate.ToString("0.00", CultureInfo.InvariantCulture));

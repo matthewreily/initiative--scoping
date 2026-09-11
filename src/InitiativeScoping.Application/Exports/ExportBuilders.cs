@@ -54,7 +54,8 @@ public static class InitiativeExport
         IReadOnlyList<ActualAdjustment> adjustments,
         IReadOnlyDictionary<int, string> resourceTypeNames,
         IReadOnlyDictionary<int, string> businessUnitNames,
-        IReadOnlyDictionary<int, string> vendorNames)
+        IReadOnlyDictionary<int, string> vendorNames,
+        IReadOnlyDictionary<int, string> seniorityNames)
     {
         var phases = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
         var baseline = variance.Baseline;
@@ -98,7 +99,7 @@ public static class InitiativeExport
             forecast.Lines.Select(l => (IReadOnlyList<object?>)
             [
                 phases.GetValueOrDefault(l.Allocation.PhaseId), l.Allocation.BusinessUnit?.Name, resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
-                l.Allocation.Seniority.ToString(), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
+                seniorityNames.GetValueOrDefault(l.Allocation.SeniorityId), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
                 l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
                 l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
@@ -117,7 +118,7 @@ public static class InitiativeExport
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
                 baseline!.Version, phases.GetValueOrDefault(l.PhaseId), businessUnitNames.GetValueOrDefault(l.BusinessUnitId), resourceTypeNames.GetValueOrDefault(l.ResourceTypeId),
-                l.Seniority.ToString(), l.Location, l.ResourcingClass.ToString(), l.VendorId is { } vid ? vendorNames.GetValueOrDefault(vid) : null, l.Hours, l.HourlyRate, l.Cost
+                seniorityNames.GetValueOrDefault(l.SeniorityId), l.Location, l.ResourcingClass.ToString(), l.VendorId is { } vid ? vendorNames.GetValueOrDefault(vid) : null, l.Hours, l.HourlyRate, l.Cost
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",

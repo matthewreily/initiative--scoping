@@ -17,6 +17,15 @@ public class Vendor
     public bool IsActive { get; set; } = true;
 }
 
+/// <summary>Admin-managed career level (e.g. "Senior", "Level 1 (0-2 Years)"); rate-card rows, allocations, people and templates reference one. Ordered by <see cref="SortOrder"/>.</summary>
+public class SeniorityLevel
+{
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
 public class Discipline
 {
     public int Id { get; set; }
@@ -50,7 +59,8 @@ public class RateCardEntry
     public RateCard? RateCard { get; set; }
     public int ResourceTypeId { get; set; }
     public ResourceType? ResourceType { get; set; }
-    public Seniority Seniority { get; set; }
+    public int SeniorityId { get; set; }
+    public SeniorityLevel? Seniority { get; set; }
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
     /// <summary>Required when <see cref="ResourcingClass"/> is <see cref="ResourcingClass.Vendor"/>; null for internal resources.</summary>
