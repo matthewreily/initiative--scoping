@@ -30,6 +30,10 @@ public class SeniorityLevel
 
 public class Discipline
 {
+    public const int MaxNameLength = 100;
+    /// <summary>Discipline given to resource types created by CSV import when the file names none.</summary>
+    public const string UnassignedName = "Unassigned";
+
     public int Id { get; set; }
     public required string Name { get; set; }
     public bool IsActive { get; set; } = true;
@@ -37,6 +41,8 @@ public class Discipline
 
 public class ResourceType
 {
+    public const int MaxNameLength = 200;
+
     public int Id { get; set; }
     public required string Name { get; set; }
     public int DisciplineId { get; set; }

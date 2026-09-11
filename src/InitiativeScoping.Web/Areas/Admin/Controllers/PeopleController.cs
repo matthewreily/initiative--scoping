@@ -147,10 +147,10 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Export(CancellationToken ct)
     {
-        var people = await db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.Seniority)
+        var people = await db.People.Include(p => p.ResourceType).ThenInclude(t => t!.Discipline).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.Seniority)
             .OrderBy(p => p.DisplayName).ToListAsync(ct);
         var rows = people.Select(p => new PeopleCsvRow(p.DisplayName, SplitIds(p.ExternalIds), p.ResourceType!.Name, p.BusinessUnit!.Name,
-            p.Seniority!.Name, p.Location, p.ResourcingClass, p.IsActive, p.Vendor?.Name));
+            p.Seniority!.Name, p.Location, p.ResourcingClass, p.IsActive, p.Vendor?.Name, p.ResourceType.Discipline?.Name));
         return Csv(rows, "people.csv");
     }
 
@@ -158,7 +158,8 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         Csv(
         [
             new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", "Senior", "Onshore", ResourcingClass.InternalFte, true),
-            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", "Level 2 (3-5 Years)", "Offshore", ResourcingClass.Vendor, true, "Acme Consulting")
+            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", "Level 2 (3-5 Years)", "Offshore", ResourcingClass.Vendor, true, "Acme Consulting"),
+            new PeopleCsvRow("Sam Analyst", [], "Business Analyst", "Boarding", "Mid", "Onshore", ResourcingClass.InternalFte, true, null, "Product")
         ], "people-template.csv");
 
     /// <summary>
@@ -185,17 +186,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             parsed = PeopleCsv.Parse(reader);
         }
 
-        var resourceTypes = await db.ResourceTypes.ToDictionaryAsync(t => t.Name, t => t.Id, StringComparer.OrdinalIgnoreCase, ct);
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name, b => b.Id, StringComparer.OrdinalIgnoreCase, ct);
         var vendors = await db.Vendors.ToDictionaryAsync(v => v.Name, v => v.Id, StringComparer.OrdinalIgnoreCase, ct);
 
         var errors = parsed.Errors.Select(e => e.Line > 0 ? $"Line {e.Line}: {e.Message}" : e.Message).ToList();
-        var unknownTypes = parsed.Rows.Select(r => r.ResourceType).Where(n => !resourceTypes.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var unknownUnits = parsed.Rows.Select(r => r.BusinessUnit).Where(n => !businessUnits.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (unknownTypes.Count > 0)
-        {
-            errors.Add("Unknown resource type(s): " + string.Join(", ", unknownTypes));
-        }
         if (unknownUnits.Count > 0)
         {
             errors.Add("Unknown business unit(s): " + string.Join(", ", unknownUnits));
@@ -242,9 +237,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         Dictionary<string, SeniorityLevel> seniorities;
         IReadOnlyList<string> addedLevels;
+        ResourceTypeCatalogResult resourceTypes;
         try
         {
             (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+            resourceTypes = await ResourceTypeCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => new ResourceTypeRequest(r.ResourceType, r.Discipline)), ct);
         }
         catch (DbUpdateException)
         {
@@ -260,7 +257,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             {
                 var person = new Person
                 {
-                    DisplayName = row.DisplayName, ExternalIds = ids, ResourceTypeId = resourceTypes[row.ResourceType], BusinessUnitId = businessUnits[row.BusinessUnit],
+                    DisplayName = row.DisplayName, ExternalIds = ids, ResourceTypeId = resourceTypes.Types[row.ResourceType].Id, BusinessUnitId = businessUnits[row.BusinessUnit],
                     SeniorityId = seniorities[row.Seniority].Id, Location = row.Location, ResourcingClass = row.ResourcingClass, IsActive = row.IsActive,
                     VendorId = row.Vendor is null ? null : vendors[row.Vendor]
                 };
@@ -273,7 +270,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             var before = Snapshot(existing);
             existing.DisplayName = row.DisplayName;
             existing.ExternalIds = ids;
-            existing.ResourceTypeId = resourceTypes[row.ResourceType];
+            existing.ResourceTypeId = resourceTypes.Types[row.ResourceType].Id;
             existing.BusinessUnitId = businessUnits[row.BusinessUnit];
             existing.SeniorityId = seniorities[row.Seniority].Id;
             existing.Location = row.Location;
@@ -287,7 +284,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             }
         }
 
-        audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated, NewSeniorityLevels = addedLevels });
+        audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated, NewSeniorityLevels = addedLevels, NewResourceTypes = resourceTypes.AddedTypes, NewDisciplines = resourceTypes.AddedDisciplines });
         try
         {
             await db.SaveChangesAsync(ct);
@@ -298,8 +295,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         }
 
         await tx.CommitAsync(ct);
-        var levelsNote = addedLevels.Count == 0 ? string.Empty : $" New seniority level(s) added to the catalog: {string.Join(", ", addedLevels)}.";
-        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.{levelsNote}");
+        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.{ImportCatalogNote.For(addedLevels, resourceTypes)}");
     }
 
     private FileContentResult Csv(IEnumerable<PeopleCsvRow> rows, string fileName)

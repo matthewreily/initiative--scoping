@@ -15,7 +15,8 @@ public sealed record PeopleCsvRow(
     string Location,
     ResourcingClass ResourcingClass,
     bool IsActive,
-    string? Vendor = null);
+    string? Vendor = null,
+    string? Discipline = null);
 
 public sealed record PeopleCsvError(int Line, string Message);
 
@@ -25,14 +26,15 @@ public sealed record PeopleCsvResult(IReadOnlyList<PeopleCsvRow> Rows, IReadOnly
 }
 
 /// <summary>
-/// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive][,Vendor]
-/// ExternalIds is ';'-separated (may be empty). Seniority is the name of a seniority level (unknown names are added to the catalog on import).
+/// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive][,Vendor][,Discipline]
+/// ExternalIds is ';'-separated (may be empty). ResourceType and Seniority are catalog names (unknown names are added to the catalogs on import);
+/// Discipline is only used when a new resource type is created.
 /// ResourcingClass: InternalFte|Vendor. IsActive defaults to true. Vendor names the catalog vendor for Vendor rows and must be blank for InternalFte.
 /// </summary>
 public static class PeopleCsv
 {
-    public static readonly string[] Headers = ["DisplayName", "ExternalIds", "ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "IsActive", "Vendor"];
-    private static readonly string[] Required = Headers[..^2];
+    public static readonly string[] Headers = ["DisplayName", "ExternalIds", "ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "IsActive", "Vendor", "Discipline"];
+    private static readonly string[] Required = Headers[..^3];
 
     private static readonly CsvConfiguration Config = new(CultureInfo.InvariantCulture)
     {
@@ -64,12 +66,13 @@ public static class PeopleCsv
 
         var hasActive = header.Contains("IsActive", StringComparer.OrdinalIgnoreCase);
         var hasVendor = header.Contains("Vendor", StringComparer.OrdinalIgnoreCase);
+        var hasDiscipline = header.Contains("Discipline", StringComparer.OrdinalIgnoreCase);
 
         while (csv.Read())
         {
             var line = csv.Parser.Row;
             var name = csv.GetField("DisplayName") ?? string.Empty;
-            var resourceType = csv.GetField("ResourceType") ?? string.Empty;
+            var resourceType = (csv.GetField("ResourceType") ?? string.Empty).Trim();
             var businessUnit = csv.GetField("BusinessUnit") ?? string.Empty;
             var location = csv.GetField("Location") ?? string.Empty;
             var seniority = (csv.GetField("Seniority") ?? string.Empty).Trim();
@@ -84,6 +87,20 @@ public static class PeopleCsv
             if (seniority.Length > SeniorityLevel.MaxNameLength)
             {
                 errors.Add(new PeopleCsvError(line, $"Seniority must be at most {SeniorityLevel.MaxNameLength} characters."));
+                continue;
+            }
+
+            if (resourceType.Length > ResourceType.MaxNameLength)
+            {
+                errors.Add(new PeopleCsvError(line, $"ResourceType must be at most {ResourceType.MaxNameLength} characters."));
+                continue;
+            }
+
+            var discipline = hasDiscipline ? csv.GetField("Discipline") : null;
+            discipline = string.IsNullOrWhiteSpace(discipline) ? null : discipline.Trim();
+            if (discipline is not null && discipline.Length > Discipline.MaxNameLength)
+            {
+                errors.Add(new PeopleCsvError(line, $"Discipline must be at most {Discipline.MaxNameLength} characters."));
                 continue;
             }
 
@@ -117,7 +134,7 @@ public static class PeopleCsv
                 continue;
             }
 
-            rows.Add(new PeopleCsvRow(name, ids, resourceType, businessUnit, seniority, location, resourcingClass, isActive, vendor));
+            rows.Add(new PeopleCsvRow(name, ids, resourceType, businessUnit, seniority, location, resourcingClass, isActive, vendor, discipline));
         }
 
         foreach (var dup in rows.GroupBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
@@ -154,6 +171,7 @@ public static class PeopleCsv
             csv.WriteField(r.ResourcingClass.ToString());
             csv.WriteField(r.IsActive ? "true" : "false");
             csv.WriteField(r.Vendor ?? string.Empty);
+            csv.WriteField(r.Discipline ?? string.Empty);
             csv.NextRecord();
         }
         csv.Flush();

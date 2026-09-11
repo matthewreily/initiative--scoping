@@ -279,7 +279,7 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     }
 
     [Fact]
-    public async Task Csv_import_rejects_unknown_resource_type_and_merges_valid_rows()
+    public async Task Csv_import_rejects_unknown_vendor_and_merges_valid_rows()
     {
         var client = factory.CreateClient(NoRedirect);
         var create = await PostFormAsync(client, "/Admin/RateCards/Create", "/Admin/RateCards/Create",
@@ -287,7 +287,7 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var detailsUrl = create.Headers.Location!.ToString();
         var id = int.Parse(detailsUrl.Split('/').Last());
 
-        var bad = "ResourceType,Seniority,Location,ResourcingClass,HourlyRate\nNope,Senior,Onshore,Internal,100\n";
+        var bad = "ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor\nSoftware Engineer,Senior,Onshore,Vendor,100,Nope Vendor\n";
         await PostCsvAsync(client, detailsUrl, $"/Admin/RateCards/Import/{id}", bad);
         Assert.Equal(0, await EntryCountAsync(id));
 

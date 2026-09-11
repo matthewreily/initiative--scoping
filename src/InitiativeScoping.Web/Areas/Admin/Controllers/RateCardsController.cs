@@ -434,7 +434,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
     public async Task<IActionResult> Export(int id, CancellationToken ct)
     {
         var card = await db.RateCards
-            .Include(c => c.Entries).ThenInclude(e => e.ResourceType)
+            .Include(c => c.Entries).ThenInclude(e => e.ResourceType).ThenInclude(t => t!.Discipline)
             .Include(c => c.Entries).ThenInclude(e => e.Vendor)
             .Include(c => c.Entries).ThenInclude(e => e.Seniority)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
@@ -445,7 +445,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
 
         var rows = card.Entries
             .OrderBy(e => e.ResourceType!.Name).ThenBy(e => e.Seniority!.SortOrder)
-            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.Seniority!.Name, e.Location, e.ResourcingClass, e.HourlyRate, e.Vendor?.Name));
+            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.Seniority!.Name, e.Location, e.ResourcingClass, e.HourlyRate, e.Vendor?.Name, e.ResourceType.Discipline?.Name));
 
         var sb = new StringBuilder();
         using (var writer = new StringWriter(sb))
@@ -466,7 +466,8 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             [
                 new RateCardCsvRow("Software Engineer", "Senior", "Onshore", ResourcingClass.InternalFte, 120m),
                 new RateCardCsvRow("Software Engineer", "Senior", "Offshore", ResourcingClass.Vendor, 75m),
-                new RateCardCsvRow("Software Engineer", "Level 3 (5-8 Years)", "Offshore", ResourcingClass.Vendor, 82m, "Acme Consulting")
+                new RateCardCsvRow("Software Engineer", "Level 3 (5-8 Years)", "Offshore", ResourcingClass.Vendor, 82m, "Acme Consulting"),
+                new RateCardCsvRow("AI Engineer", "Senior", "Onshore", ResourcingClass.InternalFte, 140m, null, "Engineering")
             ]);
         }
 
@@ -499,16 +500,10 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             parsed = RateCardCsv.Parse(reader);
         }
 
-        var resourceTypes = ToLookup(await db.ResourceTypes.Select(t => new { t.Name, t.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
         var vendors = ToLookup(await db.Vendors.Select(v => new { v.Name, v.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
 
         var errors = parsed.Errors.Select(e => e.Line > 0 ? $"Line {e.Line}: {e.Message}" : e.Message).ToList();
-        var unknownTypes = parsed.Rows.Select(r => r.ResourceType).Where(n => !resourceTypes.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var unknownVendors = parsed.Rows.Select(r => r.Vendor).Where(n => n is not null && !vendors.ContainsKey(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (unknownTypes.Count > 0)
-        {
-            errors.Add("Unknown resource type(s): " + string.Join(", ", unknownTypes));
-        }
         if (unknownVendors.Count > 0)
         {
             errors.Add("Unknown vendor(s): " + string.Join(", ", unknownVendors!) + ". Add them under Admin → Vendors first.");
@@ -522,9 +517,11 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         Dictionary<string, SeniorityLevel> seniorities;
         IReadOnlyList<string> addedLevels;
+        ResourceTypeCatalogResult resourceTypes;
         try
         {
             (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+            resourceTypes = await ResourceTypeCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => new ResourceTypeRequest(r.ResourceType, r.Discipline)), ct);
         }
         catch (DbUpdateException)
         {
@@ -543,7 +540,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         var updated = 0;
         foreach (var row in parsed.Rows)
         {
-            var typeId = resourceTypes[row.ResourceType];
+            var typeId = resourceTypes.Types[row.ResourceType].Id;
             int? vendorId = row.Vendor is null ? null : vendors[row.Vendor];
             var seniorityId = seniorities[row.Seniority].Id;
             var existing = card.Entries.FirstOrDefault(e =>
@@ -565,7 +562,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             }
         }
 
-        audit.Record(nameof(RateCard), card.Id, AuditActions.Import, new { model.File.FileName, model.Replace, Added = added, Updated = updated, Removed = removed, NewSeniorityLevels = addedLevels });
+        audit.Record(nameof(RateCard), card.Id, AuditActions.Import, new { model.File.FileName, model.Replace, Added = added, Updated = updated, Removed = removed, NewSeniorityLevels = addedLevels, NewResourceTypes = resourceTypes.AddedTypes, NewDisciplines = resourceTypes.AddedDisciplines });
         try
         {
             await db.SaveChangesAsync(ct);
@@ -576,8 +573,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         await tx.CommitAsync(ct);
-        var levelsNote = addedLevels.Count == 0 ? string.Empty : $" New seniority level(s) added to the catalog: {string.Join(", ", addedLevels)}.";
-        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated, {removed} removed.{levelsNote}", "Details", new { id });
+        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated, {removed} removed.{ImportCatalogNote.For(addedLevels, resourceTypes)}", "Details", new { id });
     }
 
     private static Dictionary<string, int> ToLookup<T>(IEnumerable<T> items, Func<T, string> name, Func<T, int> id) =>
