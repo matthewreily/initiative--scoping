@@ -72,7 +72,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         // Scope mutations are rejected while Active.
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Mid),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "2",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "5"
         });
         Assert.Contains("Scope is locked", await client.GetStringAsync(details));
@@ -281,7 +281,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
 
     private static Dictionary<string, string> NewAllocation(int phaseId, int typeId) => new()
     {
-        ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+        ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
         ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "50"
     };
 
@@ -296,7 +296,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         // Seeded rate: Senior internal Onshore = 120/h; 2 x 100h = 24,000.
         var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = location, ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);

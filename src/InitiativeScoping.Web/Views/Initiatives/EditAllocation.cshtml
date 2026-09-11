@@ -3,6 +3,10 @@
     var initiative = (Initiative)ViewBag.Initiative;
     var phases = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.Phases;
     var rateOptions = (RateOptionsData)ViewBag.RateOptions;
+    var currentSeniority = (SeniorityLevel?)ViewBag.CurrentSeniority;
+    var seniorities = rateOptions.Seniorities.Any(s => s.Id == Model.SeniorityId) || currentSeniority is null
+        ? rateOptions.Seniorities
+        : rateOptions.Seniorities.Append(new NamedId(currentSeniority.Id, currentSeniority.Name + " (inactive)")).ToList();
     var locations = rateOptions.AllLocations.Append(Model.Location).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(l => l, StringComparer.OrdinalIgnoreCase);
     ViewData["Title"] = "Edit Allocation";
     var fixedDuration = initiative.PlanningMode == PlanningMode.FixedDuration;
@@ -47,8 +51,8 @@
     </div>
     <div class="row g-3 mb-3">
         <div class="col-md-3">
-            <label asp-for="Seniority" class="form-label"></label>
-            <select asp-for="Seniority" asp-items="Html.GetEnumSelectList<Seniority>()" class="form-select"></select>
+            <label asp-for="SeniorityId" class="form-label"></label>
+            <select asp-for="SeniorityId" asp-items="@(new SelectList(seniorities, "Id", "Name"))" class="form-select"></select>
         </div>
         <div class="col-md-3">
             <label asp-for="Location" class="form-label"></label>
@@ -110,7 +114,7 @@
 </form>
 @section Scripts {
     <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
-    <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("PhaseId", "ResourceTypeId", "Seniority", "Location", "ResourcingClass", "rate-preview", rateOptions, Model))" />
+    <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("PhaseId", "ResourceTypeId", "SeniorityId", "Location", "ResourcingClass", "rate-preview", rateOptions, Model))" />
     @if (fixedDuration)
     {
         <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("PhaseId", "AllocationPercent", "computed-hours", (IReadOnlyDictionary<int, int>)ViewBag.PhaseWorkingDays, (decimal)ViewBag.HoursPerDay))" />

@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
     public DbSet<Discipline> Disciplines => Set<Discipline>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
+    public DbSet<SeniorityLevel> SeniorityLevels => Set<SeniorityLevel>();
     public DbSet<ResourceType> ResourceTypes => Set<ResourceType>();
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<RateCardEntry> RateCardEntries => Set<RateCardEntry>();
@@ -58,7 +59,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<Discipline>(e =>
         {
-            e.Property(x => x.Name).HasMaxLength(100).UseCollation(ciCollation);
+            e.Property(x => x.Name).HasMaxLength(SeniorityLevel.MaxNameLength).UseCollation(ciCollation);
             e.HasIndex(x => x.Name).IsUnique();
         });
 
@@ -80,6 +81,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Name).IsUnique();
         });
 
+        b.Entity<SeniorityLevel>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100).UseCollation(ciCollation);
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
         b.Entity<ResourceType>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
@@ -98,9 +105,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Location).HasMaxLength(100).UseCollation(ciCollation);
             e.Property(x => x.HourlyRate).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.Seniority, x.Location, x.ResourcingClass, x.VendorId })
+            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.SeniorityId, x.Location, x.ResourcingClass, x.VendorId })
                 .IsUnique();
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -140,6 +148,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.PhaseName).HasMaxLength(200);
             e.Property(x => x.Percent).HasPrecision(5, 2);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Initiative>(e =>
@@ -185,6 +194,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.AllocationPercent).HasPrecision(6, 2);
             e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
@@ -242,6 +252,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.ExternalIds).HasMaxLength(1000);
             e.Property(x => x.Location).HasMaxLength(100);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });

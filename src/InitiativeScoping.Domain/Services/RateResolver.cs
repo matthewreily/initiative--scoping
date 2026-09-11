@@ -9,7 +9,7 @@ namespace InitiativeScoping.Domain.Services;
 /// </summary>
 public readonly record struct RateKey(
     int ResourceTypeId,
-    Seniority Seniority,
+    int SeniorityId,
     string Location,
     ResourcingClass ResourcingClass,
     int? VendorId = null);
@@ -24,7 +24,7 @@ public static class RateResolver
         EffectiveCard(rateCards, asOf)?.Entries
             .Where(e =>
                 e.ResourceTypeId == key.ResourceTypeId &&
-                e.Seniority == key.Seniority &&
+                e.SeniorityId == key.SeniorityId &&
                 e.ResourcingClass == key.ResourcingClass &&
                 VendorMatches(e.ResourcingClass, e.VendorId, key.VendorId) &&
                 string.Equals(e.Location, key.Location, StringComparison.OrdinalIgnoreCase))

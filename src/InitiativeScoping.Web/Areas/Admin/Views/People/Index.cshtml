@@ -25,7 +25,7 @@
             <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
             <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
         </form>
-        <p class="text-muted small mt-2 mb-0">Columns: DisplayName, ExternalIds (';'-separated), ResourceType, BusinessUnit, Seniority, Location, ResourcingClass (Internal/Vendor), IsActive (optional), Vendor (optional; catalog vendor name for Vendor rows). Rows update an existing person matched by external ID, else by name; otherwise a new person is added. The whole file is rejected if any row is invalid.</p>
+        <p class="text-muted small mt-2 mb-0">Columns: DisplayName, ExternalIds (';'-separated), ResourceType, BusinessUnit, Seniority (any name; new names are added to Admin → Seniority), Location, ResourcingClass (Internal/Vendor), IsActive (optional), Vendor (optional; catalog vendor name for Vendor rows). Rows update an existing person matched by external ID, else by name; otherwise a new person is added. The whole file is rejected if any row is invalid.</p>
     </div>
 </div>
 <form asp-action="BulkDelete" method="post" data-bulk>
@@ -42,7 +42,7 @@
             <td class="small text-muted">@p.ExternalIds</td>
             <td>@p.ResourceType?.Name</td>
             <td>@p.BusinessUnit?.Name</td>
-            <td>@p.Seniority</td>
+            <td data-sort="@p.Seniority!.SortOrder">@p.Seniority.Name</td>
             <td>@p.Location</td>
             <td>@(p.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
             <td>@(p.ResourcingClass == ResourcingClass.Vendor ? p.Vendor?.Name ?? "—" : "—")</td>

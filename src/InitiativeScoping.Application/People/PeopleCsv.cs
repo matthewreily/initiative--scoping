@@ -1,6 +1,7 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Application.People;
@@ -10,7 +11,7 @@ public sealed record PeopleCsvRow(
     IReadOnlyList<string> ExternalIds,
     string ResourceType,
     string BusinessUnit,
-    Seniority Seniority,
+    string Seniority,
     string Location,
     ResourcingClass ResourcingClass,
     bool IsActive,
@@ -25,7 +26,7 @@ public sealed record PeopleCsvResult(IReadOnlyList<PeopleCsvRow> Rows, IReadOnly
 
 /// <summary>
 /// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive][,Vendor]
-/// ExternalIds is ';'-separated (may be empty). Seniority: Associate|Mid|Senior|Staff|Principal.
+/// ExternalIds is ';'-separated (may be empty). Seniority is the name of a seniority level (unknown names are added to the catalog on import).
 /// ResourcingClass: InternalFte|Vendor. IsActive defaults to true. Vendor names the catalog vendor for Vendor rows and must be blank for InternalFte.
 /// </summary>
 public static class PeopleCsv
@@ -71,16 +72,18 @@ public static class PeopleCsv
             var resourceType = csv.GetField("ResourceType") ?? string.Empty;
             var businessUnit = csv.GetField("BusinessUnit") ?? string.Empty;
             var location = csv.GetField("Location") ?? string.Empty;
+            var seniority = (csv.GetField("Seniority") ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(businessUnit) || string.IsNullOrWhiteSpace(location))
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(businessUnit)
+                || string.IsNullOrWhiteSpace(seniority) || string.IsNullOrWhiteSpace(location))
             {
-                errors.Add(new PeopleCsvError(line, "DisplayName, ResourceType, BusinessUnit and Location are required."));
+                errors.Add(new PeopleCsvError(line, "DisplayName, ResourceType, BusinessUnit, Seniority and Location are required."));
                 continue;
             }
 
-            if (!Enum.TryParse<Seniority>(csv.GetField("Seniority"), true, out var seniority) || !Enum.IsDefined(seniority))
+            if (seniority.Length > SeniorityLevel.MaxNameLength)
             {
-                errors.Add(new PeopleCsvError(line, $"Unknown Seniority '{csv.GetField("Seniority")}'."));
+                errors.Add(new PeopleCsvError(line, $"Seniority must be at most {SeniorityLevel.MaxNameLength} characters."));
                 continue;
             }
 
@@ -146,7 +149,7 @@ public static class PeopleCsv
             csv.WriteField(string.Join(";", r.ExternalIds));
             csv.WriteField(r.ResourceType);
             csv.WriteField(r.BusinessUnit);
-            csv.WriteField(r.Seniority.ToString());
+            csv.WriteField(r.Seniority);
             csv.WriteField(r.Location);
             csv.WriteField(r.ResourcingClass.ToString());
             csv.WriteField(r.IsActive ? "true" : "false");

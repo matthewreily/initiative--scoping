@@ -33,8 +33,9 @@
     </div>
     <div class="row">
         <div class="col-md-4 mb-3">
-            <label asp-for="Seniority" class="form-label"></label>
-            <select asp-for="Seniority" asp-items="Html.GetEnumSelectList<Seniority>()" class="form-select"></select>
+            <label asp-for="SeniorityId" class="form-label"></label>
+            <select asp-for="SeniorityId" asp-items="ViewBag.Seniorities" class="form-select"></select>
+            <span asp-validation-for="SeniorityId" class="text-danger"></span>
         </div>
         <div class="col-md-4 mb-3">
             <label asp-for="Location" class="form-label"></label>

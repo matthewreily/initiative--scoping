@@ -4,7 +4,7 @@
     {
         id = c.CardId,
         effectiveStart = c.EffectiveStart.ToString("yyyy-MM-dd"),
-        options = c.Options.Select(o => new { type = o.ResourceTypeId, seniority = (int)o.Seniority, location = o.Location, cls = (int)o.ResourcingClass, vendor = o.VendorId, rate = o.Rate })
+        options = c.Options.Select(o => new { type = o.ResourceTypeId, seniority = o.SeniorityId, location = o.Location, cls = (int)o.ResourcingClass, vendor = o.VendorId, rate = o.Rate })
     });
     var phaseStarts = Model.Data.PhaseStarts.ToDictionary(p => p.Key, p => p.Value.ToString("yyyy-MM-dd"));
     var vendorClass = (int)InitiativeScoping.Domain.Enums.ResourcingClass.Vendor;
@@ -18,7 +18,7 @@
         const cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cards));
         const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
         const VENDOR = '@vendorClass';
-        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@((int)Model.Current.Seniority)', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)' };
+        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)' };
         const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
 
         function pricedFor(phaseId) {

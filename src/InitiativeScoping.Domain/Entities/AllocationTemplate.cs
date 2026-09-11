@@ -20,6 +20,7 @@ public class AllocationTemplateLine
     public required string PhaseName { get; set; }
     public int ResourceTypeId { get; set; }
     public ResourceType? ResourceType { get; set; }
-    public Seniority Seniority { get; set; }
+    public int SeniorityId { get; set; }
+    public SeniorityLevel? Seniority { get; set; }
     public decimal Percent { get; set; }
 }

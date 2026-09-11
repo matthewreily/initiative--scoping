@@ -20,7 +20,7 @@ public class BaselineTests
         {
             initiative.Allocations.Add(new InitiativeAllocation
             {
-                Id = a, InitiativeId = 7, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = a, Seniority = Seniority.Mid, Location = "Onshore",
+                Id = a, InitiativeId = 7, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = a, SeniorityId = 2, Location = "Onshore",
                 ResourcingClass = ResourcingClass.InternalFte, Quantity = 2, EstimatedHours = 50m
             });
         }

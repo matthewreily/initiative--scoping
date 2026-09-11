@@ -3,7 +3,7 @@ using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Domain.Services;
 
-public sealed record SizedAllocation(string PhaseName, int ResourceTypeId, Seniority Seniority, decimal Hours);
+public sealed record SizedAllocation(string PhaseName, int ResourceTypeId, int SeniorityId, decimal Hours);
 
 public static class SizingApplier
 {
@@ -27,7 +27,7 @@ public static class SizingApplier
                 ? totalHours - allocated
                 : Math.Round(totalHours * line.Percent / 100m, 2, MidpointRounding.AwayFromZero);
             allocated += hours;
-            result.Add(new SizedAllocation(line.PhaseName, line.ResourceTypeId, line.Seniority, hours));
+            result.Add(new SizedAllocation(line.PhaseName, line.ResourceTypeId, line.SeniorityId, hours));
         }
 
         return result;

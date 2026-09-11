@@ -63,7 +63,7 @@
                     <tbody>
                     @foreach (var l in t.Lines.OrderBy(l => l.PhaseName).ThenBy(l => l.ResourceType!.Name))
                     {
-                        <tr><td>@l.PhaseName</td><td>@l.ResourceType!.Name</td><td>@l.Seniority</td><td class="text-end">@l.Percent.ToString("0.##")</td></tr>
+                        <tr><td>@l.PhaseName</td><td>@l.ResourceType!.Name</td><td>@l.Seniority!.Name</td><td class="text-end">@l.Percent.ToString("0.##")</td></tr>
                     }
                     </tbody>
                 </table>

@@ -510,7 +510,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         var allocation = new InitiativeAllocation
         {
-            PhaseId = model.PhaseId, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = model.ResourceTypeId, Seniority = model.Seniority,
+            PhaseId = model.PhaseId, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = model.ResourceTypeId, SeniorityId = model.SeniorityId,
             Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, VendorId = VendorFor(model), Quantity = model.Quantity,
             EstimatedHours = model.EstimatedHours, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
         };
@@ -537,10 +537,11 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
 
         await PopulateAllocationLists(allocation.Initiative!, ct);
+        ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
         return View(new AllocationEditModel
         {
             Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, BusinessUnitId = allocation.BusinessUnitId, ResourceTypeId = allocation.ResourceTypeId,
-            Seniority = allocation.Seniority, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass, VendorId = allocation.VendorId,
+            SeniorityId = allocation.SeniorityId, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass, VendorId = allocation.VendorId,
             Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
             ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
         });
@@ -573,6 +574,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         if (!ModelState.IsValid)
         {
             await PopulateAllocationLists(initiative, ct);
+            ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
             return View(model);
         }
 
@@ -580,7 +582,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         allocation.PhaseId = model.PhaseId;
         allocation.BusinessUnitId = model.BusinessUnitId;
         allocation.ResourceTypeId = model.ResourceTypeId;
-        allocation.Seniority = model.Seniority;
+        allocation.SeniorityId = model.SeniorityId;
         allocation.Location = model.Location.Trim();
         allocation.ResourcingClass = model.ResourcingClass;
         allocation.VendorId = VendorFor(model);
@@ -954,7 +956,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
                 initiative.Allocations.Add(new InitiativeAllocation
                 {
-                    Phase = phase, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
+                    Phase = phase, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, SeniorityId = sized.SeniorityId,
                     Location = location, ResourcingClass = model.ResourcingClass, VendorId = vendorId, Quantity = 1,
                     AllocationPercent = percent,
                     EstimatedHours = DurationCalculator.Hours(percent, workingDays, calendar.HoursPerDay)
@@ -992,7 +994,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             {
                 initiative.Allocations.Add(new InitiativeAllocation
                 {
-                    Phase = phasesByName[sized.PhaseName], BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, Seniority = sized.Seniority,
+                    Phase = phasesByName[sized.PhaseName], BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, SeniorityId = sized.SeniorityId,
                     Location = location, ResourcingClass = model.ResourcingClass, VendorId = vendorId, Quantity = 1, EstimatedHours = sized.Hours
                 });
             }
@@ -1155,6 +1157,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
             .Include(i => i.Allocations).ThenInclude(a => a.BusinessUnit)
             .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
+            .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
             .Include(i => i.NonLaborCosts).ThenInclude(c => c.CostCatalogItem)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
             .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)
@@ -1238,6 +1241,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         ViewBag.Initiative = initiative;
         ViewBag.Phases = new SelectList(initiative.Phases.OrderBy(p => p.Sequence), "Id", "Name");
         ViewBag.RateOptions = await BuildRateOptionsAsync(initiative, await LoadRateCardsAsync(ct), ct);
+        ViewBag.CurrentSeniority = null;
         if (initiative.PlanningMode == PlanningMode.FixedDuration)
         {
             var calendar = await workCalendar.GetAsync(ct);
@@ -1384,13 +1388,15 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var participantIds = initiative.ParticipatingBusinessUnitIds.ToHashSet();
         var businessUnits = await db.BusinessUnits.Where(b => participantIds.Contains(b.Id)).OrderBy(b => b.Name).Select(b => new NamedId(b.Id, b.Name)).ToListAsync(ct);
         var vendors = await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).Select(v => new NamedId(v.Id, v.Name)).ToListAsync(ct);
+        var seniorities = await db.SeniorityLevels.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Name).Select(s => new NamedId(s.Id, s.Name)).ToListAsync(ct);
+        var seniorityOrder = seniorities.Select((s, i) => (s.Id, i)).ToDictionary(x => x.Id, x => x.i);
         var cardOptions = cards
             .Where(c => c.Status == RateCardStatus.Published)
             .OrderBy(c => c.EffectiveStart).ThenBy(c => c.Id)
             .Select(c => new RateCardOptions(c.Id, c.EffectiveStart, c.Entries
                 .Where(e => typeNames.ContainsKey(e.ResourceTypeId))
-                .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => e.Seniority).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass).ThenBy(e => e.VendorId)
-                .Select(e => new RateOption(e.ResourceTypeId, typeNames[e.ResourceTypeId], e.Seniority, e.Location, e.ResourcingClass, e.VendorId, e.HourlyRate))
+                .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => seniorityOrder.GetValueOrDefault(e.SeniorityId, int.MaxValue)).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass).ThenBy(e => e.VendorId)
+                .Select(e => new RateOption(e.ResourceTypeId, typeNames[e.ResourceTypeId], e.SeniorityId, e.Location, e.ResourcingClass, e.VendorId, e.HourlyRate))
                 .ToList()))
             .ToList();
         var locations = cards.SelectMany(c => c.Entries.Select(e => e.Location))
@@ -1405,7 +1411,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             initiative.Phases.ToDictionary(p => p.Id, p => p.PlannedStart),
             types,
             locations,
-            vendors);
+            vendors,
+            seniorities);
     }
 
     private async Task ValidateAllocation(AllocationEditModel model, Initiative initiative, CancellationToken ct, InitiativeAllocation? existing = null)
@@ -1439,17 +1446,22 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             ModelState.AddModelError(nameof(model.ResourceTypeId), "Select a resource type.");
         }
+
+        if (!await db.SeniorityLevels.AnyAsync(s => s.Id == model.SeniorityId, ct))
+        {
+            ModelState.AddModelError(nameof(model.SeniorityId), "Select a seniority level.");
+        }
         else if (phase is not null && participates && vendorError is null)
         {
             var priced = RateResolver.PricedEntries(await LoadRateCardsAsync(ct), phase.PlannedStart);
             var location = model.Location.Trim();
             var vendorId = VendorFor(model);
             var unchanged = existing is not null
-                && existing.ResourceTypeId == model.ResourceTypeId && existing.Seniority == model.Seniority
+                && existing.ResourceTypeId == model.ResourceTypeId && existing.SeniorityId == model.SeniorityId
                 && existing.ResourcingClass == model.ResourcingClass && existing.VendorId == vendorId
                 && string.Equals(existing.Location, location, StringComparison.OrdinalIgnoreCase);
             if (priced.Count > 0 && !unchanged && !priced.Any(e =>
-                    e.ResourceTypeId == model.ResourceTypeId && e.Seniority == model.Seniority && e.ResourcingClass == model.ResourcingClass
+                    e.ResourceTypeId == model.ResourceTypeId && e.SeniorityId == model.SeniorityId && e.ResourcingClass == model.ResourcingClass
                     && RateResolver.VendorMatches(e.ResourcingClass, e.VendorId, vendorId)
                     && string.Equals(e.Location, location, StringComparison.OrdinalIgnoreCase)))
             {
@@ -1563,7 +1575,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         new { i.Name, i.Description, i.BusinessUnitId, ParticipatingBusinessUnitIds = i.ParticipatingBusinessUnitIds.ToList(), i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct };
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
-        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.Seniority, a.Location, a.ResourcingClass, a.VendorId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
+        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
 
     private static List<RollupRow> Rollup(ForecastResult forecast, Func<ForecastLine, string> key, IEnumerable<string>? order = null)
     {

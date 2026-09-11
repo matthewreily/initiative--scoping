@@ -75,7 +75,8 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
         var typeNames = await db.ResourceTypeNamesAsync(ct);
         var businessUnitNames = await db.BusinessUnits.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.Name, ct);
         var vendorNames = await db.Vendors.AsNoTracking().ToDictionaryAsync(v => v.Id, v => v.Name, ct);
-        var bytes = writer.Write(InitiativeExport.Build(initiative, forecast, actuals.Variance, actuals.Entries, actuals.Adjustments, typeNames, businessUnitNames, vendorNames));
+        var seniorityNames = await db.SeniorityLevels.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+        var bytes = writer.Write(InitiativeExport.Build(initiative, forecast, actuals.Variance, actuals.Entries, actuals.Adjustments, typeNames, businessUnitNames, vendorNames, seniorityNames));
 
         audit.Record(nameof(Initiative), id, AuditActions.Export, new { Format = writer.Extension, Rows = actuals.Entries.Count });
         await db.SaveChangesAsync(ct);

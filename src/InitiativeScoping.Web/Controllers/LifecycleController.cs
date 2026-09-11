@@ -131,6 +131,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         var typeNames = await db.ResourceTypes.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name, ct);
         var buNames = await db.BusinessUnits.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.Name, ct);
         var vendorNames = await db.Vendors.AsNoTracking().ToDictionaryAsync(v => v.Id, v => v.Name, ct);
+        var seniorityNames = await db.SeniorityLevels.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name, ct);
         var phaseNames = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
 
         return View(new BaselinesModel
@@ -140,7 +141,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             Selected = selected,
             Previous = previous,
             LiveForecast = forecast,
-            Lines = selected is null ? [] : BaselineLines(selected, previous, phaseNames, typeNames, buNames, vendorNames),
+            Lines = selected is null ? [] : BaselineLines(selected, previous, phaseNames, typeNames, buNames, vendorNames, seniorityNames),
             Requests = initiative.RebaselineRequests.OrderByDescending(r => r.Id).ToList(),
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
             CanApprove = InitiativeAccess.CanApproveRebaseline(currentUser)
@@ -312,10 +313,11 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
     private static List<BaselineLineRow> BaselineLines(
         ForecastBaseline selected, ForecastBaseline? previous,
         IReadOnlyDictionary<int, string> phaseNames, IReadOnlyDictionary<int, string> typeNames,
-        IReadOnlyDictionary<int, string> buNames, IReadOnlyDictionary<int, string> vendorNames)
+        IReadOnlyDictionary<int, string> buNames, IReadOnlyDictionary<int, string> vendorNames, IReadOnlyDictionary<int, string> seniorityNames)
     {
-        static string Key(ForecastBaselineLine l) => $"{l.PhaseId}|{l.BusinessUnitId}|{l.ResourceTypeId}|{l.Seniority}|{l.Location}|{l.ResourcingClass}|{l.VendorId}";
+        static string Key(ForecastBaselineLine l) => $"{l.PhaseId}|{l.BusinessUnitId}|{l.ResourceTypeId}|{l.SeniorityId}|{l.Location}|{l.ResourcingClass}|{l.VendorId}";
         string? VendorName(int? id) => id is null ? null : vendorNames.GetValueOrDefault(id.Value, $"Vendor #{id}");
+        string SeniorityName(int id) => seniorityNames.GetValueOrDefault(id, $"Seniority #{id}");
         var prev = (previous?.Lines ?? []).GroupBy(Key).ToDictionary(g => g.Key, g => (Hours: g.Sum(l => l.Hours), Cost: g.Sum(l => l.Cost)));
         var rows = selected.Lines.GroupBy(Key).Select(g =>
         {
@@ -326,7 +328,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
                 buNames.GetValueOrDefault(first.BusinessUnitId, $"BU #{first.BusinessUnitId}"),
                 VendorName(first.VendorId),
                 typeNames.GetValueOrDefault(first.ResourceTypeId, $"Type #{first.ResourceTypeId}"),
-                first.Seniority, first.Location, first.ResourcingClass,
+                SeniorityName(first.SeniorityId), first.Location, first.ResourcingClass,
                 g.Sum(l => l.Hours), first.HourlyRate, g.Sum(l => l.Cost),
                 previous is null ? null : g.Sum(l => l.Hours) - p.Hours,
                 previous is null ? null : g.Sum(l => l.Cost) - p.Cost);
@@ -341,7 +343,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
                 buNames.GetValueOrDefault(l.BusinessUnitId, $"BU #{l.BusinessUnitId}"),
                 VendorName(l.VendorId),
                 typeNames.GetValueOrDefault(l.ResourceTypeId, $"Type #{l.ResourceTypeId}"),
-                l.Seniority, l.Location, l.ResourcingClass, 0m, l.HourlyRate, 0m, -p.Hours, -p.Cost));
+                SeniorityName(l.SeniorityId), l.Location, l.ResourcingClass, 0m, l.HourlyRate, 0m, -p.Hours, -p.Cost));
         }
 
         return rows.OrderBy(r => r.Phase).ThenBy(r => r.ResourceType).ThenBy(r => r.Seniority).ToList();

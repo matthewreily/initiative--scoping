@@ -19,7 +19,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Index(string? search, CancellationToken ct)
     {
-        var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).AsQueryable();
+        var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.Seniority).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
@@ -56,7 +56,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             ExternalIds = NormalizeIds(model.ExternalIds),
             ResourceTypeId = model.ResourceTypeId,
             BusinessUnitId = model.BusinessUnitId,
-            Seniority = model.Seniority,
+            SeniorityId = model.SeniorityId,
             Location = model.Location.Trim(),
             ResourcingClass = model.ResourcingClass,
             VendorId = VendorFor(model),
@@ -77,7 +77,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             return NotFound();
         }
 
-        await PopulateLists(ct);
+        await PopulateLists(ct, person.SeniorityId);
         return View(new PersonEditModel
         {
             Id = person.Id,
@@ -85,7 +85,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             ExternalIds = person.ExternalIds,
             ResourceTypeId = person.ResourceTypeId,
             BusinessUnitId = person.BusinessUnitId,
-            Seniority = person.Seniority,
+            SeniorityId = person.SeniorityId,
             Location = person.Location,
             ResourcingClass = person.ResourcingClass,
             VendorId = person.VendorId,
@@ -106,7 +106,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         await Validate(model, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateLists(ct);
+            await PopulateLists(ct, person.SeniorityId);
             return View(model);
         }
 
@@ -115,7 +115,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         person.ExternalIds = NormalizeIds(model.ExternalIds);
         person.ResourceTypeId = model.ResourceTypeId;
         person.BusinessUnitId = model.BusinessUnitId;
-        person.Seniority = model.Seniority;
+        person.SeniorityId = model.SeniorityId;
         person.Location = model.Location.Trim();
         person.ResourcingClass = model.ResourcingClass;
         person.VendorId = VendorFor(model);
@@ -147,18 +147,18 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Export(CancellationToken ct)
     {
-        var people = await db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor)
+        var people = await db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.Seniority)
             .OrderBy(p => p.DisplayName).ToListAsync(ct);
         var rows = people.Select(p => new PeopleCsvRow(p.DisplayName, SplitIds(p.ExternalIds), p.ResourceType!.Name, p.BusinessUnit!.Name,
-            p.Seniority, p.Location, p.ResourcingClass, p.IsActive, p.Vendor?.Name));
+            p.Seniority!.Name, p.Location, p.ResourcingClass, p.IsActive, p.Vendor?.Name));
         return Csv(rows, "people.csv");
     }
 
     public IActionResult Template() =>
         Csv(
         [
-            new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", Seniority.Senior, "Onshore", ResourcingClass.InternalFte, true),
-            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", Seniority.Mid, "Offshore", ResourcingClass.Vendor, true, "Acme Consulting")
+            new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", "Senior", "Onshore", ResourcingClass.InternalFte, true),
+            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", "Level 2 (3-5 Years)", "Offshore", ResourcingClass.Vendor, true, "Acme Consulting")
         ], "people-template.csv");
 
     /// <summary>
@@ -239,6 +239,18 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             return RedirectWithError("Import rejected; no changes made. " + string.Join(" | ", errors.Take(10)) + (errors.Count > 10 ? $" (+{errors.Count - 10} more)" : string.Empty));
         }
 
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        Dictionary<string, SeniorityLevel> seniorities;
+        IReadOnlyList<string> addedLevels;
+        try
+        {
+            (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+        }
+        catch (DbUpdateException)
+        {
+            return RedirectWithError(SeniorityCatalog.ConcurrentImportMessage);
+        }
+
         var added = 0;
         var updated = 0;
         foreach (var (row, existing) in matches)
@@ -249,7 +261,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
                 var person = new Person
                 {
                     DisplayName = row.DisplayName, ExternalIds = ids, ResourceTypeId = resourceTypes[row.ResourceType], BusinessUnitId = businessUnits[row.BusinessUnit],
-                    Seniority = row.Seniority, Location = row.Location, ResourcingClass = row.ResourcingClass, IsActive = row.IsActive,
+                    SeniorityId = seniorities[row.Seniority].Id, Location = row.Location, ResourcingClass = row.ResourcingClass, IsActive = row.IsActive,
                     VendorId = row.Vendor is null ? null : vendors[row.Vendor]
                 };
                 db.People.Add(person);
@@ -263,7 +275,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             existing.ExternalIds = ids;
             existing.ResourceTypeId = resourceTypes[row.ResourceType];
             existing.BusinessUnitId = businessUnits[row.BusinessUnit];
-            existing.Seniority = row.Seniority;
+            existing.SeniorityId = seniorities[row.Seniority].Id;
             existing.Location = row.Location;
             existing.ResourcingClass = row.ResourcingClass;
             existing.VendorId = row.Vendor is null ? null : vendors[row.Vendor];
@@ -275,10 +287,19 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             }
         }
 
-        await db.SaveChangesAsync(ct);
-        audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated });
-        await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.");
+        audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated, NewSeniorityLevels = addedLevels });
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return RedirectWithError(SeniorityCatalog.ConcurrentImportMessage);
+        }
+
+        await tx.CommitAsync(ct);
+        var levelsNote = addedLevels.Count == 0 ? string.Empty : $" New seniority level(s) added to the catalog: {string.Join(", ", addedLevels)}.";
+        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.{levelsNote}");
     }
 
     private FileContentResult Csv(IEnumerable<PeopleCsvRow> rows, string fileName)
@@ -305,6 +326,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         if (!await db.BusinessUnits.AnyAsync(b => b.Id == model.BusinessUnitId, ct))
         {
             ModelState.AddModelError(nameof(model.BusinessUnitId), "Choose a business unit.");
+        }
+
+        if (!await db.SeniorityLevels.AnyAsync(s => s.Id == model.SeniorityId, ct))
+        {
+            ModelState.AddModelError(nameof(model.SeniorityId), "Choose a seniority level.");
         }
 
         if (model.ResourcingClass == ResourcingClass.Vendor && model.VendorId is { } vendorId && !await db.Vendors.AnyAsync(v => v.Id == vendorId, ct))
@@ -340,17 +366,18 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         return joined.Length == 0 ? null : joined;
     }
 
-    private async Task PopulateLists(CancellationToken ct)
+    private async Task PopulateLists(CancellationToken ct, int? currentSeniorityId = null)
     {
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.BusinessUnits = new SelectList(await db.BusinessUnits.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.Vendors = new SelectList(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");
+        ViewBag.Seniorities = new SelectList(await SeniorityCatalog.OptionsAsync(db, currentSeniorityId is null ? [] : [currentSeniorityId.Value], ct), "Id", "Name");
     }
 
     private static int? VendorFor(PersonEditModel model) => model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;
 
     private static object Snapshot(Person p) =>
-        new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.Seniority, p.Location, p.ResourcingClass, p.VendorId, p.IsActive };
+        new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.SeniorityId, p.Location, p.ResourcingClass, p.VendorId, p.IsActive };
 
     [HttpPost]
     public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(

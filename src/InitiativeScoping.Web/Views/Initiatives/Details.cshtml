@@ -2,7 +2,6 @@
 @{
     var i = Model.Initiative;
     ViewData["Title"] = i.Name;
-    var seniorities = Html.GetEnumSelectList<Seniority>();
     var classes = Html.GetEnumSelectList<ResourcingClass>();
     var roles = Html.GetEnumSelectList<InitiativeMemberRole>();
     var nonLaborCategories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString()).ToList();
@@ -12,7 +11,7 @@
     var orderedAllocations = i.Allocations
         .OrderBy(a => i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence ?? int.MaxValue)
         .ThenBy(a => Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId))
-        .ThenBy(a => a.Seniority).ToList();
+        .ThenBy(a => a.Seniority!.SortOrder).ToList();
     var fixedDuration = i.PlanningMode == PlanningMode.FixedDuration;
     var fd = Model.FixedDuration;
 }
@@ -276,7 +275,7 @@ else
                     <td data-sort="@(i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence)">@phaseNames.GetValueOrDefault(a.PhaseId)</td>
                     <td>@a.BusinessUnit?.Name</td>
                     <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
-                    <td>@a.Seniority</td>
+                    <td data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
                     <td>@a.Location</td>
                     <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}")</td>
                     <td class="text-end">@a.Quantity</td>
@@ -345,7 +344,7 @@ else
                 </div>
                 <div class="col-md-2">
                     <label for="seniority" class="form-label small mb-0">Seniority</label>
-                    <select name="Seniority" id="seniority" asp-items="seniorities" class="form-select form-select-sm"></select>
+                    <select name="SeniorityId" id="seniority" asp-items="@(new SelectList(Model.RateOptions.Seniorities, "Id", "Name"))" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2">
                     <label for="location" class="form-label small mb-0">Location</label>

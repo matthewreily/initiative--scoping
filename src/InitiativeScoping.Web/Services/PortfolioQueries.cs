@@ -50,6 +50,7 @@ public static class PortfolioQueries
             .Include(i => i.ParticipatingBusinessUnits).ThenInclude(p => p.BusinessUnit)
             .Include(i => i.Allocations).ThenInclude(a => a.BusinessUnit)
             .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
+            .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
             .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
             .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)

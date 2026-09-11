@@ -35,6 +35,25 @@ public class DisciplineListItem
     public int ReferenceCount { get; init; }
 }
 
+public class SeniorityEditModel
+{
+    public int Id { get; set; }
+    [Required, StringLength(100)]
+    public string Name { get; set; } = string.Empty;
+    [Required, Range(0, 1000), Display(Name = "Sort order")]
+    public int SortOrder { get; set; } = 1;
+    public bool IsActive { get; set; } = true;
+}
+
+public class SeniorityListItem
+{
+    public required SeniorityLevel Level { get; init; }
+    public int RateCardEntries { get; init; }
+    public int Allocations { get; init; }
+    public int People { get; init; }
+    public int TemplateLines { get; init; }
+}
+
 public class VendorEditModel
 {
     public int Id { get; set; }
@@ -83,8 +102,8 @@ public class RateCardEntryEditModel
     public int RateCardId { get; set; }
     [Required, Display(Name = "Resource type")]
     public int ResourceTypeId { get; set; }
-    [Required]
-    public Seniority Seniority { get; set; } = Seniority.Mid;
+    [Required, Display(Name = "Seniority")]
+    public int SeniorityId { get; set; }
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
@@ -100,6 +119,7 @@ public class RateCardDetailsModel
     public required RateCard Card { get; init; }
     public required RateCardEntryEditModel NewEntry { get; init; }
     public required SelectList ResourceTypes { get; init; }
+    public required SelectList Seniorities { get; init; }
     public required SelectList Vendors { get; init; }
     public string? FilterResourceType { get; init; }
     public bool IsEditable => Card.Status != RateCardStatus.Retired;
@@ -142,8 +162,8 @@ public class AllocationTemplateLineEditModel
     public string PhaseName { get; set; } = string.Empty;
     [Required, Display(Name = "Resource type")]
     public int ResourceTypeId { get; set; }
-    [Required]
-    public Seniority Seniority { get; set; } = Seniority.Mid;
+    [Required, Display(Name = "Seniority")]
+    public int SeniorityId { get; set; }
     [Required, Range(0.01, 100)]
     public decimal Percent { get; set; }
 }
@@ -165,8 +185,8 @@ public class PersonEditModel
     public int ResourceTypeId { get; set; }
     [Required, Display(Name = "Business unit")]
     public int BusinessUnitId { get; set; }
-    [Required]
-    public Seniority Seniority { get; set; } = Seniority.Mid;
+    [Required, Display(Name = "Seniority")]
+    public int SeniorityId { get; set; }
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]

@@ -83,8 +83,8 @@ public class AllocationEditModel
     public int BusinessUnitId { get; set; }
     [Required, Display(Name = "Resource type")]
     public int ResourceTypeId { get; set; }
-    [Required]
-    public Seniority Seniority { get; set; } = Seniority.Mid;
+    [Required, Display(Name = "Seniority")]
+    public int SeniorityId { get; set; }
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
@@ -175,7 +175,7 @@ public sealed record RollupRow(string Label, decimal Hours, decimal Cost, bool H
 public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 
 /// <summary>One priced (resource type, seniority, location, class, vendor) combination from a published rate card; rates are global across business units.</summary>
-public sealed record RateOption(int ResourceTypeId, string ResourceType, Seniority Seniority, string Location, ResourcingClass ResourcingClass, int? VendorId, decimal Rate);
+public sealed record RateOption(int ResourceTypeId, string ResourceType, int SeniorityId, string Location, ResourcingClass ResourcingClass, int? VendorId, decimal Rate);
 
 public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, IReadOnlyList<RateOption> Options);
 
@@ -201,7 +201,8 @@ public sealed record RateOptionsData(
     IReadOnlyDictionary<int, DateOnly> PhaseStarts,
     IReadOnlyList<NamedId> AllResourceTypes,
     IReadOnlyList<string> AllLocations,
-    IReadOnlyList<NamedId> Vendors)
+    IReadOnlyList<NamedId> Vendors,
+    IReadOnlyList<NamedId> Seniorities)
 {
     public bool HasAnyPricing => Cards.Any(c => c.Options.Count > 0);
 }
@@ -290,7 +291,7 @@ public sealed record BaselineLineRow(
     string BusinessUnit,
     string? Vendor,
     string ResourceType,
-    Seniority Seniority,
+    string Seniority,
     string Location,
     ResourcingClass ResourcingClass,
     decimal Hours,

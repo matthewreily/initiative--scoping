@@ -37,7 +37,7 @@ public static class BaselineSnapshot
                 PhaseId = l.Allocation.PhaseId,
                 BusinessUnitId = l.Allocation.BusinessUnitId,
                 ResourceTypeId = l.Allocation.ResourceTypeId,
-                Seniority = l.Allocation.Seniority,
+                SeniorityId = l.Allocation.SeniorityId,
                 Location = l.Allocation.Location,
                 ResourcingClass = l.Allocation.ResourcingClass,
                 VendorId = l.Allocation.VendorId,

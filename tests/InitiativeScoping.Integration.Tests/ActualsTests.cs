@@ -107,9 +107,9 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var client = factory.CreateClient(NoRedirect);
         var (typeId, buId) = await LookupsAsync(factory);
         var tag = Guid.NewGuid().ToString("N")[..8];
-        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Sam {tag}", $"SAM-{tag}", typeId, buId, "Senior"));
-        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Off {tag}", $"OFF-{tag}", typeId, buId, "Senior", location: "Offshore"));
-        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Gone {tag}", $"GONE-{tag}", typeId, buId, "Senior", active: false));
+        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Sam {tag}", $"SAM-{tag}", typeId, buId, 3));
+        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Off {tag}", $"OFF-{tag}", typeId, buId, 3, location: "Offshore"));
+        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Gone {tag}", $"GONE-{tag}", typeId, buId, 3, active: false));
         var id = await CreateMappedInitiativeAsync(client, factory, $"Import {tag}", $"PRJ-{tag}");
 
         // Invalid file: nothing is written.
@@ -193,7 +193,7 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var client = factory.CreateClient(NoRedirect);
         var (typeId, buId) = await LookupsAsync(factory);
         var tag = Guid.NewGuid().ToString("N")[..8];
-        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Ann {tag}", $"ANN-{tag}", typeId, buId, "Mid"));
+        await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", Person($"Ann {tag}", $"ANN-{tag}", typeId, buId, 2));
         var personId = await PersonIdAsync(factory, $"Ann {tag}");
         var id = await CreateInitiativeAsync(client, factory, $"Unmapped {tag}");
 
@@ -327,10 +327,10 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 
     // ----- Helpers -----
 
-    private static Dictionary<string, string> Person(string name, string ids, int typeId, int buId, string seniority = "Mid", string location = "Onshore", bool active = true) => new()
+    private static Dictionary<string, string> Person(string name, string ids, int typeId, int buId, int seniorityId = 2, string location = "Onshore", bool active = true) => new()
     {
         ["DisplayName"] = name, ["ExternalIds"] = ids, ["ResourceTypeId"] = typeId.ToString(), ["BusinessUnitId"] = buId.ToString(),
-        ["Seniority"] = seniority, ["Location"] = location, ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["IsActive"] = active ? "true" : "false"
+        ["SeniorityId"] = seniorityId.ToString(), ["Location"] = location, ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["IsActive"] = active ? "true" : "false"
     };
 
     private static async Task<(int TypeId, int BuId)> LookupsAsync(WebAppFactory f)
@@ -405,7 +405,7 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         // Seeded rate: Senior internal Onshore = 120/h; 2 x 100h = 24,000.
         var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
-            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["Seniority"] = nameof(Seniority.Senior),
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);
