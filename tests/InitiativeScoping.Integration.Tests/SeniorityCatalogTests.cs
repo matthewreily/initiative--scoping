@@ -155,6 +155,35 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task People_edit_form_keeps_an_inactive_level_that_the_person_already_uses()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var name = $"Retired ({Guid.NewGuid():N})";
+        int personId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var level = new SeniorityLevel { Name = name, SortOrder = 50, IsActive = false };
+            db.SeniorityLevels.Add(level);
+            var person = new Person
+            {
+                DisplayName = $"P {Guid.NewGuid():N}"[..20], ResourceTypeId = await db.ResourceTypes.Select(t => t.Id).FirstAsync(),
+                BusinessUnitId = await db.BusinessUnits.Select(b => b.Id).FirstAsync(), Seniority = level, Location = "Onshore",
+                ResourcingClass = ResourcingClass.InternalFte
+            };
+            db.People.Add(person);
+            await db.SaveChangesAsync();
+            personId = person.Id;
+        }
+
+        var html = await client.GetStringAsync($"/Admin/People/Edit/{personId}");
+        Assert.Contains(name + " (inactive)", html);
+
+        var create = await client.GetStringAsync("/Admin/People/Create");
+        Assert.DoesNotContain(name, create);
+    }
+
+    [Fact]
     public async Task Allocation_form_lists_catalog_levels_and_rejects_unknown_ids()
     {
         var client = factory.CreateClient(NoRedirect);

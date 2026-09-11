@@ -1,6 +1,7 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Application.RateCards;
@@ -70,6 +71,12 @@ public static class RateCardCsv
             if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(seniority) || string.IsNullOrWhiteSpace(location))
             {
                 errors.Add(new RateCardCsvError(line, "ResourceType, Seniority and Location are required."));
+                continue;
+            }
+
+            if (seniority.Length > SeniorityLevel.MaxNameLength)
+            {
+                errors.Add(new RateCardCsvError(line, $"Seniority must be at most {SeniorityLevel.MaxNameLength} characters."));
                 continue;
             }
 

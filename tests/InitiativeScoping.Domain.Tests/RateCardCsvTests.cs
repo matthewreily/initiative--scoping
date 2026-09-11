@@ -56,6 +56,15 @@ public class RateCardCsvTests
     }
 
     [Fact]
+    public void Rejects_seniority_names_over_the_catalog_limit()
+    {
+        var result = RateCardCsv.Parse(new StringReader(Header + $"SE,{new string('x', 101)},Onshore,Internal,100\n"));
+
+        Assert.False(result.IsValid);
+        Assert.Contains("at most 100 characters", Assert.Single(result.Errors).Message);
+    }
+
+    [Fact]
     public void Accepts_any_seniority_name()
     {
         var result = RateCardCsv.Parse(new StringReader(Header + "SE,Level 1 (0-2 Years),Onshore,Internal,100\n"));

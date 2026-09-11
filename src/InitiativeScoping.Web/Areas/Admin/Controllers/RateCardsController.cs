@@ -520,7 +520,16 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+        Dictionary<string, SeniorityLevel> seniorities;
+        IReadOnlyList<string> addedLevels;
+        try
+        {
+            (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+        }
+        catch (DbUpdateException)
+        {
+            return RedirectWithError(SeniorityCatalog.ConcurrentImportMessage, "Details", new { id });
+        }
 
         var removed = 0;
         if (model.Replace)
@@ -557,7 +566,15 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         audit.Record(nameof(RateCard), card.Id, AuditActions.Import, new { model.File.FileName, model.Replace, Added = added, Updated = updated, Removed = removed, NewSeniorityLevels = addedLevels });
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return RedirectWithError(SeniorityCatalog.ConcurrentImportMessage, "Details", new { id });
+        }
+
         await tx.CommitAsync(ct);
         var levelsNote = addedLevels.Count == 0 ? string.Empty : $" New seniority level(s) added to the catalog: {string.Join(", ", addedLevels)}.";
         return RedirectWithSuccess($"Import complete: {added} added, {updated} updated, {removed} removed.{levelsNote}", "Details", new { id });

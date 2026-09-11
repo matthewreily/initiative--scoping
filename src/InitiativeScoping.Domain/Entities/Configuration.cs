@@ -20,6 +20,8 @@ public class Vendor
 /// <summary>Admin-managed career level (e.g. "Senior", "Level 1 (0-2 Years)"); rate-card rows, allocations, people and templates reference one. Ordered by <see cref="SortOrder"/>.</summary>
 public class SeniorityLevel
 {
+    public const int MaxNameLength = 100;
+
     public int Id { get; set; }
     public required string Name { get; set; }
     public int SortOrder { get; set; }

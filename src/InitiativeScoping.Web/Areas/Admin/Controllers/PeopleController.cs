@@ -77,7 +77,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             return NotFound();
         }
 
-        await PopulateLists(ct);
+        await PopulateLists(ct, person.SeniorityId);
         return View(new PersonEditModel
         {
             Id = person.Id,
@@ -106,7 +106,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         await Validate(model, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateLists(ct);
+            await PopulateLists(ct, person.SeniorityId);
             return View(model);
         }
 
@@ -240,7 +240,16 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         }
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+        Dictionary<string, SeniorityLevel> seniorities;
+        IReadOnlyList<string> addedLevels;
+        try
+        {
+            (seniorities, addedLevels) = await SeniorityCatalog.ResolveOrCreateAsync(db, audit, parsed.Rows.Select(r => r.Seniority), ct);
+        }
+        catch (DbUpdateException)
+        {
+            return RedirectWithError(SeniorityCatalog.ConcurrentImportMessage);
+        }
 
         var added = 0;
         var updated = 0;
@@ -278,9 +287,16 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             }
         }
 
-        await db.SaveChangesAsync(ct);
         audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated, NewSeniorityLevels = addedLevels });
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return RedirectWithError(SeniorityCatalog.ConcurrentImportMessage);
+        }
+
         await tx.CommitAsync(ct);
         var levelsNote = addedLevels.Count == 0 ? string.Empty : $" New seniority level(s) added to the catalog: {string.Join(", ", addedLevels)}.";
         return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.{levelsNote}");
@@ -350,12 +366,12 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         return joined.Length == 0 ? null : joined;
     }
 
-    private async Task PopulateLists(CancellationToken ct)
+    private async Task PopulateLists(CancellationToken ct, int? currentSeniorityId = null)
     {
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.BusinessUnits = new SelectList(await db.BusinessUnits.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.Vendors = new SelectList(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");
-        ViewBag.Seniorities = new SelectList(await db.SeniorityLevels.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Name).ToListAsync(ct), "Id", "Name");
+        ViewBag.Seniorities = new SelectList(await SeniorityCatalog.OptionsAsync(db, currentSeniorityId is null ? [] : [currentSeniorityId.Value], ct), "Id", "Name");
     }
 
     private static int? VendorFor(PersonEditModel model) => model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;

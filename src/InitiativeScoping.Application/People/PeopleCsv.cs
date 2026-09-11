@@ -1,6 +1,7 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Application.People;
@@ -77,6 +78,12 @@ public static class PeopleCsv
                 || string.IsNullOrWhiteSpace(seniority) || string.IsNullOrWhiteSpace(location))
             {
                 errors.Add(new PeopleCsvError(line, "DisplayName, ResourceType, BusinessUnit, Seniority and Location are required."));
+                continue;
+            }
+
+            if (seniority.Length > SeniorityLevel.MaxNameLength)
+            {
+                errors.Add(new PeopleCsvError(line, $"Seniority must be at most {SeniorityLevel.MaxNameLength} characters."));
                 continue;
             }
 

@@ -128,7 +128,7 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
             return NotFound();
         }
 
-        await PopulateResourceTypes(ct);
+        await PopulateResourceTypes(ct, template.Lines.Select(l => l.SeniorityId));
         return View(new AllocationTemplateEditModel
         {
             Id = template.Id,
@@ -156,7 +156,7 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
         await ValidateTemplate(model, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateResourceTypes(ct);
+            await PopulateResourceTypes(ct, template.Lines.Select(l => l.SeniorityId).Concat(model.Lines.Select(l => l.SeniorityId)));
             return View(model);
         }
 
@@ -232,9 +232,9 @@ public class SizingController(AppDbContext db, IAuditLog audit) : AdminControlle
         }
     }
 
-    private async Task PopulateResourceTypes(CancellationToken ct)
+    private async Task PopulateResourceTypes(CancellationToken ct, IEnumerable<int>? referencedSeniorityIds = null)
     {
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
-        ViewBag.Seniorities = new SelectList(await db.SeniorityLevels.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Name).ToListAsync(ct), "Id", "Name");
+        ViewBag.Seniorities = new SelectList(await SeniorityCatalog.OptionsAsync(db, referencedSeniorityIds ?? [], ct), "Id", "Name");
     }
 }
