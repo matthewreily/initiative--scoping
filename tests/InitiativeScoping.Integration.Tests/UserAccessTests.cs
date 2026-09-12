@@ -218,6 +218,25 @@ public class UserAccessTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         Assert.Contains("Dev User (dev.user@example.com)", audit);
     }
 
+    [Fact]
+    public async Task Sign_out_is_in_the_nav_and_lands_on_signed_out_page()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var home = await client.GetStringAsync("/");
+        Assert.Contains("action=\"/Access/SignOut\"", home);
+        Assert.Contains("Sign out", home);
+
+        var post = await PostFormAsync(client, "/", "/Access/SignOut", new());
+        Assert.Equal(HttpStatusCode.Redirect, post.StatusCode);
+        Assert.Equal("/Access/SignedOut", post.Headers.Location!.ToString());
+
+        // Unknown users can sign out too: the page is outside the access gate.
+        await using var f = new NoRoleFactory();
+        var gated = f.CreateClient(NoRedirect);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(gated, "/Access", "/Access/SignOut", new())).StatusCode);
+        Assert.Contains("signed out", await gated.GetStringAsync("/Access/SignedOut"));
+    }
+
     private static async Task Seed(WebAppFactory f, UserAccount account)
     {
         using var scope = f.Services.CreateScope();

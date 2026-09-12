@@ -4,6 +4,9 @@ using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Infrastructure.Access;
 using InitiativeScoping.Web.Authorization;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,6 +43,26 @@ public class AccessController(UserAccessService access, AccessCache accessCache)
             : "Your account already exists.";
         return RedirectToAction(nameof(Index));
     }
+
+    /// <summary>Ends the app session and the Entra session, landing on <see cref="SignedOut"/>.</summary>
+    [HttpPost("/Access/SignOut")]
+    public IActionResult EndSession()
+    {
+        var landing = Url.Action(nameof(SignedOut))!;
+        if (User.Identity?.AuthenticationType == AuthSetup.DevScheme)
+        {
+            return Redirect(landing);
+        }
+
+        return SignOut(
+            new AuthenticationProperties { RedirectUri = landing },
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            OpenIdConnectDefaults.AuthenticationScheme);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("/Access/SignedOut")]
+    public IActionResult SignedOut() => View();
 
     private SignedInUser SignedIn() => new(PrincipalClaims.ObjectId(User), PrincipalClaims.Email(User), PrincipalClaims.DisplayName(User), []);
 }

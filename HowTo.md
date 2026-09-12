@@ -26,6 +26,7 @@ Three application roles, granted in-app at `Admin → Users`:
 - Admins see a pending count on `Admin → Users` and **Approve** (choosing Viewer/User/Admin) or **Reject**. They can also **Add user** by e-mail before that person has ever signed in (the row is linked to their Entra account at first sign-in), change roles, **Disable**/**Enable**, or remove. An Admin cannot demote, disable or remove their own account.
 - Sign-in also records each person's display name and e-mail, which is why members, *Created by*, *Requested/Decided by* and the audit log show names instead of object IDs, and why *Add member* offers a picker of known users.
 - Two overrides exist for bootstrapping and compatibility: accounts listed in `Auth:BootstrapAdmins` (object ID or e-mail; `bootstrap_admins` in the Terraform tfvars) are always Admin, and Entra **app roles** (`Admin`/`User`/`Viewer`, plus the legacy `Administrator`→Admin, `InitiativeOwner`/`Contributor`/`FinancePmo`→User) still apply and win when higher than the in-app role — including for pending or disabled accounts, so remove the Entra assignment too when revoking someone.
+- **Sign out** (top right, next to your name) ends both the app session and the Entra session, so the next visit prompts for credentials again — use it on shared computers or to switch accounts.
 
 ## 1. First-time setup (Admin)
 
