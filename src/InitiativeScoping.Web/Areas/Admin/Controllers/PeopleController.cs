@@ -106,7 +106,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         await Validate(model, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateLists(ct, person.SeniorityId);
+            await PopulateLists(ct, person.SeniorityId, model.SeniorityId);
             return View(model);
         }
 
@@ -362,12 +362,12 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         return joined.Length == 0 ? null : joined;
     }
 
-    private async Task PopulateLists(CancellationToken ct, int? currentSeniorityId = null)
+    private async Task PopulateLists(CancellationToken ct, params int[] includeSeniorityIds)
     {
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.BusinessUnits = new SelectList(await db.BusinessUnits.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.Vendors = new SelectList(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");
-        ViewBag.Seniorities = new SelectList(await SeniorityCatalog.OptionsAsync(db, currentSeniorityId is null ? [] : [currentSeniorityId.Value], ct), "Id", "Name");
+        ViewBag.Seniorities = new SelectList(await SeniorityCatalog.OptionsAsync(db, includeSeniorityIds, ct), "Id", "Name");
     }
 
     private static int? VendorFor(PersonEditModel model) => model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;

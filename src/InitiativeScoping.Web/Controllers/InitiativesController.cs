@@ -574,7 +574,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         if (!ModelState.IsValid)
         {
             await PopulateAllocationLists(initiative, ct);
-            ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
+            ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([model.SeniorityId], ct)
+                ?? await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
             return View(model);
         }
 
