@@ -95,8 +95,8 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
         var level1 = $"Level 1 (0-2 Years) {tag}";
         var level2 = $"Level 2 (3-5 Years) {tag}";
 
-        // A rejected file (unknown resource type) must not add the seniority level either.
-        var bad = $"ResourceType,Seniority,Location,ResourcingClass,HourlyRate\nNope,{level1},Onshore,Internal,100\n";
+        // A rejected file (unknown vendor) must not add the seniority level either.
+        var bad = $"ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor\nSoftware Engineer,{level1},Onshore,Vendor,100,No Such Vendor {tag}\n";
         await PostCsvAsync(client, detailsUrl, $"/Admin/RateCards/Import/{id}", bad);
         Assert.Contains("Import rejected", await client.GetStringAsync(detailsUrl));
         Assert.Equal(0, await LevelCountAsync(level1));
@@ -130,6 +130,76 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
         export.EnsureSuccessStatusCode();
         Assert.Contains($"Software Engineer,{level1},Onshore,Vendor,85", await export.Content.ReadAsStringAsync());
         Assert.Contains(level1, await client.GetStringAsync("/Admin/Seniorities"));
+    }
+
+    [Fact]
+    public async Task Rate_card_csv_import_adds_unknown_resource_types_with_discipline_or_unassigned()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var create = await PostFormAsync(client, "/Admin/RateCards/Create", "/Admin/RateCards/Create",
+            new() { ["Name"] = $"Type-{Guid.NewGuid():N}"[..14], ["EffectiveStart"] = "2027-08-01" });
+        var detailsUrl = create.Headers.Location!.ToString();
+        var id = int.Parse(detailsUrl.Split('/').Last());
+        var tag = Guid.NewGuid().ToString("N")[..6];
+        var agile = $"Agile Practitioner {tag}";
+        var ai = $"AI Engineer {tag}";
+        var newDiscipline = $"Data Science {tag}";
+
+        // A rejected file (unknown vendor) must not add the resource type.
+        var bad = $"ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor\n{agile},Senior,Onshore,Vendor,100,No Such Vendor {tag}\n";
+        await PostCsvAsync(client, detailsUrl, $"/Admin/RateCards/Import/{id}", bad);
+        Assert.Contains("Import rejected", await client.GetStringAsync(detailsUrl));
+        using (var check = factory.Services.CreateScope())
+        {
+            Assert.False(await check.ServiceProvider.GetRequiredService<AppDbContext>().ResourceTypes.AnyAsync(t => t.Name == agile));
+        }
+
+        var good = "ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor,Discipline\n" +
+                   $"{agile},Senior,Onshore,Internal,120,,\n" +
+                   $"{ai},Senior,Onshore,Internal,150,,{newDiscipline}\n" +
+                   $"{ai.ToUpperInvariant()},Mid,Onshore,Internal,110,,Engineering\n" +
+                   $"Software Engineer,Senior,Onshore,Internal,130,,{newDiscipline}\n";
+        await PostCsvAsync(client, detailsUrl, $"/Admin/RateCards/Import/{id}", good);
+        var page = await client.GetStringAsync(detailsUrl);
+        Assert.Contains("4 added", page);
+        Assert.Contains("New resource type(s) added", page);
+        Assert.Contains("New discipline(s) added", page);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var agileType = await db.ResourceTypes.Include(t => t.Discipline).SingleAsync(t => t.Name == agile);
+        Assert.Equal(Discipline.UnassignedName, agileType.Discipline!.Name);
+        var aiType = await db.ResourceTypes.Include(t => t.Discipline).SingleAsync(t => t.Name == ai);
+        Assert.Equal(newDiscipline, aiType.Discipline!.Name);
+        Assert.Equal(1, await db.ResourceTypes.CountAsync(t => t.Name.ToUpper() == ai.ToUpper()));
+        Assert.Equal(2, await db.RateCardEntries.CountAsync(e => e.RateCardId == id && e.ResourceTypeId == aiType.Id));
+        Assert.True(await db.AuditEvents.AnyAsync(a => a.Entity == nameof(ResourceType) && a.EntityId == aiType.Id.ToString() && a.Action == "Create"));
+        Assert.True(await db.AuditEvents.AnyAsync(a => a.Entity == nameof(Discipline) && a.EntityId == aiType.DisciplineId.ToString() && a.Action == "Create"));
+        var existing = await db.ResourceTypes.Include(t => t.Discipline).SingleAsync(t => t.Name == "Software Engineer");
+        Assert.NotEqual(newDiscipline, existing.Discipline!.Name);
+    }
+
+    [Fact]
+    public async Task People_csv_import_adds_unknown_resource_types()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var type = $"Business Analyst {tag}";
+        var csv = "DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,IsActive,Vendor,Discipline\n" +
+                  $"Bea {tag},BEA-{tag},{type},Boarding,Mid,Onshore,Internal,true,,Product\n";
+
+        var content = new MultipartFormDataContent { { new StringContent(await GetTokenAsync(client, "/Admin/People")), "__RequestVerificationToken" } };
+        var file = new StringContent(csv);
+        file.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+        content.Add(file, "File", "people.csv");
+        var response = await client.PostAsync("/Admin/People/Import", content);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var person = await db.People.Include(p => p.ResourceType!).ThenInclude(t => t.Discipline).SingleAsync(p => p.DisplayName == $"Bea {tag}");
+        Assert.Equal(type, person.ResourceType!.Name);
+        Assert.Equal("Product", person.ResourceType.Discipline!.Name);
     }
 
     [Fact]

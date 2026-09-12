@@ -59,7 +59,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<Discipline>(e =>
         {
-            e.Property(x => x.Name).HasMaxLength(SeniorityLevel.MaxNameLength).UseCollation(ciCollation);
+            e.Property(x => x.Name).HasMaxLength(Discipline.MaxNameLength).UseCollation(ciCollation);
             e.HasIndex(x => x.Name).IsUnique();
         });
 
@@ -89,7 +89,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<ResourceType>(e =>
         {
-            e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
+            e.Property(x => x.Name).HasMaxLength(ResourceType.MaxNameLength).UseCollation(ciCollation);
             e.HasIndex(x => x.Name).IsUnique();
             e.HasOne(x => x.Discipline).WithMany().OnDelete(DeleteBehavior.Restrict);
         });

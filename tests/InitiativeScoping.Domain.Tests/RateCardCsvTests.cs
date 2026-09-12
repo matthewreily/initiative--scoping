@@ -34,6 +34,24 @@ public class RateCardCsvTests
     }
 
     [Fact]
+    public void Optional_discipline_column_is_carried_and_length_checked()
+    {
+        var result = RateCardCsv.Parse(new StringReader("ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor,Discipline\n" +
+            "Agile Practitioner,Senior,Onshore,Internal,100,,\n" +
+            "AI Engineer,Senior,Onshore,Internal,150,, Data Science \n" +
+            $"Business Analyst,Senior,Onshore,Internal,90,,{new string('x', 101)}\n"));
+
+        Assert.Null(result.Rows[0].Discipline);
+        Assert.Equal("Data Science", result.Rows[1].Discipline);
+        Assert.Contains("Discipline must be at most", Assert.Single(result.Errors).Message);
+
+        var sw = new StringWriter();
+        RateCardCsv.Write(sw, result.Rows);
+        Assert.StartsWith(string.Join(',', RateCardCsv.Headers), sw.ToString());
+        Assert.Contains("AI Engineer,Senior,Onshore,InternalFte,150.00,,Data Science", sw.ToString());
+    }
+
+    [Fact]
     public void Reports_missing_columns()
     {
         var result = RateCardCsv.Parse(new StringReader("ResourceType,Location\nA,B\n"));

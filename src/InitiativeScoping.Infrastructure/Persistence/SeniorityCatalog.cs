@@ -10,7 +10,7 @@ public sealed record SeniorityOption(int Id, string Name);
 public static class SeniorityCatalog
 {
     public const string ConcurrentImportMessage =
-        "Import not applied: the seniority catalog was changed by another import at the same time. Please retry the import.";
+        "Import not applied: the seniority or resource type catalog was changed by another import at the same time. Please retry the import.";
 
     /// <summary>Active levels plus any inactive ones in <paramref name="includeIds"/> (labelled "(inactive)") so edit forms keep the row's current value.</summary>
     public static async Task<IReadOnlyList<SeniorityOption>> OptionsAsync(AppDbContext db, IEnumerable<int> includeIds, CancellationToken ct)

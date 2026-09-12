@@ -12,7 +12,8 @@ public sealed record RateCardCsvRow(
     string Location,
     ResourcingClass ResourcingClass,
     decimal HourlyRate,
-    string? Vendor = null);
+    string? Vendor = null,
+    string? Discipline = null);
 
 public sealed record RateCardCsvError(int Line, string Message);
 
@@ -22,15 +23,16 @@ public sealed record RateCardCsvResult(IReadOnlyList<RateCardCsvRow> Rows, IRead
 }
 
 /// <summary>
-/// CSV format: ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor
+/// CSV format: ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor,Discipline
 /// A legacy BusinessUnit column is accepted and ignored.
-/// Seniority is the name of a seniority level (unknown names are added to the catalog on import). ResourcingClass: InternalFte|Vendor.
+/// ResourceType and Seniority are catalog names; unknown names are added to the catalogs on import. Discipline (optional) is only used
+/// when a new resource type is created; existing types keep their discipline. ResourcingClass: InternalFte|Vendor.
 /// Vendor names a specific vendor for Vendor rows (blank = generic "any vendor" rate) and must be blank for InternalFte rows; the column may be omitted.
 /// </summary>
 public static class RateCardCsv
 {
     public static readonly string[] RequiredHeaders = ["ResourceType", "Seniority", "Location", "ResourcingClass", "HourlyRate"];
-    public static readonly string[] Headers = [.. RequiredHeaders, "Vendor"];
+    public static readonly string[] Headers = [.. RequiredHeaders, "Vendor", "Discipline"];
 
     private static readonly CsvConfiguration Config = new(CultureInfo.InvariantCulture)
     {
@@ -55,6 +57,7 @@ public static class RateCardCsv
         var header = csv.HeaderRecord ?? [];
         var missing = RequiredHeaders.Where(h => !header.Contains(h, StringComparer.OrdinalIgnoreCase)).ToList();
         var hasVendorColumn = header.Contains("Vendor", StringComparer.OrdinalIgnoreCase);
+        var hasDisciplineColumn = header.Contains("Discipline", StringComparer.OrdinalIgnoreCase);
         if (missing.Count > 0)
         {
             errors.Add(new RateCardCsvError(1, $"Missing column(s): {string.Join(", ", missing)}"));
@@ -64,13 +67,27 @@ public static class RateCardCsv
         while (csv.Read())
         {
             var line = csv.Parser.Row;
-            var resourceType = csv.GetField("ResourceType") ?? string.Empty;
+            var resourceType = (csv.GetField("ResourceType") ?? string.Empty).Trim();
             var location = csv.GetField("Location") ?? string.Empty;
             var seniority = (csv.GetField("Seniority") ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(seniority) || string.IsNullOrWhiteSpace(location))
             {
                 errors.Add(new RateCardCsvError(line, "ResourceType, Seniority and Location are required."));
+                continue;
+            }
+
+            if (resourceType.Length > ResourceType.MaxNameLength)
+            {
+                errors.Add(new RateCardCsvError(line, $"ResourceType must be at most {ResourceType.MaxNameLength} characters."));
+                continue;
+            }
+
+            var discipline = hasDisciplineColumn ? csv.GetField("Discipline") : null;
+            discipline = string.IsNullOrWhiteSpace(discipline) ? null : discipline.Trim();
+            if (discipline is not null && discipline.Length > Discipline.MaxNameLength)
+            {
+                errors.Add(new RateCardCsvError(line, $"Discipline must be at most {Discipline.MaxNameLength} characters."));
                 continue;
             }
 
@@ -101,7 +118,7 @@ public static class RateCardCsv
                 continue;
             }
 
-            rows.Add(new RateCardCsvRow(resourceType, seniority, location, resourcingClass, rate, vendor));
+            rows.Add(new RateCardCsvRow(resourceType, seniority, location, resourcingClass, rate, vendor, discipline));
         }
 
         var duplicates = rows
@@ -132,6 +149,7 @@ public static class RateCardCsv
             csv.WriteField(r.ResourcingClass.ToString());
             csv.WriteField(r.HourlyRate.ToString("0.00", CultureInfo.InvariantCulture));
             csv.WriteField(r.Vendor ?? string.Empty);
+            csv.WriteField(r.Discipline ?? string.Empty);
             csv.NextRecord();
         }
         csv.Flush();
