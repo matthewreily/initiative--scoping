@@ -50,7 +50,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return new InitiativeListItem
             {
                 Initiative = i, PhaseCount = i.Phases.Count,
-                TotalHours = forecast.TotalHours, TotalCost = forecast.TotalCost, IsComplete = forecast.IsComplete
+                TotalHours = forecast.TotalHours, TotalCost = forecast.TotalCost, IsComplete = forecast.IsComplete,
+                RunRate = RunRateCalculator.Calculate(i, forecast.TotalCost)
             };
         }).ToList();
 

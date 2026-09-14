@@ -36,7 +36,10 @@
     <thead>
     <tr>
         <th>Name</th><th class="d-none d-md-table-cell">Business unit</th><th>Status</th><th class="d-none d-lg-table-cell">Sizing</th><th class="d-none d-md-table-cell">Schedule</th>
-        <th class="text-end d-none d-lg-table-cell">Phases</th><th class="text-end d-none d-md-table-cell">Hours</th><th class="text-end">Forecast cost</th>
+        <th class="text-end d-none d-lg-table-cell">Phases</th><th class="text-end d-none d-md-table-cell">Hours</th>
+        <th class="text-end d-none d-md-table-cell" title="Forecast cost spread evenly over the planned window (target start → target end or last phase end), per average month">Monthly run rate</th>
+        <th class="text-end d-none d-lg-table-cell" title="Forecast cost spread evenly over the planned window, per year">Yearly run rate</th>
+        <th class="text-end">Forecast cost</th>
     </tr>
     </thead>
     <tbody>
@@ -51,6 +54,8 @@
             <td class="d-none d-md-table-cell">@i.TargetStart.ToString("yyyy-MM-dd")@if (i.PlanningMode == PlanningMode.FixedDuration && i.TargetEnd is not null) { <span class="text-nowrap"> → @i.TargetEnd.Value.ToString("yyyy-MM-dd")</span> <span class="badge bg-light text-dark border" title="Fixed duration">Fixed</span> }</td>
             <td class="text-end d-none d-lg-table-cell">@item.PhaseCount</td>
             <td class="text-end d-none d-md-table-cell">@item.TotalHours.ToString("N1")</td>
+            <td class="text-end d-none d-md-table-cell" title="@item.RunRate.Days planned day(s)">@item.RunRate.Monthly.ToString("C0")</td>
+            <td class="text-end d-none d-lg-table-cell" title="@item.RunRate.Days planned day(s)">@item.RunRate.Yearly.ToString("C0")</td>
             <td class="text-end">
                 @item.TotalCost.ToString("C0")
                 @if (!item.IsComplete)
@@ -62,7 +67,7 @@
     }
     @if (Model.Items.Count == 0)
     {
-        <tr data-nosort><td colspan="8" class="text-muted">No initiatives match.</td></tr>
+        <tr data-nosort><td colspan="10" class="text-muted">No initiatives match.</td></tr>
     }
     </tbody>
 </table>
