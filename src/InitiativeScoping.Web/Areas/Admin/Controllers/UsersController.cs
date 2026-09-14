@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InitiativeScoping.Web.Areas.Admin.Controllers;
 
-public class UsersController(AppDbContext db, IAuditLog audit, ICurrentUser currentUser, IUserDirectory directory, AccessCache accessCache, TimeProvider clock)
+public class UsersController(AppDbContext db, IAuditLog audit, ICurrentUser currentUser, IUserDirectory directory, IDirectorySearch directorySearch, AccessCache accessCache, TimeProvider clock)
     : AdminControllerBase
 {
     public async Task<IActionResult> Index(string? q, CancellationToken ct)
@@ -29,25 +29,37 @@ public class UsersController(AppDbContext db, IAuditLog audit, ICurrentUser curr
         return View(new UsersIndexModel { Query = q, Users = users, CurrentUserId = currentUser.UserId });
     }
 
-    public IActionResult Create() => View(new UserAccountEditModel { Role = AppRole.User });
+    public async Task<IActionResult> Create(string? q, string? email, string? displayName, string? objectId, CancellationToken ct)
+    {
+        var model = new UserAccountEditModel
+        {
+            Role = AppRole.User,
+            Email = email?.Trim() ?? "",
+            DisplayName = displayName?.Trim(),
+            ObjectId = string.IsNullOrWhiteSpace(objectId) ? null : objectId.Trim()
+        };
+        return View(await WithDirectoryAsync(model, q, ct));
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create(UserAccountEditModel model, CancellationToken ct)
     {
         var email = model.Email.Trim();
-        if (await db.UserAccounts.AnyAsync(u => u.Email == email, ct))
+        var objectId = string.IsNullOrWhiteSpace(model.ObjectId) ? null : model.ObjectId.Trim();
+        if (await db.UserAccounts.AnyAsync(u => u.Email == email || (objectId != null && u.ObjectId == objectId), ct))
         {
             ModelState.AddModelError(nameof(model.Email), "A user with this e-mail already exists.");
         }
 
         if (!ModelState.IsValid)
         {
-            return View(model);
+            return View(await WithDirectoryAsync(model, null, ct));
         }
 
         var now = clock.GetUtcNow();
         var account = new UserAccount
         {
+            ObjectId = objectId,
             Email = email,
             DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? email : model.DisplayName.Trim(),
             Role = model.Role,
@@ -63,6 +75,36 @@ public class UsersController(AppDbContext db, IAuditLog audit, ICurrentUser curr
         await db.SaveChangesAsync(ct);
         Changed();
         return RedirectWithSuccess($"{account.Email} added as {account.Role}. Their access starts at first sign-in.");
+    }
+
+    private async Task<UserAccountEditModel> WithDirectoryAsync(UserAccountEditModel model, string? q, CancellationToken ct)
+    {
+        model.DirectoryAvailable = directorySearch.IsAvailable;
+        model.Query = q?.Trim();
+        if (!model.DirectoryAvailable || string.IsNullOrWhiteSpace(model.Query))
+        {
+            return model;
+        }
+
+        var result = await directorySearch.SearchAsync(model.Query, ct);
+        model.DirectoryError = result.Error;
+        if (result.Users.Count == 0)
+        {
+            return model;
+        }
+
+        var emails = result.Users.Select(r => r.Email).ToList();
+        var ids = result.Users.Select(r => r.ObjectId).ToList();
+        var existing = await db.UserAccounts.AsNoTracking()
+            .Where(u => emails.Contains(u.Email) || (u.ObjectId != null && ids.Contains(u.ObjectId)))
+            .Select(u => new { u.Email, u.ObjectId })
+            .ToListAsync(ct);
+        var knownEmails = existing.Select(e => e.Email).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownIds = existing.Where(e => e.ObjectId != null).Select(e => e.ObjectId!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        model.DirectoryMatches = result.Users
+            .Select(u => new DirectoryMatch(u, knownEmails.Contains(u.Email) || knownIds.Contains(u.ObjectId)))
+            .ToList();
+        return model;
     }
 
     [HttpPost]
@@ -177,4 +219,15 @@ public class UserAccountEditModel
 
     [StringLength(1000)]
     public string? Note { get; set; }
+
+    /// <summary>Entra object id when the person was picked from the directory; otherwise linked at first sign-in.</summary>
+    [StringLength(64)]
+    public string? ObjectId { get; set; }
+
+    public bool DirectoryAvailable { get; set; }
+    public string? Query { get; set; }
+    public string? DirectoryError { get; set; }
+    public IReadOnlyList<DirectoryMatch> DirectoryMatches { get; set; } = [];
 }
+
+public record DirectoryMatch(DirectoryUser User, bool AlreadyListed);

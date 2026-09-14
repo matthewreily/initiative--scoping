@@ -20,6 +20,7 @@ public static class AuthSetup
 
         if (useDevAuth)
         {
+            services.AddSingleton<IDirectorySearch, NoDirectorySearch>();
             services.AddAuthentication(DevScheme)
                 .AddScheme<DevAuthOptions, DevAuthHandler>(DevScheme, o =>
                 {
@@ -34,6 +35,7 @@ public static class AuthSetup
             services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
                 .AddMicrosoftIdentityWebApp(config.GetSection("AzureAd"));
             services.AddRazorPages().AddMicrosoftIdentityUI();
+            services.AddHttpClient<IDirectorySearch, GraphDirectorySearch>(c => c.Timeout = TimeSpan.FromSeconds(10));
         }
 
         services.AddAuthorizationBuilder()
