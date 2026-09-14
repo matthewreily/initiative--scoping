@@ -49,7 +49,10 @@
                     </ul>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <span class="navbar-text small text-muted">@User.Identity.Name</span>
+                        <form asp-area="" asp-controller="Access" asp-action="EndSession" method="post" class="d-flex align-items-center gap-2">
+                            <span class="navbar-text small text-muted">@User.Identity.Name</span>
+                            <button type="submit" class="btn btn-link btn-sm p-0 text-dark">Sign out</button>
+                        </form>
                     }
                 </div>
             </div>

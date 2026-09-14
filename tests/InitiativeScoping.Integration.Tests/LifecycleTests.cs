@@ -257,9 +257,9 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         var details = await client.GetStringAsync($"/Initiatives/Details/{id}");
         Assert.DoesNotContain("RequestRebaseline", details);
         Assert.DoesNotContain("ChangeStatus", details);
-        Assert.DoesNotContain("__RequestVerificationToken", details);
+        Assert.DoesNotContain("/Activate", details);
 
-        // A viewer sees no forms (so no antiforgery token); a forged POST must not succeed either way.
+        // A viewer sees no lifecycle forms; a forged POST must not succeed either way.
         foreach (var (url, fields) in new[]
         {
             ($"/Initiatives/{id}/Activate", new Dictionary<string, string>()),
