@@ -61,6 +61,15 @@ resource "google_artifact_registry_repository" "images" {
   depends_on    = [google_project_service.apis]
 }
 
+# Lets another environment's deployer pull images from here (prod promotes the image dev already ran).
+resource "google_artifact_registry_repository_iam_member" "image_pull" {
+  for_each   = toset(var.image_pull_members)
+  location   = google_artifact_registry_repository.images.location
+  repository = google_artifact_registry_repository.images.name
+  role       = "roles/artifactregistry.reader"
+  member     = each.value
+}
+
 # ---------- Database ----------
 resource "google_sql_database_instance" "db" {
   name                = "${local.name}-pg"
