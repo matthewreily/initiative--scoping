@@ -6,9 +6,60 @@
 <h1 class="h3">Administration</h1>
 <partial name="_AdminNav" />
 <h2 class="h5">Add user</h2>
-<p class="text-muted small">Grants access ahead of the person's first sign-in. The row is matched to their Entra account by e-mail when they sign in.</p>
+<p class="text-muted small">Grants access ahead of the person's first sign-in. The row is matched to their Entra account by e-mail (or object id) when they sign in.</p>
+@if (Model.DirectoryAvailable)
+{
+    <form asp-action="Create" method="get" class="col-md-6 mb-4" role="search">
+        <label for="q" class="form-label">Search the directory</label>
+        <div class="input-group">
+            <input id="q" name="q" value="@Model.Query" class="form-control" placeholder="Name or e-mail (at least 2 characters)" minlength="2" autocomplete="off" autofocus />
+            <button type="submit" class="btn btn-outline-primary">Search</button>
+        </div>
+        <div class="form-text">Finds people in Entra who have not signed in yet; or fill in the form below by hand.</div>
+    </form>
+    @if (Model.DirectoryError is not null)
+    {
+        <div class="alert alert-warning col-md-8">@Model.DirectoryError</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.Query))
+    {
+        if (Model.DirectoryMatches.Count == 0)
+        {
+            <p class="text-muted">No directory users match <strong>@Model.Query</strong>.</p>
+        }
+        else
+        {
+            <div class="table-responsive col-lg-8 mb-4">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Name</th><th>E-mail</th><th class="d-none d-md-table-cell">Title</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var m in Model.DirectoryMatches)
+                    {
+                        <tr>
+                            <td>@m.User.DisplayName</td>
+                            <td>@m.User.Email</td>
+                            <td class="d-none d-md-table-cell text-muted">@m.User.JobTitle</td>
+                            <td class="text-end">
+                                @if (m.AlreadyListed)
+                                {
+                                    <span class="badge text-bg-secondary">Already listed</span>
+                                }
+                                else
+                                {
+                                    <a asp-action="Create" asp-route-q="@Model.Query" asp-route-email="@m.User.Email" asp-route-displayName="@m.User.DisplayName" asp-route-objectId="@m.User.ObjectId" class="btn btn-sm btn-outline-primary">Select</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
 <form asp-action="Create" method="post" class="col-md-6">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <input type="hidden" asp-for="ObjectId" />
     <div class="mb-3">
         <label asp-for="Email" class="form-label"></label>
         <input asp-for="Email" class="form-control" autocomplete="off" />
