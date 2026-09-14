@@ -541,6 +541,10 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Property<int?>("PhaseId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("PhaseName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 

@@ -223,6 +223,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<ForecastBaselineNonLaborLine>(e =>
         {
             e.Property(x => x.Description).HasMaxLength(300);
+            e.Property(x => x.PhaseName).HasMaxLength(200);
             e.Property(x => x.UnitCost).HasPrecision(18, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);
         });

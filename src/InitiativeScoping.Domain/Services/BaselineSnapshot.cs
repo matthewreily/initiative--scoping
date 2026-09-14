@@ -55,6 +55,7 @@ public static class BaselineSnapshot
             NonLaborLines = forecast.NonLaborLines.Where(l => l.HasWindow).Select(l => new ForecastBaselineNonLaborLine
             {
                 PhaseId = l.Line.PhaseId,
+                PhaseName = l.Line.PhaseId is { } pid ? phaseNames.GetValueOrDefault(pid, $"Phase #{pid}") : null,
                 Category = l.Line.Category,
                 Description = l.Line.Description,
                 BillingModel = l.Line.BillingModel,

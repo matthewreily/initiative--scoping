@@ -125,7 +125,7 @@ public static class InitiativeExport
             ["Version", "Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost"],
             (baseline?.NonLaborLines ?? []).Select(l => (IReadOnlyList<object?>)
             [
-                baseline!.Version, l.PhaseId is { } pid ? phases.GetValueOrDefault(pid) : VarianceCalculator.WholeInitiative,
+                baseline!.Version, l.PhaseId is { } pid ? l.PhaseName ?? $"Phase #{pid}" : VarianceCalculator.WholeInitiative,
                 VarianceCalculator.CategoryLabel(l.Category), l.Description, l.BillingModel.ToString(),
                 l.Quantity, l.UnitCost, l.StartDate, l.EndDate, l.Periods, l.Cost
             ]).ToList());

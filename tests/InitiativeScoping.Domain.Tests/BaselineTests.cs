@@ -79,7 +79,19 @@ public class BaselineTests
         allocation.VendorId = 9;
         allocation.Vendor = new Vendor { Id = 9, Name = "Acme" };
 
-        var baseline = BaselineSnapshot.Create(initiative, Forecast(initiative, 100m), "alice", Now, null);
+        var forecast = Forecast(initiative, 100m) with
+        {
+            NonLaborLines =
+            [
+                new NonLaborForecastLine(
+                    new InitiativeNonLaborCost { PhaseId = initiative.Phases[0].Id, Description = "License", UnitCost = 10m },
+                    new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), 1, 10m),
+                new NonLaborForecastLine(
+                    new InitiativeNonLaborCost { PhaseId = null, Description = "Hosting", UnitCost = 5m },
+                    new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), 1, 5m)
+            ]
+        };
+        var baseline = BaselineSnapshot.Create(initiative, forecast, "alice", Now, null);
 
         allocation.BusinessUnit.Name = "Retail Banking";
         allocation.ResourceType.Name = "Software Engineer";
@@ -93,6 +105,8 @@ public class BaselineTests
         Assert.Equal("Engineer", line.ResourceTypeName);
         Assert.Equal("Mid", line.SeniorityName);
         Assert.Equal("Acme", line.VendorName);
+        Assert.Equal("P1", baseline.NonLaborLines.Single(l => l.Description == "License").PhaseName);
+        Assert.Null(baseline.NonLaborLines.Single(l => l.Description == "Hosting").PhaseName);
     }
 
     [Fact]

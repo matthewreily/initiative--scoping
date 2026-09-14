@@ -175,6 +175,10 @@ public class ForecastBaselineNonLaborLine
     public int ForecastBaselineId { get; set; }
     public ForecastBaseline? ForecastBaseline { get; set; }
     public int? PhaseId { get; set; }
+
+    /// <summary>Phase name when the baseline was taken; null for whole-initiative lines.</summary>
+    public string? PhaseName { get; set; }
+
     public CostCategory Category { get; set; }
     public required string Description { get; set; }
     public BillingModel BillingModel { get; set; }
