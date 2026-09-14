@@ -94,7 +94,6 @@ else
                 </div>
                 @if (sel.NonLaborLines.Count > 0 || Model.Previous?.NonLaborLines.Count > 0)
                 {
-                    var phaseNames = Model.Initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
                     <h3 class="h6 mt-3">Non-labor costs</h3>
                     <div class="table-responsive">
                     <table class="table table-sm align-middle" id="baseline-non-labor">
@@ -103,7 +102,7 @@ else
                         @foreach (var l in sel.NonLaborLines.OrderBy(l => l.PhaseId ?? int.MaxValue).ThenBy(l => l.Description))
                         {
                             <tr>
-                                <td>@(l.PhaseId is { } pid ? phaseNames.GetValueOrDefault(pid, $"Phase #{pid}") : VarianceCalculator.WholeInitiative)</td>
+                                <td>@(l.PhaseId is { } pid ? l.PhaseName ?? $"Phase #{pid}" : VarianceCalculator.WholeInitiative)</td>
                                 <td>@VarianceCalculator.CategoryLabel(l.Category)</td>
                                 <td>@l.Description</td>
                                 <td>@Html.DisplayFor(_ => l.BillingModel)</td>

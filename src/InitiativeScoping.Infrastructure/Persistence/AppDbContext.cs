@@ -223,6 +223,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<ForecastBaselineNonLaborLine>(e =>
         {
             e.Property(x => x.Description).HasMaxLength(300);
+            e.Property(x => x.PhaseName).HasMaxLength(200);
             e.Property(x => x.UnitCost).HasPrecision(18, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);
         });
@@ -241,6 +242,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<ForecastBaselineLine>(e =>
         {
             e.Property(x => x.Location).HasMaxLength(100);
+            e.Property(x => x.PhaseName).HasMaxLength(200);
+            e.Property(x => x.BusinessUnitName).HasMaxLength(200);
+            e.Property(x => x.ResourceTypeName).HasMaxLength(200);
+            e.Property(x => x.SeniorityName).HasMaxLength(200);
+            e.Property(x => x.VendorName).HasMaxLength(200);
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.Property(x => x.HourlyRate).HasPrecision(18, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);

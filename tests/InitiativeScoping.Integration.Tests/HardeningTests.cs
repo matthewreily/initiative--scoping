@@ -154,6 +154,7 @@ public class HardeningTests(WebAppFactory factory) : IClassFixture<WebAppFactory
                 baseline.Lines.Add(new ForecastBaselineLine
                 {
                     PhaseId = allocation.PhaseId, ResourceTypeId = typeId, SeniorityId = 3, Location = "Onshore",
+                    PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior",
                     ResourcingClass = ResourcingClass.InternalFte, Hours = 100, HourlyRate = 120, Cost = 12000
                 });
             }

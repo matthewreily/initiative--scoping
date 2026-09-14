@@ -117,15 +117,15 @@ public static class InitiativeExport
             ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Hours", "Hourly rate", "Cost"],
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
-                baseline!.Version, phases.GetValueOrDefault(l.PhaseId), businessUnitNames.GetValueOrDefault(l.BusinessUnitId), resourceTypeNames.GetValueOrDefault(l.ResourceTypeId),
-                seniorityNames.GetValueOrDefault(l.SeniorityId), l.Location, l.ResourcingClass.ToString(), l.VendorId is { } vid ? vendorNames.GetValueOrDefault(vid) : null, l.Hours, l.HourlyRate, l.Cost
+                baseline!.Version, l.PhaseName, l.BusinessUnitName, l.ResourceTypeName,
+                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.Hours, l.HourlyRate, l.Cost
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",
             ["Version", "Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost"],
             (baseline?.NonLaborLines ?? []).Select(l => (IReadOnlyList<object?>)
             [
-                baseline!.Version, l.PhaseId is { } pid ? phases.GetValueOrDefault(pid) : VarianceCalculator.WholeInitiative,
+                baseline!.Version, l.PhaseId is { } pid ? l.PhaseName ?? $"Phase #{pid}" : VarianceCalculator.WholeInitiative,
                 VarianceCalculator.CategoryLabel(l.Category), l.Description, l.BillingModel.ToString(),
                 l.Quantity, l.UnitCost, l.StartDate, l.EndDate, l.Periods, l.Cost
             ]).ToList());

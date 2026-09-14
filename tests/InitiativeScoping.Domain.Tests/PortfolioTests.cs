@@ -30,7 +30,7 @@ public class PortfolioCalculatorTests
             i.Baselines.Add(new ForecastBaseline
             {
                 Id = id, InitiativeId = id, Version = 1, IsCurrent = true, SnapshotBy = "u", TotalHours = 100m, TotalCost = baselineCost.Value,
-                Lines = [new ForecastBaselineLine { PhaseId = id * 10, ResourceTypeId = 1, Location = "Onshore", Hours = 100m, HourlyRate = baselineCost.Value / 100m, Cost = baselineCost.Value }]
+                Lines = [new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", PhaseId = id * 10, ResourceTypeId = 1, Location = "Onshore", Hours = 100m, HourlyRate = baselineCost.Value / 100m, Cost = baselineCost.Value }]
             });
         }
         return i;
