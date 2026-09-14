@@ -12,6 +12,7 @@ public class InitiativeListItem
     public int PhaseCount { get; init; }
     public decimal TotalHours { get; init; }
     public decimal TotalCost { get; init; }
+    public RunRate RunRate { get; init; }
     public bool IsComplete { get; init; }
 }
 
