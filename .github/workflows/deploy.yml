@@ -1,25 +1,33 @@
 name: Deploy to GCP
 
+# Promotion pipeline:
+#   push to main  -> test -> build image :<sha> -> deploy dev -> /health
+#   tag v* or Run workflow (sha) -> verify that sha's dev deploy succeeded -> copy the *same* image
+#                                    into prod's registry -> migrate -> deploy prod -> /health
+# The prod job runs in the `prod` GitHub environment, so its required reviewers gate every promotion.
+
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
-      environment:
-        description: Target environment
-        type: choice
-        options: [dev, prod]
-        default: dev
+      sha:
+        description: Commit SHA to promote to prod (must already be deployed to dev). Defaults to the selected ref's head.
+        required: false
+        type: string
 
 permissions:
   contents: read
   id-token: write
+  actions: read
 
 env:
   APP_NAME: initiative-scoping
 
 jobs:
   test:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,14 +38,13 @@ jobs:
       - run: dotnet build --no-restore --configuration Release -warnaserror
       - run: dotnet test --no-build --configuration Release
 
-  deploy:
+  deploy-dev:
     needs: test
     runs-on: ubuntu-latest
-    # Pushes to main deploy to dev; prod requires a manual dispatch and the GitHub environment's protection rules.
-    environment: ${{ github.event.inputs.environment || 'dev' }}
-    concurrency: deploy-${{ github.event.inputs.environment || 'dev' }}
+    environment: dev
+    concurrency: deploy-dev
     env:
-      ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+      ENVIRONMENT: dev
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       REGION: ${{ vars.GCP_REGION || 'us-central1' }}
       IMAGE_TAG: ${{ github.sha }}
@@ -72,6 +79,74 @@ jobs:
       - name: Deploy Cloud Run service
         run: |
           # flags after --container apply to that container only
+          gcloud run deploy "$SERVICE" --region "$REGION" --quiet --container app --image "$IMAGE"
+
+      - name: Smoke test
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')
+          echo "Service URL: $URL"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 "$URL/health"
+
+  promote-prod:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency: deploy-prod
+    env:
+      ENVIRONMENT: prod
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      # Repository-level variable: the dev registry path the image is promoted from
+      # (terraform output image_repository in the dev workspace).
+      SOURCE_IMAGE_REPOSITORY: ${{ vars.DEV_IMAGE_REPOSITORY }}
+      IMAGE_TAG: ${{ inputs.sha || github.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Resolve names
+        run: |
+          [[ -n "$SOURCE_IMAGE_REPOSITORY" ]] || { echo "Set the repository variable DEV_IMAGE_REPOSITORY (dev terraform output image_repository)." >&2; exit 1; }
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "sha must be a full 40-character commit SHA, got '$IMAGE_TAG'" >&2; exit 1; }
+          echo "SOURCE_IMAGE=${SOURCE_IMAGE_REPOSITORY}:${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/${APP_NAME}/${APP_NAME}:${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "SERVICE=${APP_NAME}-${ENVIRONMENT}" >> "$GITHUB_ENV"
+          echo "MIGRATE_JOB=${APP_NAME}-${ENVIRONMENT}-migrate" >> "$GITHUB_ENV"
+
+      - name: Require a successful dev deploy of this commit
+        run: |
+          # Only images that went through test -> build -> deploy dev -> /health on main may reach prod.
+          RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --event push --branch main \
+                   --commit "$IMAGE_TAG" --status success --json databaseId --jq 'length')
+          if [[ "$RUNS" == "0" ]]; then
+            echo "Commit $IMAGE_TAG has no successful dev deploy on main; promote only what dev has run." >&2
+            exit 1
+          fi
+          echo "Commit $IMAGE_TAG was deployed to dev successfully ($RUNS run(s))."
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: imjasonh/setup-crane@v0.4
+
+      - name: Promote image (copy by digest, no rebuild)
+        run: |
+          gcloud auth print-access-token | crane auth login -u oauth2accesstoken --password-stdin "${REGION}-docker.pkg.dev"
+          SRC_DIGEST=$(crane digest "$SOURCE_IMAGE")
+          echo "Promoting $SOURCE_IMAGE ($SRC_DIGEST) -> $IMAGE"
+          crane copy "$SOURCE_IMAGE" "$IMAGE"
+          [[ "$(crane digest "$IMAGE")" == "$SRC_DIGEST" ]] || { echo "Digest mismatch after copy" >&2; exit 1; }
+
+      - name: Run database migrations
+        run: |
+          gcloud run jobs update "$MIGRATE_JOB" --region "$REGION" --image "$IMAGE" --quiet
+          gcloud run jobs execute "$MIGRATE_JOB" --region "$REGION" --wait --quiet
+
+      - name: Deploy Cloud Run service
+        run: |
           gcloud run deploy "$SERVICE" --region "$REGION" --quiet --container app --image "$IMAGE"
 
       - name: Smoke test

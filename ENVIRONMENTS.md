@@ -9,7 +9,7 @@ values marked *Terraform output* can be re-derived with `terraform -chdir=deploy
 |---|---|
 | Repository | <https://github.com/matthewreily/initiative--scoping> |
 | CI (build + test + 80% coverage gate) | <https://github.com/matthewreily/initiative--scoping/actions/workflows/ci.yml> |
-| CD to dev (on merge to `main`) | <https://github.com/matthewreily/initiative--scoping/actions/workflows/deploy.yml> |
+| CD: dev on merge to `main`, prod via `v*` tag / Run workflow (approval-gated) | <https://github.com/matthewreily/initiative--scoping/actions/workflows/deploy.yml> |
 | Container images | `us-central1-docker.pkg.dev/initiative-scoping-dev/initiative-scoping/initiative-scoping` (Artifact Registry) |
 | Docs | `README.md` (overview/run locally), `HowTo.md` (using the app), `deploy/gcp/README.md` (infra), `deploy/entra/README.md` (identity) |
 
@@ -41,9 +41,15 @@ values marked *Terraform output* can be re-derived with `terraform -chdir=deploy
 | Grant access (approve requests, roles) | In-app: Admin → Users. Entra app roles (Enterprise applications → *Initiative Scoping (dev)* → Users and groups) remain an optional override |
 | Script | `deploy/entra/register-app.sh dev` |
 
-## prod
+## prod (GCP project `initiative-scoping-prod`, region `us-central1`)
 
-Not provisioned yet. Follow `deploy/gcp/README.md` (one-time setup) with `deploy/gcp/env/prod.tfvars` and `deploy/entra/register-app.sh prod`, then add its rows here.
+Config is in the repo (`deploy/gcp/env/prod.tfvars`, `deploy/gcp/env/prod.gcs.tfbackend` → bucket `initiative-scoping-prod-tfstate`); infrastructure is **not provisioned yet**. To bring it up:
+
+1. `deploy/entra/register-app.sh prod` → paste the printed client id into `prod.tfvars` (`entra_client_id`).
+2. `deploy/gcp/bootstrap-project.sh prod 00EDAE-09A2AC-75569D` → follow the printed next steps (client secret, first migration, redirect URI, GitHub `prod` environment variables, dev re-apply, `DEV_IMAGE_REPOSITORY` repository variable, required reviewers).
+3. Promote: push a `v*` tag on a commit that has deployed to dev (or *Run workflow* → `sha`), then approve the `prod` deployment in Actions. See `deploy/gcp/README.md` → "Continuous deployment".
+
+Once live, add the same rows as dev above (URLs follow the `initiative-scoping-prod-*.us-central1.run.app` pattern; console links are the dev ones with `project=initiative-scoping-prod`). Deploy identity: `initiative-scoping-prod-deploy@initiative-scoping-prod.iam.gserviceaccount.com` (also granted read on the dev image registry).
 
 ## Local development
 

@@ -68,6 +68,12 @@ variable "github_repository" {
   default     = "matthewreily/initiative--scoping"
 }
 
+variable "image_pull_members" {
+  type        = list(string)
+  description = "IAM members granted read on this environment's image repository, e.g. the prod deployer (serviceAccount:<app>-prod-deploy@<prod-project>.iam.gserviceaccount.com) so it can promote dev images."
+  default     = []
+}
+
 variable "enable_telemetry" {
   type        = bool
   description = "Run the Google-Built OpenTelemetry Collector as a Cloud Run sidecar and export traces/metrics to Cloud Trace / Cloud Monitoring."

@@ -17,6 +17,8 @@ GitHub Actions ──(WIF, no keys)──► Artifact Registry ──► Cloud R
 
 ## One-time setup per environment
 
+Shortcut: after step 2 (Entra) and filling the tfvars, `deploy/gcp/bootstrap-project.sh <env> <billing-account-id>` performs steps 1 and 4 (project, billing link, state bucket, registry, first image, full apply) and prints the exact commands for steps 5–8.
+
 1. Create a GCP project, enable billing, and create a GCS bucket for Terraform state.
 2. Register the app in Entra ID (see `deploy/entra/README.md`, including how to get a tenant) — `deploy/entra/register-app.sh <env>` does this (app roles, enterprise app, client secret) and prints the tfvars values; the redirect URI is added in step 8.
 3. Fill in `deploy/gcp/env/<env>.tfvars` and `deploy/gcp/env/<env>.gcs.tfbackend` (replace every `REPLACE-*`).
@@ -46,7 +48,7 @@ GitHub Actions ──(WIF, no keys)──► Artifact Registry ──► Cloud R
    gcloud run jobs execute "$(terraform output -raw migrate_job)" --region us-central1 --wait
    ```
 
-7. In GitHub → Settings → Environments create `dev` and `prod` (add required reviewers on `prod`) and set these **variables** from `terraform output`:
+7. In GitHub → Settings → Environments create `dev` and `prod` (add required reviewers on `prod`) and set these **environment variables** from `terraform output`:
 
    | Variable | Source |
    |----------|--------|
@@ -55,16 +57,29 @@ GitHub Actions ──(WIF, no keys)──► Artifact Registry ──► Cloud R
    | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `github_workload_identity_provider` |
    | `GCP_DEPLOYER_SERVICE_ACCOUNT` | `github_deployer_service_account` |
 
+   Plus one **repository-level** variable used by prod promotion: `DEV_IMAGE_REPOSITORY` = dev's `image_repository` output
+   (`us-central1-docker.pkg.dev/initiative-scoping-dev/initiative-scoping/initiative-scoping`).
+
 8. Add the Cloud Run URL as a redirect URI on the Entra app registration: `deploy/entra/register-app.sh <env> --add-url $(terraform output -raw service_url)`.
 
-## Continuous deployment
+### prod specifics
+
+- `env/prod.tfvars` is filled in for project `initiative-scoping-prod` except `entra_client_id`, which comes from `deploy/entra/register-app.sh prod` (a separate "Initiative Scoping (prod)" app registration with its own client secret — store it in prod's Secret Manager, step 5). Create the project + state bucket `initiative-scoping-prod-tfstate` first (step 1); `env/prod.gcs.tfbackend` already points at it.
+- `environment = "prod"` turns on regional HA Cloud SQL, automated backups + PITR and deletion protection; `min_instances = 1` keeps one warm instance; `seed_reference_data = false` so the first migration creates an empty catalog.
+- prod never builds an image: its deployer service account (`initiative-scoping-prod-deploy@initiative-scoping-prod.iam.gserviceaccount.com`) copies the image dev already ran. `env/dev.tfvars` grants it `roles/artifactregistry.reader` on the dev registry via `image_pull_members`, so re-apply **dev** after the prod deployer exists (`terraform apply -var-file=env/dev.tfvars`).
+- Order: prod `terraform apply` (creates the deployer) → dev `terraform apply` (grants pull) → GitHub `prod` environment variables + required reviewers → first promotion.
+
+## Continuous deployment (dev → prod promotion)
 
 `.github/workflows/deploy.yml`:
 
-- **push to `main`** → test → build image tagged with the commit SHA → push → update + execute the migrate job → `gcloud run deploy` → `curl /health`, all against **dev**.
-- **Run workflow → environment = prod** → same steps against prod, gated by the `prod` GitHub environment's protection rules.
+- **push to `main`** → test → build image tagged with the commit SHA → push to dev's registry → update + execute the dev migrate job → `gcloud run deploy` → `curl /health`. Only **dev** is touched.
+- **Promote to prod** — either push a tag `v*` on a commit that is on `main`, or *Run workflow* and enter the commit `sha` (defaults to the selected ref's head). The `promote-prod` job runs in the `prod` GitHub environment, so it waits for the required reviewers, then:
+  1. checks via the GitHub API that the same commit has a **successful dev deploy** on `main` (otherwise it fails — nothing reaches prod that dev has not run);
+  2. copies the dev image to prod's registry **by digest** with `crane copy` (no rebuild; the digest is verified after the copy), so prod runs byte-for-byte what was tested in dev;
+  3. updates + executes the prod migrate job, deploys the Cloud Run service, and curls `/health`.
 
-Roll back by re-running the workflow from an older commit, or `gcloud run services update-traffic <service> --to-revisions <rev>=100` (migrations are additive, so the previous image keeps working).
+A release is therefore: merge → watch dev → `git tag v1.4.0 <sha> && git push origin v1.4.0` → approve the `prod` deployment in the Actions run. Roll back by promoting an earlier SHA (Run workflow → `sha`), or `gcloud run services update-traffic <service> --to-revisions <rev>=100` (migrations are additive, so the previous image keeps working).
 
 ## Observability (OpenTelemetry)
 

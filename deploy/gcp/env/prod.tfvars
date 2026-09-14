@@ -1,10 +1,11 @@
-project_id          = "REPLACE-gcp-project-id"
+project_id          = "initiative-scoping-prod"
 region              = "us-central1"
 environment         = "prod"
 db_tier             = "db-custom-1-3840"
 min_instances       = 1
 max_instances       = 5
 seed_reference_data = false
-entra_tenant_id     = "REPLACE-tenant-guid"
-entra_client_id     = "REPLACE-app-registration-client-id"
-alert_emails        = ["REPLACE-oncall@example.com"]
+entra_tenant_id     = "f0f37d2f-1252-4242-8058-8b307b86b0b5"
+entra_client_id     = "REPLACE-with-client-id-printed-by-deploy/entra/register-app.sh-prod"
+alert_emails        = ["me@mattreily.com"]
+bootstrap_admins    = ["me@mattreily.com"]
