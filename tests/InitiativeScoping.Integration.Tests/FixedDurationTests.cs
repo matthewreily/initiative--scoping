@@ -342,6 +342,23 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         Assert.Equal(HttpStatusCode.Redirect, deleteHoliday.StatusCode);
     }
 
+    [Fact]
+    public async Task AddPhaseForm_DefaultsPlannedEndToTargetEnd_InFixedMode()
+    {
+        var client = factory.CreateClient(new() { AllowAutoRedirect = false });
+        var id = await CreateFixedAsync(client, "Phase default end");
+        var details = $"/Initiatives/Details/{id}";
+
+        var html = await client.GetStringAsync(details);
+        Assert.Contains("id=\"plannedstart\" type=\"date\" class=\"form-control form-control-sm\" value=\"2026-01-05\"", html);
+        Assert.Contains("id=\"plannedend\" type=\"date\" class=\"form-control form-control-sm\" value=\"2026-03-27\"", html);
+
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Discovery", ["PlannedStart"] = "2026-01-05", ["PlannedEnd"] = "2026-01-30" });
+        html = await client.GetStringAsync(details);
+        Assert.Contains("id=\"plannedstart\" type=\"date\" class=\"form-control form-control-sm\" value=\"2026-01-31\"", html);
+        Assert.Contains("id=\"plannedend\" type=\"date\" class=\"form-control form-control-sm\" value=\"2026-03-27\"", html);
+    }
+
     private static async Task<int> HolidayIdAsync(WebAppFactory f)
     {
         using var scope = f.Services.CreateScope();
