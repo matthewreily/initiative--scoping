@@ -63,7 +63,7 @@ Three application roles, granted in-app at `Admin → Users`:
 
 1. Owner: **Request re-baseline** with a reason.
 2. Administrator: **Re-baselines** (nav bar) → **Approve** (scope unlocks) or **Reject**.
-3. Owner edits phases/allocations, then **Finalize** to snapshot **v2**. All versions remain in `Baselines` with deltas; variance is always measured against the *current* version.
+3. Owner edits phases/allocations, then **Finalize** to snapshot **v2**. All versions remain in `Baselines` with deltas; variance is always measured against the *current* version. Baseline lines store the phase, business unit, resource type, seniority and vendor **names as of the snapshot**, so renaming a catalog entry later does not relabel historical baselines.
 
 ## 4. Load actuals (FinancePmo / Administrator)
 

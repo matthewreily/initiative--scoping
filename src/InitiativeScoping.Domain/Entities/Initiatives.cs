@@ -175,6 +175,10 @@ public class ForecastBaselineNonLaborLine
     public int ForecastBaselineId { get; set; }
     public ForecastBaseline? ForecastBaseline { get; set; }
     public int? PhaseId { get; set; }
+
+    /// <summary>Phase name when the baseline was taken; null for whole-initiative lines.</summary>
+    public string? PhaseName { get; set; }
+
     public CostCategory Category { get; set; }
     public required string Description { get; set; }
     public BillingModel BillingModel { get; set; }
@@ -198,6 +202,12 @@ public class ForecastBaselineLine
     public required string Location { get; set; }
     public ResourcingClass ResourcingClass { get; set; }
     public int? VendorId { get; set; }
+    /// <summary>Dimension names as they were when the baseline was taken; later catalog renames do not relabel history.</summary>
+    public required string PhaseName { get; set; }
+    public required string BusinessUnitName { get; set; }
+    public required string ResourceTypeName { get; set; }
+    public required string SeniorityName { get; set; }
+    public string? VendorName { get; set; }
     public decimal Hours { get; set; }
     public decimal HourlyRate { get; set; }
     public decimal Cost { get; set; }

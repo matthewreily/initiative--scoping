@@ -127,8 +127,8 @@ public class VarianceCalculatorTests
                 Id = 1, InitiativeId = 5, Version = 1, IsCurrent = true, SnapshotBy = "u", TotalHours = 300m, TotalCost = 30_000m,
                 Lines =
                 [
-                    new ForecastBaselineLine { PhaseId = 1, ResourceTypeId = 1, Location = "Onshore", Hours = 200m, HourlyRate = 100m, Cost = 20_000m },
-                    new ForecastBaselineLine { PhaseId = 2, ResourceTypeId = 2, Location = "Onshore", Hours = 100m, HourlyRate = 100m, Cost = 10_000m }
+                    new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", PhaseId = 1, ResourceTypeId = 1, Location = "Onshore", Hours = 200m, HourlyRate = 100m, Cost = 20_000m },
+                    new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", PhaseId = 2, ResourceTypeId = 2, Location = "Onshore", Hours = 100m, HourlyRate = 100m, Cost = 10_000m }
                 ]
             });
         }
