@@ -111,17 +111,6 @@ jobs:
           echo "SERVICE=${APP_NAME}-${ENVIRONMENT}" >> "$GITHUB_ENV"
           echo "MIGRATE_JOB=${APP_NAME}-${ENVIRONMENT}-migrate" >> "$GITHUB_ENV"
 
-      - name: Require a successful dev deploy of this commit
-        run: |
-          # Only images that went through test -> build -> deploy dev -> /health on main may reach prod.
-          RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --event push --branch main \
-                   --commit "$IMAGE_TAG" --status success --json databaseId --jq 'length')
-          if [[ "$RUNS" == "0" ]]; then
-            echo "Commit $IMAGE_TAG has no successful dev deploy on main; promote only what dev has run." >&2
-            exit 1
-          fi
-          echo "Commit $IMAGE_TAG was deployed to dev successfully ($RUNS run(s))."
-
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -132,12 +121,31 @@ jobs:
 
       - uses: imjasonh/setup-crane@v0.4
 
-      - name: Promote image (copy by digest, no rebuild)
+      - name: Require a successful dev deploy of this commit
         run: |
+          # Only images that went through test -> build -> deploy dev -> /health on main may reach prod.
+          # Pin the digest first, then check no dev run for this commit is still in flight (a rerun
+          # re-pushes the mutable :<sha> tag), so what we copy is exactly what a finished run validated.
           gcloud auth print-access-token | crane auth login -u oauth2accesstoken --password-stdin "${REGION}-docker.pkg.dev"
           SRC_DIGEST=$(crane digest "$SOURCE_IMAGE")
-          echo "Promoting $SOURCE_IMAGE ($SRC_DIGEST) -> $IMAGE"
-          crane copy "$SOURCE_IMAGE" "$IMAGE"
+          list() { gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --event push --branch main \
+                     --commit "$IMAGE_TAG" --status "$1" --json databaseId --jq 'length'; }
+          for s in queued in_progress waiting requested pending; do
+            [[ "$(list "$s")" == "0" ]] || { echo "A dev deploy for $IMAGE_TAG is still $s; wait for it to finish." >&2; exit 1; }
+          done
+          RUNS=$(list success)
+          if [[ "$RUNS" == "0" ]]; then
+            echo "Commit $IMAGE_TAG has no successful dev deploy on main; promote only what dev has run." >&2
+            exit 1
+          fi
+          [[ "$(crane digest "$SOURCE_IMAGE")" == "$SRC_DIGEST" ]] || { echo "Source tag changed while checking; retry." >&2; exit 1; }
+          echo "Commit $IMAGE_TAG was deployed to dev successfully ($RUNS run(s)); digest $SRC_DIGEST"
+          echo "SRC_DIGEST=$SRC_DIGEST" >> "$GITHUB_ENV"
+
+      - name: Promote image (copy by digest, no rebuild)
+        run: |
+          echo "Promoting ${SOURCE_IMAGE_REPOSITORY}@${SRC_DIGEST} -> $IMAGE"
+          crane copy "${SOURCE_IMAGE_REPOSITORY}@${SRC_DIGEST}" "$IMAGE"
           [[ "$(crane digest "$IMAGE")" == "$SRC_DIGEST" ]] || { echo "Digest mismatch after copy" >&2; exit 1; }
 
       - name: Run database migrations

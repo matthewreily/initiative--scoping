@@ -7,6 +7,8 @@
 #   deploy/gcp/bootstrap-project.sh <dev|prod> <billing-account-id>
 #
 # Reads project_id/region from deploy/gcp/env/<env>.tfvars and the bucket from env/<env>.gcs.tfbackend.
+# The first Terraform apply needs an image to exist: dev builds it from this checkout; prod never
+# builds -- it copies the image dev is currently running (the promotion workflow takes over after).
 # Requires: gcloud, terraform, docker.
 set -euo pipefail
 
@@ -39,9 +41,22 @@ terraform init -reconfigure -backend-config="env/$ENV.gcs.tfbackend"
 terraform apply -var-file="env/$ENV.tfvars" -target=google_artifact_registry_repository.images -auto-approve
 REPO=$(terraform output -raw image_repository)
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-docker build -t "$REPO:latest" ../..
-docker push "$REPO:latest"
-terraform apply -var-file="env/$ENV.tfvars"
+if [[ "$ENV" == dev ]]; then
+  IMAGE_TAG=latest
+  docker build -t "$REPO:$IMAGE_TAG" ../..
+  docker push "$REPO:$IMAGE_TAG"
+else
+  DEV_PROJECT=$(sed -n 's/^project_id *= *"\([^"]*\)".*/\1/p' env/dev.tfvars)
+  DEV_IMAGE=$(gcloud run services describe "initiative-scoping-dev" --project "$DEV_PROJECT" --region "$REGION" \
+    --format 'value(spec.template.spec.containers[].image)' | tr ';' '\n' | grep '/initiative-scoping:' | head -1)
+  [[ -n "$DEV_IMAGE" ]] || { echo "Could not find the app image currently deployed to dev" >&2; exit 1; }
+  IMAGE_TAG=${DEV_IMAGE##*:}
+  echo "Seeding prod with the image dev is running: $DEV_IMAGE"
+  docker pull "$DEV_IMAGE"
+  docker tag "$DEV_IMAGE" "$REPO:$IMAGE_TAG"
+  docker push "$REPO:$IMAGE_TAG"
+fi
+terraform apply -var-file="env/$ENV.tfvars" -var "image_tag=$IMAGE_TAG"
 
 cat <<EOF
 

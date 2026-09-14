@@ -34,6 +34,8 @@ Shortcut: after step 2 (Entra) and filling the tfvars, `deploy/gcp/bootstrap-pro
    terraform apply -var-file=env/dev.tfvars
    ```
 
+   For prod, do not build locally: `bootstrap-project.sh prod` seeds the registry by copying the image dev is currently running (same SHA tag), so nothing reaches prod that has not gone through CI and dev.
+
 5. Store the Entra client secret:
 
    ```bash
