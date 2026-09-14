@@ -306,6 +306,50 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     }
 
     [Fact]
+    public async Task Rate_card_details_filters_by_class_and_vendor()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var vendorName = $"Vend{Guid.NewGuid():N}"[..12];
+        int vendorId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var vendor = new Vendor { Name = vendorName };
+            db.Vendors.Add(vendor);
+            await db.SaveChangesAsync();
+            vendorId = vendor.Id;
+        }
+
+        var create = await PostFormAsync(client, "/Admin/RateCards/Create", "/Admin/RateCards/Create",
+            new() { ["Name"] = $"Filter-{Guid.NewGuid():N}"[..14], ["EffectiveStart"] = "2027-06-01" });
+        var detailsUrl = create.Headers.Location!.ToString();
+        var id = int.Parse(detailsUrl.Split('/').Last());
+
+        var csv = "ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor\n" +
+                  "Software Engineer,Senior,LocInt,Internal,100,\n" +
+                  $"Software Engineer,Senior,LocVendA,Vendor,60,{vendorName}\n" +
+                  "QA Analyst,Senior,LocVendB,Vendor,50,\n";
+        await PostCsvAsync(client, detailsUrl, $"/Admin/RateCards/Import/{id}", csv);
+        Assert.Equal(3, await EntryCountAsync(id));
+
+        var all = await client.GetStringAsync(detailsUrl);
+        Assert.Contains("LocInt", all);
+        Assert.Contains("LocVendA", all);
+        Assert.Contains("LocVendB", all);
+        Assert.Contains($">{vendorName}</option>", all);
+
+        var internalOnly = await client.GetStringAsync($"{detailsUrl}?resourcingClass=InternalFte");
+        Assert.Contains("LocInt", internalOnly);
+        Assert.DoesNotContain("LocVendA", internalOnly);
+        Assert.DoesNotContain("LocVendB", internalOnly);
+
+        var vendorOnly = await client.GetStringAsync($"{detailsUrl}?resourcingClass=Vendor&vendorId={vendorId}");
+        Assert.Contains("LocVendA", vendorOnly);
+        Assert.DoesNotContain("LocInt", vendorOnly);
+        Assert.DoesNotContain("LocVendB", vendorOnly);
+    }
+
+    [Fact]
     public async Task Allocation_template_requires_lines_totalling_100_percent()
     {
         var client = factory.CreateClient(NoRedirect);
