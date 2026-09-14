@@ -128,11 +128,6 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
 
         var previous = selected is null ? null : baselines.FirstOrDefault(b => b.Version < selected.Version);
         var forecast = ForecastCalculator.Calculate(initiative, await LoadRateCardsAsync(ct));
-        var typeNames = await db.ResourceTypes.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name, ct);
-        var buNames = await db.BusinessUnits.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.Name, ct);
-        var vendorNames = await db.Vendors.AsNoTracking().ToDictionaryAsync(v => v.Id, v => v.Name, ct);
-        var seniorityNames = await db.SeniorityLevels.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name, ct);
-        var phaseNames = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
 
         return View(new BaselinesModel
         {
@@ -141,7 +136,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             Selected = selected,
             Previous = previous,
             LiveForecast = forecast,
-            Lines = selected is null ? [] : BaselineLines(selected, previous, phaseNames, typeNames, buNames, vendorNames, seniorityNames),
+            Lines = selected is null ? [] : BaselineLines(selected, previous),
             Requests = initiative.RebaselineRequests.OrderByDescending(r => r.Id).ToList(),
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
             CanApprove = InitiativeAccess.CanApproveRebaseline(currentUser)
@@ -298,7 +293,10 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.BusinessUnit)
             .Include(i => i.Members)
             .Include(i => i.Phases)
-            .Include(i => i.Allocations)
+            .Include(i => i.Allocations).ThenInclude(a => a.BusinessUnit)
+            .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
+            .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
+            .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
             .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines)
             .Include(i => i.RebaselineRequests)
@@ -310,25 +308,17 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
     private static object BaselineDiff(ForecastBaseline b, int? requestId = null) =>
         new { b.Version, b.TotalHours, b.TotalCost, LineCount = b.Lines.Count, b.Reason, RequestId = requestId };
 
-    private static List<BaselineLineRow> BaselineLines(
-        ForecastBaseline selected, ForecastBaseline? previous,
-        IReadOnlyDictionary<int, string> phaseNames, IReadOnlyDictionary<int, string> typeNames,
-        IReadOnlyDictionary<int, string> buNames, IReadOnlyDictionary<int, string> vendorNames, IReadOnlyDictionary<int, string> seniorityNames)
+    private static List<BaselineLineRow> BaselineLines(ForecastBaseline selected, ForecastBaseline? previous)
     {
         static string Key(ForecastBaselineLine l) => $"{l.PhaseId}|{l.BusinessUnitId}|{l.ResourceTypeId}|{l.SeniorityId}|{l.Location}|{l.ResourcingClass}|{l.VendorId}";
-        string? VendorName(int? id) => id is null ? null : vendorNames.GetValueOrDefault(id.Value, $"Vendor #{id}");
-        string SeniorityName(int id) => seniorityNames.GetValueOrDefault(id, $"Seniority #{id}");
         var prev = (previous?.Lines ?? []).GroupBy(Key).ToDictionary(g => g.Key, g => (Hours: g.Sum(l => l.Hours), Cost: g.Sum(l => l.Cost)));
         var rows = selected.Lines.GroupBy(Key).Select(g =>
         {
             var first = g.First();
             prev.Remove(g.Key, out var p);
             return new BaselineLineRow(
-                phaseNames.GetValueOrDefault(first.PhaseId, $"Phase #{first.PhaseId}"),
-                buNames.GetValueOrDefault(first.BusinessUnitId, $"BU #{first.BusinessUnitId}"),
-                VendorName(first.VendorId),
-                typeNames.GetValueOrDefault(first.ResourceTypeId, $"Type #{first.ResourceTypeId}"),
-                SeniorityName(first.SeniorityId), first.Location, first.ResourcingClass,
+                first.PhaseName, first.BusinessUnitName, first.VendorName, first.ResourceTypeName,
+                first.SeniorityName, first.Location, first.ResourcingClass,
                 g.Sum(l => l.Hours), first.HourlyRate, g.Sum(l => l.Cost),
                 previous is null ? null : g.Sum(l => l.Hours) - p.Hours,
                 previous is null ? null : g.Sum(l => l.Cost) - p.Cost);
@@ -339,11 +329,8 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         {
             var l = previous!.Lines.First(x => Key(x) == key);
             rows.Add(new BaselineLineRow(
-                phaseNames.GetValueOrDefault(l.PhaseId, $"Phase #{l.PhaseId}"),
-                buNames.GetValueOrDefault(l.BusinessUnitId, $"BU #{l.BusinessUnitId}"),
-                VendorName(l.VendorId),
-                typeNames.GetValueOrDefault(l.ResourceTypeId, $"Type #{l.ResourceTypeId}"),
-                SeniorityName(l.SeniorityId), l.Location, l.ResourcingClass, 0m, l.HourlyRate, 0m, -p.Hours, -p.Cost));
+                l.PhaseName, l.BusinessUnitName, l.VendorName, l.ResourceTypeName,
+                l.SeniorityName, l.Location, l.ResourcingClass, 0m, l.HourlyRate, 0m, -p.Hours, -p.Cost));
         }
 
         return rows.OrderBy(r => r.Phase).ThenBy(r => r.ResourceType).ThenBy(r => r.Seniority).ToList();

@@ -68,6 +68,34 @@ public class BaselineTests
     }
 
     [Fact]
+    public void Snapshot_captures_dimension_names_so_later_renames_do_not_relabel_history()
+    {
+        var initiative = NewInitiative();
+        var allocation = initiative.Allocations[0];
+        allocation.BusinessUnit = new BusinessUnit { Id = 1, Name = "Retail" };
+        allocation.ResourceType = new ResourceType { Id = 1, Name = "Engineer", DisciplineId = 1 };
+        allocation.Seniority = new SeniorityLevel { Id = 2, Name = "Mid" };
+        allocation.ResourcingClass = ResourcingClass.Vendor;
+        allocation.VendorId = 9;
+        allocation.Vendor = new Vendor { Id = 9, Name = "Acme" };
+
+        var baseline = BaselineSnapshot.Create(initiative, Forecast(initiative, 100m), "alice", Now, null);
+
+        allocation.BusinessUnit.Name = "Retail Banking";
+        allocation.ResourceType.Name = "Software Engineer";
+        allocation.Seniority.Name = "Level 2";
+        allocation.Vendor.Name = "Acme Corp";
+        initiative.Phases[0].Name = "Discovery";
+
+        var line = Assert.Single(baseline.Lines);
+        Assert.Equal("P1", line.PhaseName);
+        Assert.Equal("Retail", line.BusinessUnitName);
+        Assert.Equal("Engineer", line.ResourceTypeName);
+        Assert.Equal("Mid", line.SeniorityName);
+        Assert.Equal("Acme", line.VendorName);
+    }
+
+    [Fact]
     public void Snapshot_refuses_unpriced_forecast()
     {
         var initiative = NewInitiative();

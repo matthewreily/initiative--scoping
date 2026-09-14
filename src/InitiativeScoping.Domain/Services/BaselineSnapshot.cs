@@ -22,6 +22,8 @@ public static class BaselineSnapshot
             existing.IsCurrent = false;
         }
 
+        var phaseNames = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
+
         var baseline = new ForecastBaseline
         {
             InitiativeId = initiative.Id,
@@ -41,6 +43,11 @@ public static class BaselineSnapshot
                 Location = l.Allocation.Location,
                 ResourcingClass = l.Allocation.ResourcingClass,
                 VendorId = l.Allocation.VendorId,
+                PhaseName = l.Allocation.Phase?.Name ?? phaseNames.GetValueOrDefault(l.Allocation.PhaseId, $"Phase #{l.Allocation.PhaseId}"),
+                BusinessUnitName = l.Allocation.BusinessUnit?.Name ?? $"BU #{l.Allocation.BusinessUnitId}",
+                ResourceTypeName = l.Allocation.ResourceType?.Name ?? $"Type #{l.Allocation.ResourceTypeId}",
+                SeniorityName = l.Allocation.Seniority?.Name ?? $"Seniority #{l.Allocation.SeniorityId}",
+                VendorName = l.Allocation.Vendor?.Name ?? (l.Allocation.VendorId is { } vid ? $"Vendor #{vid}" : null),
                 Hours = l.Hours,
                 HourlyRate = l.HourlyRate!.Value,
                 Cost = l.Cost

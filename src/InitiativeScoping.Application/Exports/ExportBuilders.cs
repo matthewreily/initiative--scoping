@@ -117,8 +117,8 @@ public static class InitiativeExport
             ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Hours", "Hourly rate", "Cost"],
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
-                baseline!.Version, phases.GetValueOrDefault(l.PhaseId), businessUnitNames.GetValueOrDefault(l.BusinessUnitId), resourceTypeNames.GetValueOrDefault(l.ResourceTypeId),
-                seniorityNames.GetValueOrDefault(l.SeniorityId), l.Location, l.ResourcingClass.ToString(), l.VendorId is { } vid ? vendorNames.GetValueOrDefault(vid) : null, l.Hours, l.HourlyRate, l.Cost
+                baseline!.Version, l.PhaseName, l.BusinessUnitName, l.ResourceTypeName,
+                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.Hours, l.HourlyRate, l.Cost
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",
