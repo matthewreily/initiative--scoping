@@ -54,8 +54,8 @@
             <td class="d-none d-md-table-cell">@i.TargetStart.ToString("yyyy-MM-dd")@if (i.PlanningMode == PlanningMode.FixedDuration && i.TargetEnd is not null) { <span class="text-nowrap"> → @i.TargetEnd.Value.ToString("yyyy-MM-dd")</span> <span class="badge bg-light text-dark border" title="Fixed duration">Fixed</span> }</td>
             <td class="text-end d-none d-lg-table-cell">@item.PhaseCount</td>
             <td class="text-end d-none d-md-table-cell">@item.TotalHours.ToString("N1")</td>
-            <td class="text-end d-none d-md-table-cell" title="@item.RunRate.Days planned day(s)">@item.RunRate.Monthly.ToString("C0")</td>
-            <td class="text-end d-none d-lg-table-cell" title="@item.RunRate.Days planned day(s)">@item.RunRate.Yearly.ToString("C0")</td>
+            <td class="text-end d-none d-md-table-cell" data-sort="@item.RunRate.Monthly.ToString(System.Globalization.CultureInfo.InvariantCulture)" title="@item.RunRate.Days planned day(s)">@item.RunRate.Monthly.ToString("C0")</td>
+            <td class="text-end d-none d-lg-table-cell" data-sort="@item.RunRate.Yearly.ToString(System.Globalization.CultureInfo.InvariantCulture)" title="@item.RunRate.Days planned day(s)">@item.RunRate.Yearly.ToString("C0")</td>
             <td class="text-end">
                 @item.TotalCost.ToString("C0")
                 @if (!item.IsComplete)

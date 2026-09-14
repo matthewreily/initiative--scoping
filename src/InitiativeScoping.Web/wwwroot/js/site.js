@@ -52,7 +52,8 @@
             th.classList.add('sortable');
             th.tabIndex = 0;
             th.setAttribute('role', 'button');
-            th.title = 'Sort by ' + th.textContent.trim();
+            const sortHint = 'Sort by ' + th.textContent.trim();
+            th.title = th.title ? th.title + ' — ' + sortHint : sortHint;
             const toggle = () => sort(table, index, th.classList.contains('sorted-asc') ? -1 : 1);
             th.addEventListener('click', e => { if (!e.target.closest('input,button,a,select')) toggle(); });
             th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
