@@ -122,6 +122,9 @@ public class RateCardDetailsModel
     public required SelectList Seniorities { get; init; }
     public required SelectList Vendors { get; init; }
     public string? FilterResourceType { get; init; }
+    public required SelectList FilterVendors { get; init; }
+    public int? FilterVendorId { get; init; }
+    public ResourcingClass? FilterResourcingClass { get; init; }
     public bool IsEditable => Card.Status != RateCardStatus.Retired;
 }
 

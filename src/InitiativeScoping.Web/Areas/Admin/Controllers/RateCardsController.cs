@@ -76,7 +76,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         return RedirectWithSuccess($"Rate card '{card.Name}' updated.", "Details", new { id });
     }
 
-    public async Task<IActionResult> Details(int id, string? resourceType, CancellationToken ct)
+    public async Task<IActionResult> Details(int id, string? resourceType, int? vendorId, ResourcingClass? resourcingClass, CancellationToken ct)
     {
         var card = await db.RateCards
             .Include(c => c.Entries).ThenInclude(e => e.ResourceType)
@@ -88,8 +88,17 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return NotFound();
         }
 
+        var entryVendors = card.Entries
+            .Where(e => e.Vendor is not null)
+            .Select(e => e.Vendor!)
+            .DistinctBy(v => v.Id)
+            .OrderBy(v => v.Name)
+            .ToList();
+
         card.Entries = card.Entries
             .Where(e => string.IsNullOrEmpty(resourceType) || e.ResourceType!.Name == resourceType)
+            .Where(e => vendorId is null || e.VendorId == vendorId)
+            .Where(e => resourcingClass is null || e.ResourcingClass == resourcingClass)
             .OrderBy(e => e.ResourceType!.Name)
             .ThenBy(e => e.ResourcingClass).ThenBy(e => e.Vendor?.Name).ThenBy(e => e.Location).ThenBy(e => e.Seniority!.SortOrder)
             .ToList();
@@ -101,7 +110,10 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             ResourceTypes = await ResourceTypeSelect(ct),
             Seniorities = await SenioritySelect(ct),
             Vendors = await VendorSelect(ct),
-            FilterResourceType = resourceType
+            FilterResourceType = resourceType,
+            FilterVendors = new SelectList(entryVendors, "Id", "Name", vendorId),
+            FilterVendorId = vendorId,
+            FilterResourcingClass = resourcingClass
         });
     }
 
