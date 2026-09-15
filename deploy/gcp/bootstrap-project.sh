@@ -27,7 +27,7 @@ CLIENT_ID=$(tfvar entra_client_id)
 [[ "$CLIENT_ID" != REPLACE* ]] || { echo "entra_client_id in env/$ENV.tfvars is still a placeholder: run deploy/entra/register-app.sh $ENV first" >&2; exit 1; }
 
 if ! gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1; then
-  gcloud projects create "$PROJECT_ID" --name "Initiative Scoping ($ENV)"
+  gcloud projects create "$PROJECT_ID" --name "Initiative Scoping $ENV"
 fi
 gcloud billing projects link "$PROJECT_ID" --billing-account "$BILLING" >/dev/null
 gcloud services enable cloudresourcemanager.googleapis.com serviceusage.googleapis.com storage.googleapis.com --project "$PROJECT_ID"
