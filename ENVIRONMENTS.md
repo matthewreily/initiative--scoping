@@ -43,18 +43,29 @@ values marked *Terraform output* can be re-derived with `terraform -chdir=deploy
 
 ## prod (GCP project `initiative-scoping-prod`, region `us-central1`)
 
-Config is in the repo (`deploy/gcp/env/prod.tfvars`, `deploy/gcp/env/prod.gcs.tfbackend` → bucket `initiative-scoping-prod-tfstate`); infrastructure is **not provisioned yet**. To bring it up:
+| What | Where |
+|---|---|
+| Application | <https://initiative-scoping-prod-561297293406.us-central1.run.app> |
+| Health check (no login) | <https://initiative-scoping-prod-561297293406.us-central1.run.app/health> |
+| Cloud Run service `initiative-scoping-prod` | <https://console.cloud.google.com/run/detail/us-central1/initiative-scoping-prod/revisions?project=initiative-scoping-prod> |
+| Cloud Run migration job `initiative-scoping-prod-migrate` | <https://console.cloud.google.com/run/jobs?project=initiative-scoping-prod> |
+| Cloud SQL (PostgreSQL 16, regional HA, backups + PITR, deletion protection) `initiative-scoping-prod-pg` | <https://console.cloud.google.com/sql/instances/initiative-scoping-prod-pg/overview?project=initiative-scoping-prod> |
+| Secret Manager (DB connection string, Entra client secret, OTel collector config) | <https://console.cloud.google.com/security/secret-manager?project=initiative-scoping-prod> |
+| Cloud KMS key for Data Protection keys | <https://console.cloud.google.com/security/kms?project=initiative-scoping-prod> |
+| Logs | <https://console.cloud.google.com/logs/query?project=initiative-scoping-prod> |
+| Traces (OpenTelemetry → Cloud Trace) | <https://console.cloud.google.com/traces/list?project=initiative-scoping-prod> |
+| Monitoring alerts & uptime check | <https://console.cloud.google.com/monitoring/alerting?project=initiative-scoping-prod> |
+| Billing reports | <https://console.cloud.google.com/billing/00EDAE-09A2AC-75569D/reports?project=initiative-scoping-prod> |
+| Container images (copied from dev by digest, tagged with the commit SHA) | `us-central1-docker.pkg.dev/initiative-scoping-prod/initiative-scoping/initiative-scoping` |
+| Terraform | `deploy/gcp`, vars `deploy/gcp/env/prod.tfvars`, state bucket `initiative-scoping-prod-tfstate` (`deploy/gcp/env/prod.gcs.tfbackend`) |
+| Deploy identity | Workload Identity Federation → `initiative-scoping-prod-deploy@initiative-scoping-prod.iam.gserviceaccount.com` (no keys; also has read on the dev image registry) |
+| Release | push a `v*` tag on a commit that has deployed to dev (or *Run workflow* → `sha`), then approve the `prod` deployment in Actions (GitHub environment `prod`, required reviewer). First release: `v1.0.0`. See `deploy/gcp/README.md` → "Continuous deployment" |
 
-1. `deploy/entra/register-app.sh prod` → paste the printed client id into `prod.tfvars` (`entra_client_id`).
-2. `deploy/gcp/bootstrap-project.sh prod 00EDAE-09A2AC-75569D` → follow the printed next steps (client secret, first migration, redirect URI, GitHub `prod` environment variables, dev re-apply, `DEV_IMAGE_REPOSITORY` repository variable, required reviewers).
-3. Promote: push a `v*` tag on a commit that has deployed to dev (or *Run workflow* → `sha`), then approve the `prod` deployment in Actions. See `deploy/gcp/README.md` → "Continuous deployment".
-
-Once live, add the same rows as dev above (URLs follow the `initiative-scoping-prod-*.us-central1.run.app` pattern; console links are the dev ones with `project=initiative-scoping-prod`). Deploy identity: `initiative-scoping-prod-deploy@initiative-scoping-prod.iam.gserviceaccount.com` (also granted read on the dev image registry).
-
-## Local development
+### Identity (Microsoft Entra ID)
 
 | What | Where |
 |---|---|
-| App | <http://localhost:5086> (`dotnet run --project src/InitiativeScoping.Web`), dev auth bypass as Administrator |
-| Database | SQLite `src/InitiativeScoping.Web/initiative-scoping.dev.db` (auto-created and seeded) |
-| PostgreSQL alternative | `docker compose up` (see `docker-compose.yml`) |
+| Tenant | `f0f37d2f-1252-4242-8058-8b307b86b0b5` |
+| App registration `Initiative Scoping (prod)` (client `e1ab5424-6eed-4b2b-adfd-ba1cad05e9fc`) | <https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/e1ab5424-6eed-4b2b-adfd-ba1cad05e9fc> |
+| Grant access (approve requests, roles) | In-app: Admin → Users (bootstrap admin: `me@mattreily.com`) |
+| Script | `deploy/entra/register-app.sh prod` |
