@@ -1,6 +1,8 @@
 @{
     Layout = "/Views/Shared/_Layout.cshtml";
     var current = ViewContext.RouteData.Values["controller"]?.ToString();
+    var action = ViewContext.RouteData.Values["action"]?.ToString();
+    var isIndex = string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
     string Cls(string c) => c == current ? "nav-link active" : "nav-link";
     var groups = new (string Heading, (string Controller, string Label)[] Items)[]
     {
@@ -48,6 +50,26 @@
         </nav>
     </aside>
     <div class="col-lg-10 min-w-0">
+        @{
+            var crumb = groups.SelectMany(g => g.Items).FirstOrDefault(i => i.Controller == current);
+        }
+        @if (crumb.Controller is not null)
+        {
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-area="Admin" asp-controller="BusinessUnits" asp-action="Index">Admin</a></li>
+                    @if (isIndex)
+                    {
+                        <li class="breadcrumb-item active" aria-current="page">@crumb.Label</li>
+                    }
+                    else
+                    {
+                        <li class="breadcrumb-item"><a asp-area="Admin" asp-controller="@crumb.Controller" asp-action="Index">@crumb.Label</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">@ViewData["Title"]</li>
+                    }
+                </ol>
+            </nav>
+        }
         @RenderBody()
     </div>
 </div>

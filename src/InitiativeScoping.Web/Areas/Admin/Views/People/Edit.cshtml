@@ -43,6 +43,7 @@
         <div class="col-md-4 mb-3">
             <label asp-for="ResourcingClass" class="form-label"></label>
             <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
+            <span asp-validation-for="ResourcingClass" class="text-danger"></span>
         </div>
         <div class="col-md-4 mb-3" id="vendor-wrap" hidden>
             <label asp-for="VendorId" class="form-label"></label>
