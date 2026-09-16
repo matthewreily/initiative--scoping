@@ -1,4 +1,10 @@
-﻿<!DOCTYPE html>
+﻿@{
+    var area = ViewContext.RouteData.Values["area"]?.ToString() ?? "";
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    string NavCls(string a, params string[] controllers) =>
+        a == area && controllers.Contains(controller) ? "nav-link active" : "nav-link";
+}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -20,30 +26,30 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="@NavCls("", "Home")" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Initiatives" asp-action="Index">Initiatives</a>
+                            <a class="@NavCls("", "Initiatives")" asp-area="" asp-controller="Initiatives" asp-action="Index">Initiatives</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Portfolio" asp-action="Index">Portfolio</a>
+                            <a class="@NavCls("", "Portfolio")" asp-area="" asp-controller="Portfolio" asp-action="Index">Portfolio</a>
                         </li>
                         @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Admin))
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Actuals" asp-action="Index">Actuals</a>
+                                <a class="@NavCls("", "Actuals")" asp-area="" asp-controller="Actuals" asp-action="Index">Actuals</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="Admin" asp-controller="BusinessUnits" asp-action="Index">Admin</a>
+                                <a class="@(area == "Admin" && controller != "Users" ? "nav-link active" : "nav-link")" asp-area="Admin" asp-controller="BusinessUnits" asp-action="Index">Admin</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Lifecycle" asp-action="Pending">Re-baselines</a>
+                                <a class="@NavCls("", "Lifecycle")" asp-area="" asp-controller="Lifecycle" asp-action="Pending">Re-baselines</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Audit" asp-action="Index">Audit</a>
+                                <a class="@NavCls("", "Audit")" asp-area="" asp-controller="Audit" asp-action="Index">Audit</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="Admin" asp-controller="Users" asp-action="Index">Users</a>
+                                <a class="@NavCls("Admin", "Users")" asp-area="Admin" asp-controller="Users" asp-action="Index">Users</a>
                             </li>
                         }
                     </ul>
@@ -58,6 +64,7 @@
             </div>
         </nav>
     </header>
+    <partial name="_Flash" />
     <div class="container">
         <main role="main" class="pb-3">
             @RenderBody()

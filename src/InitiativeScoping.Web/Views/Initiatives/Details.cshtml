@@ -33,6 +33,7 @@
             &middot; Sizing: @(i.SizingMethod == SizingMethod.Direct ? "Direct hours" : $"{i.SizingMethod} {i.SizeKey}")
             @if (i.VarianceThresholdPct is not null) { <span> &middot; Variance threshold @i.VarianceThresholdPct%</span> }
         </div>
+        <div class="mt-2"><partial name="_Lifecycle" model="i.Status" /></div>
     </div>
     <div class="d-flex flex-wrap gap-1">
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
@@ -57,7 +58,6 @@
         }
     </div>
 </div>
-<partial name="_Alerts" />
 @if (!string.IsNullOrEmpty(i.Description))
 {
     <p>@i.Description</p>

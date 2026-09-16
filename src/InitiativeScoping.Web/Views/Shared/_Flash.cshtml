@@ -1,0 +1,27 @@
+@{
+    var success = TempData["Success"] as string;
+    var error = TempData["Error"] as string;
+}
+@if (success is not null || error is not null)
+{
+    <div class="toast-container position-fixed top-0 end-0 p-3" aria-live="polite" aria-atomic="true">
+        @if (success is not null)
+        {
+            <div class="toast align-items-center text-bg-success border-0 show" role="status" data-flash data-bs-delay="6000">
+                <div class="d-flex">
+                    <div class="toast-body">@success</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        }
+        @if (error is not null)
+        {
+            <div class="toast align-items-center text-bg-danger border-0 show" role="alert" data-flash data-bs-autohide="false">
+                <div class="d-flex">
+                    <div class="toast-body">@error</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        }
+    </div>
+}

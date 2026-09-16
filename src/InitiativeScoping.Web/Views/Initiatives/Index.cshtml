@@ -9,7 +9,6 @@
         <a class="btn btn-primary btn-sm" asp-action="Create">New initiative</a>
     }
 </div>
-<partial name="_Alerts" />
 
 <form method="get" class="row g-2 mb-3">
     <div class="col-md-4">
@@ -67,7 +66,27 @@
     }
     @if (Model.Items.Count == 0)
     {
-        <tr data-nosort><td colspan="10" class="text-muted">No initiatives match.</td></tr>
+        <tr data-nosort><td colspan="10" class="text-muted">
+            @if (string.IsNullOrWhiteSpace(Model.Search) && Model.Status is null && Model.BusinessUnitId is null)
+            {
+                <div class="empty-state border-0">
+                    <div class="h5">No initiatives yet</div>
+                    @if (Model.CanCreate)
+                    {
+                        <p class="mb-2">Create your first initiative to start sizing effort and forecasting cost.</p>
+                        <a class="btn btn-primary btn-sm" asp-action="Create">New initiative</a>
+                    }
+                    else
+                    {
+                        <p class="mb-0">You will see initiatives here once you are added as a member.</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <text>No initiatives match these filters.</text>
+            }
+        </td></tr>
     }
     </tbody>
 </table>
