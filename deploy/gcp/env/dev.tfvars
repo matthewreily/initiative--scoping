@@ -11,3 +11,5 @@ alert_emails        = ["me@mattreily.com"]
 bootstrap_admins    = ["me@mattreily.com"]
 # prod promotes the exact image that ran in dev, so its deployer may read this registry.
 image_pull_members = ["serviceAccount:initiative-scoping-prod-deploy@initiative-scoping-prod.iam.gserviceaccount.com"]
+billing_account    = "00EDAE-09A2AC-75569D"
+monthly_budget_usd = 25

@@ -261,3 +261,51 @@ resource "google_monitoring_alert_policy" "sql_disk" {
     }
   }
 }
+
+# ---------- Budget (Cloud Billing) ----------
+# One budget per project, scoped to this project only. Alerts go to the same e-mail channels as the
+# monitoring policies (so `alert_emails` must be set); the billing account's default recipients are
+# not notified. Created only when both `billing_account` and a positive `monthly_budget_usd` are set.
+
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
+resource "google_billing_budget" "monthly" {
+  count           = local.alerting && var.billing_account != "" && var.monthly_budget_usd > 0 ? 1 : 0
+  billing_account = var.billing_account
+  display_name    = "${local.name} monthly"
+
+  budget_filter {
+    projects               = ["projects/${data.google_project.this.number}"]
+    calendar_period        = "MONTH"
+    credit_types_treatment = "INCLUDE_ALL_CREDITS"
+  }
+
+  amount {
+    specified_amount {
+      currency_code = "USD"
+      units         = tostring(floor(var.monthly_budget_usd))
+    }
+  }
+
+  dynamic "threshold_rules" {
+    for_each = var.budget_alert_thresholds
+    content {
+      threshold_percent = threshold_rules.value
+      spend_basis       = "CURRENT_SPEND"
+    }
+  }
+
+  threshold_rules {
+    threshold_percent = 1.0
+    spend_basis       = "FORECASTED_SPEND"
+  }
+
+  all_updates_rule {
+    monitoring_notification_channels = local.alert_channels
+    disable_default_iam_recipients   = true
+  }
+
+  depends_on = [google_project_service.apis]
+}

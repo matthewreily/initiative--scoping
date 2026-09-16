@@ -9,3 +9,5 @@ entra_tenant_id     = "f0f37d2f-1252-4242-8058-8b307b86b0b5"
 entra_client_id     = "e1ab5424-6eed-4b2b-adfd-ba1cad05e9fc"
 alert_emails        = ["me@mattreily.com"]
 bootstrap_admins    = ["me@mattreily.com"]
+billing_account     = "00EDAE-09A2AC-75569D"
+monthly_budget_usd  = 25
