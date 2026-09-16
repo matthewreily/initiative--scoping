@@ -128,16 +128,19 @@ if [[ "$ALREADY" == "0" ]]; then
   echo "Assigned you the Admin role."
 fi
 
-# Microsoft Graph User.Read.All (application) so Admin -> Users -> Add user can search the directory
-# for people who have not signed in yet. Consent needs a Global/Privileged Role admin; the app works
-# without it (admins add people by e-mail instead).
+# Microsoft Graph application permissions: User.Read.All so Admin -> Users -> Add user can search the
+# directory for people who have not signed in yet, and Mail.Send so access-request notifications go out
+# from the mailbox in graph_mail_sender. Consent needs a Global/Privileged Role admin; the app works
+# without either (admins add people by e-mail; nothing is sent).
 GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
 USER_READ_ALL="df021288-bdef-4463-88db-98f22de89214"
-az ad app permission add --id "$APP_ID" --api "$GRAPH_APP_ID" --api-permissions "${USER_READ_ALL}=Role" >/dev/null 2>&1 || true
+MAIL_SEND="b633e1c5-b582-4048-a93e-9f11b44c7e96"
+az ad app permission add --id "$APP_ID" --api "$GRAPH_APP_ID" \
+  --api-permissions "${USER_READ_ALL}=Role" "${MAIL_SEND}=Role" >/dev/null 2>&1 || true
 if az ad app permission admin-consent --id "$APP_ID" >/dev/null 2>&1; then
-  echo "Granted admin consent for Microsoft Graph User.Read.All (directory search)."
+  echo "Granted admin consent for Microsoft Graph User.Read.All (directory search) and Mail.Send (access-request e-mails)."
 else
-  echo "Could not grant admin consent for User.Read.All; directory search stays off until an admin grants it (Entra -> App registrations -> API permissions)."
+  echo "Could not grant admin consent for User.Read.All / Mail.Send; directory search and e-mail stay off until an admin grants them (Entra -> App registrations -> API permissions)."
 fi
 
 # Client secret (value is shown once; 12 months).

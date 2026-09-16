@@ -64,10 +64,16 @@ Shortcut: after step 2 (Entra) and filling the tfvars, `deploy/gcp/bootstrap-pro
 
 8. Add the Cloud Run URL as a redirect URI on the Entra app registration: `deploy/entra/register-app.sh <env> --add-url $(terraform output -raw service_url)`.
 
-9. (Optional) Outbound e-mail so admins are notified of access requests. Add to the tfvars, e.g. for Microsoft 365 / SendGrid:
+9. (Optional) Outbound e-mail so admins are notified of access requests. Preferred: **Microsoft Graph** with the app's own Entra credentials — set the sending mailbox in the tfvars and grant the `Mail.Send` application permission with admin consent (`deploy/entra/register-app.sh <env>` does both the add and the consent when run by a Global admin; otherwise Entra → App registrations → the app → API permissions → Add → Microsoft Graph → Application → `Mail.Send` → Grant admin consent):
 
    ```hcl
-   smtp = { host = "smtp.office365.com", port = 587, username = "noreply@example.com", from = "noreply@example.com" }
+   graph_mail_sender = "noreply@example.com"   # licensed M365 mailbox; a shared mailbox works too
+   ```
+
+   then `terraform apply -var-file="env/<env>.tfvars"`. No extra secret is needed. Alternatively, classic SMTP (note that Microsoft 365 no longer accepts password-based SMTP AUTH), e.g. SendGrid:
+
+   ```hcl
+   smtp = { host = "smtp.sendgrid.net", port = 587, username = "apikey", from = "noreply@example.com" }
    ```
 
    then store the SMTP password the same way as the Entra secret and re-apply:

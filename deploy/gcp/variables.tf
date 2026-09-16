@@ -126,6 +126,12 @@ variable "smtp" {
   default = {}
 }
 
+variable "graph_mail_sender" {
+  type        = string
+  description = "Microsoft 365 mailbox (UPN) the app sends access-request e-mails from via Microsoft Graph, using the Entra app's own credentials (needs the Mail.Send application permission with admin consent). Empty disables Graph mail; takes precedence over smtp when set."
+  default     = ""
+}
+
 variable "billing_account" {
   type        = string
   description = "Billing account id (e.g. 00EDAE-09A2AC-75569D) the project is linked to; required for the monthly budget. Empty disables the budget."
