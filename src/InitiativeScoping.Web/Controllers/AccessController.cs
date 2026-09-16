@@ -15,7 +15,7 @@ namespace InitiativeScoping.Web.Controllers;
 /// <summary>Landing page for signed-in people who have no app role yet: shows status and lets them ask for access.</summary>
 [Authorize]
 [AutoValidateAntiforgeryToken]
-public class AccessController(UserAccessService access, AccessCache accessCache) : Controller
+public class AccessController(UserAccessService access, AccessCache accessCache, AccessRequestNotifier notifier) : Controller
 {
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -36,8 +36,14 @@ public class AccessController(UserAccessService access, AccessCache accessCache)
             return RedirectToAction("Index", "Home");
         }
 
-        var account = await access.RequestAccessAsync(SignedIn(), model.Note, ct);
+        var (account, created) = await access.RequestAccessAsync(SignedIn(), model.Note, ct);
         accessCache.Invalidate();
+        if (created)
+        {
+            var usersPage = Url.Action("Index", "Users", new { area = "Admin" }, Request.Scheme, Request.Host.Value)!;
+            await notifier.NotifyAsync(account, usersPage, ct);
+        }
+
         TempData["Success"] = account.Status == UserAccountStatus.Pending
             ? "Your request has been sent to the administrators."
             : "Your account already exists.";

@@ -113,3 +113,15 @@ variable "otel_collector_image" {
   description = "Google-Built OpenTelemetry Collector image for the sidecar."
   default     = "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.159.0"
 }
+
+variable "smtp" {
+  description = "Outbound e-mail (admins are notified of access requests). Leave host empty to disable; the password goes into the <name>-smtp-password secret out-of-band."
+  type = object({
+    host         = optional(string, "")
+    port         = optional(number, 587)
+    use_starttls = optional(bool, true)
+    username     = optional(string, "")
+    from         = optional(string, "")
+  })
+  default = {}
+}

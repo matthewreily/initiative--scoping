@@ -217,13 +217,14 @@ else
             @foreach (var p in i.Phases.OrderBy(p => p.Sequence))
             {
                 var roll = Model.ByPhase.FirstOrDefault(r => r.Label == p.Name);
+                var hasAllocations = i.Allocations.Any(a => a.PhaseId == p.Id);
                 <tr>
                     <td>@p.Sequence</td>
                     <td>@p.Name @if (p.DateHistory.Count > 0) { <span class="badge bg-light text-dark border" title="Dates changed @p.DateHistory.Count time(s)">@p.DateHistory.Count</span> }</td>
                     <td>@p.PlannedStart.ToString("yyyy-MM-dd")</td>
                     <td>@p.PlannedEnd.ToString("yyyy-MM-dd")</td>
                     @if (fd is not null) { <td class="text-end">@fd.PhaseWorkingDays.GetValueOrDefault(p.Id)</td> }
-                    <td class="text-end">@((roll?.Hours ?? 0).ToString("N1"))</td>
+                    <td class="text-end">@((roll?.Hours ?? 0).ToString("N1")) @if (!hasAllocations) { <span class="badge bg-light text-secondary border" title="This phase has no allocations yet, so it contributes no hours or cost. Add one in the Allocations section below.">No allocations yet</span> }</td>
                     <td class="text-end">@((roll?.Cost ?? 0).ToString("C0")) @if (roll?.HasUnpriced == true) { <span class="text-warning" title="Unpriced lines">&#9888;</span> }</td>
                     <td class="text-end text-nowrap">
                         @if (Model.ScopeWritable)
