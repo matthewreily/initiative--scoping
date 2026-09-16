@@ -148,6 +148,24 @@ resource "google_secret_manager_secret_version" "oidc_client_secret_placeholder"
   }
 }
 
+# SMTP password for outbound e-mail (access-request notifications); same placeholder pattern as the
+# Entra secret. Only wired into the service when var.smtp.host is set.
+resource "google_secret_manager_secret" "smtp_password" {
+  secret_id = "${local.name}-smtp-password"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "smtp_password_placeholder" {
+  secret      = google_secret_manager_secret.smtp_password.id
+  secret_data = "PLACEHOLDER-set-with-gcloud-secrets-versions-add"
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
+}
+
 # ---------- Runtime identity ----------
 resource "google_service_account" "run" {
   account_id   = "${local.name}-run"
@@ -229,6 +247,12 @@ resource "google_secret_manager_secret_iam_member" "run_conn" {
 
 resource "google_secret_manager_secret_iam_member" "run_oidc" {
   secret_id = google_secret_manager_secret.oidc_client_secret.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "run_smtp" {
+  secret_id = google_secret_manager_secret.smtp_password.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run.email}"
 }
@@ -346,6 +370,31 @@ resource "google_cloud_run_v2_service" "web" {
           }
         }
       }
+      dynamic "env" {
+        for_each = var.smtp.host == "" ? {} : {
+          Email__Host        = var.smtp.host
+          Email__Port        = tostring(var.smtp.port)
+          Email__UseStartTls = tostring(var.smtp.use_starttls)
+          Email__Username    = var.smtp.username
+          Email__From        = var.smtp.from
+        }
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.smtp.host == "" ? [] : [1]
+        content {
+          name = "Email__Password"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.smtp_password.secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
       startup_probe {
         http_get {
           path = "/health"
@@ -411,6 +460,8 @@ resource "google_cloud_run_v2_service" "web" {
     google_secret_manager_secret_version.oidc_client_secret_placeholder,
     google_secret_manager_secret_iam_member.run_conn,
     google_secret_manager_secret_iam_member.run_oidc,
+    google_secret_manager_secret_version.smtp_password_placeholder,
+    google_secret_manager_secret_iam_member.run_smtp,
     google_secret_manager_secret_version.otel_config,
     google_secret_manager_secret_iam_member.run_otel_config,
     google_project_iam_member.run_telemetry,

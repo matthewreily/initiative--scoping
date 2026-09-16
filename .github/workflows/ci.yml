@@ -8,6 +8,10 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -20,6 +24,14 @@ jobs:
           --logger "trx;LogFileName=results.trx"
           --collect:"XPlat Code Coverage" --settings tests/coverage.runsettings
           --results-directory TestResults
+      - name: Test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit & integration tests
+          path: TestResults/**/*.trx
+          reporter: dotnet-trx
+          fail-on-error: false
       - name: Enforce line coverage threshold
         run: python3 tests/coverage-check.py TestResults 80
       - uses: actions/upload-artifact@v4

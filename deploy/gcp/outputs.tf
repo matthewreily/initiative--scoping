@@ -31,3 +31,8 @@ output "github_workload_identity_provider" {
 output "github_deployer_service_account" {
   value = google_service_account.deployer.email
 }
+
+output "smtp_password_secret_id" {
+  description = "Secret Manager id for the SMTP password (only used when var.smtp.host is set)."
+  value       = google_secret_manager_secret.smtp_password.secret_id
+}

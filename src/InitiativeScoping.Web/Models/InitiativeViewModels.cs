@@ -47,7 +47,7 @@ public class InitiativeEditModel
     [StringLength(200), Display(Name = "Sponsoring team")]
     public string? SponsoringTeam { get; set; }
     [Required, Display(Name = "Sizing method")]
-    public SizingMethod SizingMethod { get; set; } = SizingMethod.Direct;
+    public SizingMethod SizingMethod { get; set; } = SizingMethod.TShirt;
     [StringLength(50), Display(Name = "Size")]
     public string? SizeKey { get; set; }
     [Required, Display(Name = "Planning mode")]

@@ -4,6 +4,7 @@ using InitiativeScoping.Application.Exports;
 using InitiativeScoping.Infrastructure.Access;
 using InitiativeScoping.Infrastructure.Actuals;
 using InitiativeScoping.Infrastructure.DataProtection;
+using InitiativeScoping.Infrastructure.Email;
 using InitiativeScoping.Infrastructure.Exports;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
@@ -63,6 +64,19 @@ public static class DependencyInjection
                 .ToArray());
         services.AddSingleton<IUserDirectory, DbUserDirectory>();
         services.AddScoped<UserAccessService>();
+        var email = configuration.GetSection(EmailOptions.Section);
+        services.Configure<EmailOptions>(o =>
+        {
+            o.Host = email["Host"];
+            o.Port = int.TryParse(email["Port"], out var port) ? port : o.Port;
+            o.UseStartTls = !bool.TryParse(email["UseStartTls"], out var startTls) || startTls;
+            o.Username = email["Username"];
+            o.Password = email["Password"];
+            o.From = email["From"];
+            o.FromName = email["FromName"] ?? o.FromName;
+        });
+        services.TryAddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<AccessRequestNotifier>();
         services.AddScoped<IWorkCalendar, DbWorkCalendar>();
         services.AddScoped<IActualsImporter, ActualsImporter>();
         services.AddSingleton<IExportWriter, CsvExportWriter>();

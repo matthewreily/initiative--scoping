@@ -64,6 +64,19 @@ Shortcut: after step 2 (Entra) and filling the tfvars, `deploy/gcp/bootstrap-pro
 
 8. Add the Cloud Run URL as a redirect URI on the Entra app registration: `deploy/entra/register-app.sh <env> --add-url $(terraform output -raw service_url)`.
 
+9. (Optional) Outbound e-mail so admins are notified of access requests. Add to the tfvars, e.g. for Microsoft 365 / SendGrid:
+
+   ```hcl
+   smtp = { host = "smtp.office365.com", port = 587, username = "noreply@example.com", from = "noreply@example.com" }
+   ```
+
+   then store the SMTP password the same way as the Entra secret and re-apply:
+
+   ```bash
+   printf '%s' "$SMTP_PASSWORD" | gcloud secrets versions add "$(terraform output -raw smtp_password_secret_id)" --data-file=-
+   terraform apply -var-file="env/<env>.tfvars"
+   ```
+
 ### prod specifics
 
 - `env/prod.tfvars` is filled in for project `initiative-scoping-prod` except `entra_client_id`, which comes from `deploy/entra/register-app.sh prod` (a separate "Initiative Scoping (prod)" app registration with its own client secret — store it in prod's Secret Manager, step 5). Create the project + state bucket `initiative-scoping-prod-tfstate` first (step 1); `env/prod.gcs.tfbackend` already points at it.
