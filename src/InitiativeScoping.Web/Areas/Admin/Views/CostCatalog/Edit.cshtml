@@ -5,9 +5,7 @@
     var categories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString());
     var billing = Html.GetEnumSelectList<BillingModel>();
 }
-<h1 class="h3">Administration</h1>
-<partial name="_AdminNav" />
-<h2 class="h5">@ViewData["Title"]</h2>
+<h2 class="h4">@ViewData["Title"]</h2>
 <form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-md-6">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <div class="mb-3">

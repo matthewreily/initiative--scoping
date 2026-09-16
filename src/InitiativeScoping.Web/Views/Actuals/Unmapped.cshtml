@@ -10,7 +10,6 @@
         <button type="submit" class="btn btn-outline-primary btn-sm" title="Re-run project mappings and roster matching for every unmapped entry">Re-apply mappings &amp; roster</button>
     </form>
 </div>
-<partial name="~/Views/Initiatives/_Alerts.cshtml" />
 <p class="text-muted small">Entries whose project has no initiative mapping or whose person is not on the roster. Assign them here, or add the mapping/person and re-apply.</p>
 <partial name="_Entries" model="Model" />
 @if (Model.PageCount > 1)

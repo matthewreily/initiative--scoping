@@ -1,0 +1,33 @@
+@model InitiativeStatus
+@{
+    // Draft → Active → Complete is the happy path; On hold / Cancelled are shown in place of the step they interrupt.
+    var main = new[] { InitiativeStatus.Draft, InitiativeStatus.Active, InitiativeStatus.Complete };
+    var reached = Model switch
+    {
+        InitiativeStatus.Draft => 0,
+        InitiativeStatus.Active or InitiativeStatus.OnHold => 1,
+        InitiativeStatus.Complete => 2,
+        _ => -1
+    };
+    string Cls(int index) => Model switch
+    {
+        InitiativeStatus.Cancelled => "step",
+        InitiativeStatus.OnHold when index == 1 => "step halted",
+        _ when index < reached => "step done",
+        _ when index == reached => "step current",
+        _ => "step"
+    };
+    string Label(int index) => index == 1 && Model == InitiativeStatus.OnHold ? "On hold" : main[index].ToString();
+}
+<div class="lifecycle" aria-label="Lifecycle: @Model">
+    @for (var s = 0; s < main.Length; s++)
+    {
+        if (s > 0) { <span class="sep" aria-hidden="true">›</span> }
+        <span class="@Cls(s)">@Label(s)</span>
+    }
+    @if (Model == InitiativeStatus.Cancelled)
+    {
+        <span class="sep" aria-hidden="true">›</span>
+        <span class="step ended">Cancelled</span>
+    }
+</div>

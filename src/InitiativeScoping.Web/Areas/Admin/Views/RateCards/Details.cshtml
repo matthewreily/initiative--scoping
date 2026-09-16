@@ -3,12 +3,10 @@
     var card = Model.Card;
     ViewData["Title"] = card.Name;
 }
-<h1 class="h3">Administration</h1>
-<partial name="_AdminNav" />
 
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
     <div>
-        <h2 class="h5 mb-1">@card.Name <partial name="_StatusBadge" model="card.Status" /></h2>
+        <h2 class="h4 mb-1">@card.Name <partial name="_StatusBadge" model="card.Status" /></h2>
         <div class="text-muted small">Effective from @card.EffectiveStart.ToString("yyyy-MM-dd") &middot; @card.Entries.Count entr@(card.Entries.Count == 1 ? "y" : "ies") shown</div>
     </div>
     <div class="btn-group">

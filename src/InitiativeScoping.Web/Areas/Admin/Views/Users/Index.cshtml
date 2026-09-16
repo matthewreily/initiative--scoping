@@ -10,10 +10,8 @@
         _ => "bg-secondary"
     };
 }
-<h1 class="h3">Administration</h1>
-<partial name="_AdminNav" />
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h2 class="h5 mb-0">Users @if (Model.Pending > 0) { <span class="badge bg-warning text-dark">@Model.Pending pending</span> }</h2>
+    <h2 class="h4 mb-0">Users @if (Model.Pending > 0) { <span class="badge bg-warning text-dark">@Model.Pending pending</span> }</h2>
     <form method="get" class="d-flex gap-2">
         <input type="search" name="q" value="@Model.Query" class="form-control form-control-sm" placeholder="Search name, e-mail or id" aria-label="Search users" />
         <button type="submit" class="btn btn-outline-secondary btn-sm">Search</button>

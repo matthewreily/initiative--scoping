@@ -105,3 +105,25 @@
         refresh();
     });
 })();
+
+// Flash toasts rendered by _Flash: show via Bootstrap so success auto-hides and errors stay until dismissed.
+(function () {
+    document.querySelectorAll('[data-flash]').forEach(el => {
+        if (window.bootstrap?.Toast) bootstrap.Toast.getOrCreateInstance(el).show();
+    });
+})();
+
+// Submit feedback: once a form is really submitting, mark its submit button busy so double-clicks
+// are ignored and the user sees progress. Skipped for GET forms (filters) and forms with data-no-busy.
+(function () {
+    document.addEventListener('submit', e => {
+        const form = e.target;
+        if (e.defaultPrevented || form.method.toLowerCase() !== 'post' || form.hasAttribute('data-no-busy')) return;
+        const button = e.submitter || form.querySelector('button[type=submit],input[type=submit]');
+        if (!button || button.classList.contains('is-loading')) return;
+        button.classList.add('is-loading');
+        button.setAttribute('aria-busy', 'true');
+        // Disable after the submit has dispatched so the button's name/value still posts.
+        setTimeout(() => { button.disabled = true; }, 0);
+    });
+})();

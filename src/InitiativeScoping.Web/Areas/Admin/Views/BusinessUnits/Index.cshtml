@@ -2,10 +2,8 @@
 @{
     ViewData["Title"] = "Business Units";
 }
-<h1 class="h3">Administration</h1>
-<partial name="_AdminNav" />
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h2 class="h5 mb-0">Business Units</h2>
+    <h2 class="h4 mb-0">Business Units</h2>
     <a class="btn btn-primary btn-sm" asp-action="Create">New business unit</a>
 </div>
 <form asp-action="BulkDelete" method="post" data-bulk>

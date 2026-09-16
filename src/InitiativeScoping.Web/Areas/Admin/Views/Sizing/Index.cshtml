@@ -2,13 +2,11 @@
 @{
     ViewData["Title"] = "Sizing";
 }
-<h1 class="h3">Administration</h1>
-<partial name="_AdminNav" />
 
 <div class="row g-4">
     <div class="col-lg-5">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <h2 class="h5 mb-0">Sizing conversions</h2>
+            <h2 class="h4 mb-0">Sizing conversions</h2>
             <a class="btn btn-primary btn-sm" asp-action="CreateConversion">New conversion</a>
         </div>
         <p class="text-muted small">Maps a relative size (T-shirt or story points) to total estimated hours.</p>
@@ -41,7 +39,7 @@
 
     <div class="col-lg-7">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <h2 class="h5 mb-0">Allocation templates</h2>
+            <h2 class="h4 mb-0">Allocation templates</h2>
             <a class="btn btn-primary btn-sm" asp-action="CreateTemplate">New template</a>
         </div>
         <p class="text-muted small">Optional default split of a relative-sized estimate across phases, resource types and seniority. Lines must total 100%.</p>

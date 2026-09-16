@@ -5,7 +5,6 @@
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Actuals imports</a></li><li class="breadcrumb-item active">Import #@i.Id</li></ol></nav>
 <h1 class="h3">Import #@i.Id <span class="text-muted fs-6">@i.Source @i.FileName</span></h1>
-<partial name="~/Views/Initiatives/_Alerts.cshtml" />
 <div class="row g-3 mb-3">
     <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted small">Status</div><div>@i.Status</div></div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted small">Records</div><div class="fs-4">@i.RecordCount</div></div></div></div>
