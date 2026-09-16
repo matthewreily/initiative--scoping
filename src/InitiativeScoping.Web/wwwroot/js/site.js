@@ -127,3 +127,31 @@
         setTimeout(() => { button.disabled = true; }, 0);
     });
 })();
+
+// Tab strips with data-tab-memory: open the tab named in the URL hash (#pane-x or #x), otherwise the
+// one last used for this key, and keep both in sync so form round-trips return to the same tab.
+(function () {
+    document.querySelectorAll('[data-tab-memory]').forEach(strip => {
+        const key = 'tab:' + strip.dataset.tabMemory;
+        const buttons = [...strip.querySelectorAll('[data-bs-toggle="tab"]')];
+        const byPane = id => buttons.find(b => b.dataset.bsTarget === '#pane-' + id.replace(/^pane-/, ''));
+        let wanted = location.hash ? byPane(location.hash.slice(1)) : null;
+        if (!wanted) {
+            const remembered = sessionStorage.getItem(key);
+            wanted = remembered ? byPane(remembered) : null;
+        }
+        if (wanted && !wanted.classList.contains('active') && window.bootstrap?.Tab) bootstrap.Tab.getOrCreateInstance(wanted).show();
+        strip.addEventListener('shown.bs.tab', e => {
+            const pane = e.target.dataset.bsTarget.slice(1);
+            sessionStorage.setItem(key, pane);
+            history.replaceState(null, '', '#' + pane);
+        });
+    });
+    // Anchors inside a hidden pane (e.g. links to #non-labor-costs) should reveal their pane first.
+    const target = location.hash && document.getElementById(location.hash.slice(1));
+    const pane = target?.closest('.tab-pane');
+    if (pane && !pane.classList.contains('active') && window.bootstrap?.Tab) {
+        const btn = document.querySelector(`[data-bs-target="#${pane.id}"]`);
+        if (btn) { bootstrap.Tab.getOrCreateInstance(btn).show(); setTimeout(() => target.scrollIntoView(), 0); }
+    }
+})();

@@ -180,8 +180,42 @@ else
     }
 </div>
 
-<div class="row g-4">
-    <div class="col-lg-7">
+@{
+    var baselineDelta = current is null ? (decimal?)null : Model.Forecast.TotalCost - current.TotalCost;
+    var tabList = new (string Key, string Label, int? Count)[]
+    {
+        ("plan", "Plan", i.Phases.Count),
+        ("costs", "Costs", i.NonLaborCosts.Count),
+        ("team", "Team", i.Members.Count),
+        ("actuals", "Actuals", null),
+        ("history", "History", i.Baselines.Count)
+    };
+}
+<div class="details-sticky" id="details-sticky">
+    <ul class="nav nav-tabs" role="tablist" id="details-tabs" data-tab-memory="initiative-@i.Id">
+        @foreach (var (key, label, count) in tabList)
+        {
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(key == "plan" ? "active" : "")" id="tab-@key" data-bs-toggle="tab" data-bs-target="#pane-@key" type="button" role="tab" aria-controls="pane-@key" aria-selected="@(key == "plan" ? "true" : "false")">
+                    @label @if (count is not null) { <span class="badge rounded-pill text-bg-light ms-1">@count</span> }
+                </button>
+            </li>
+        }
+    </ul>
+    <div class="details-summary small text-muted" aria-label="Summary">
+        <span><span class="text-body fw-semibold">@Model.Forecast.TotalHours.ToString("N1")</span> h</span>
+        <span><span class="text-body fw-semibold">@Model.Forecast.TotalCost.ToString("C0")</span> forecast</span>
+        @if (baselineDelta is not null)
+        {
+            <span class="@(baselineDelta > 0 ? "text-danger" : baselineDelta < 0 ? "text-success" : "")" title="Live forecast vs. current baseline v@(current!.Version)">@(baselineDelta >= 0 ? "+" : "")@baselineDelta.Value.ToString("C0") vs. baseline</span>
+        }
+        @if (!Model.Forecast.IsComplete) { <span class="text-warning">Unpriced lines</span> }
+    </div>
+</div>
+<div class="tab-content pt-3">
+    <div class="tab-pane fade show active" id="pane-plan" role="tabpanel" aria-labelledby="tab-plan">
+        <div class="row g-4">
+            <div class="col-lg-7">
         <h2 class="h5">Phases</h2>
         @if (fd is not null)
         {
@@ -404,6 +438,92 @@ else
             }
         }
 
+            </div>
+            <div class="col-lg-5">
+        @if (Model.ScopeWritable)
+        {
+            <h2 class="h5">Apply relative size</h2>
+            @if (fixedDuration)
+            {
+                <p class="small text-muted mb-2">Converts a size to target hours (admin conversion table), tiles the fixed window across the template's phases, and sets each allocation's staffing % so it delivers the template hours in its phase.</p>
+            }
+            else
+            {
+                <p class="small text-muted mb-2">Converts a size to hours (admin conversion table) and splits them per the matching allocation template, creating any missing phases.</p>
+            }
+            <form asp-action="ApplySize" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
+                <div class="col-5">
+                    <label for="method" class="form-label small mb-0">Method</label>
+                    <select name="Method" id="method" class="form-select form-select-sm">
+                        <option value="@SizingMethod.TShirt" selected="@(Model.ApplySize.Method == SizingMethod.TShirt)">T-shirt</option>
+                        <option value="@SizingMethod.StoryPoints" selected="@(Model.ApplySize.Method == SizingMethod.StoryPoints)">Story points</option>
+                    </select>
+                </div>
+                <div class="col-3">
+                    <label for="sizekey" class="form-label small mb-0">Size</label>
+                    <select name="SizeKey" id="sizekey" class="form-select form-select-sm" required>
+                        <option value="">Select…</option>
+                        @foreach (var o in Model.SizeOptions)
+                        {
+                            <option value="@o.Key" data-method="@o.Method" selected="@(o.Method == Model.ApplySize.Method && o.Key == Model.ApplySize.SizeKey)">@o.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-4">
+                    <label for="location-2" class="form-label small mb-0">Location</label>
+                    <input name="Location" id="location-2" class="form-control form-control-sm" value="@Model.ApplySize.Location" required />
+                </div>
+                <div class="col-5">
+                    <label for="businessunitid-2" class="form-label small mb-0">Business unit</label>
+                    <select name="BusinessUnitId" id="businessunitid-2" asp-items="@(new SelectList(Model.RateOptions.BusinessUnits, "Id", "Name", Model.ApplySize.BusinessUnitId))" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-4">
+                    <label for="resourcingclass-2" class="form-label small mb-0">Class</label>
+                    <select name="ResourcingClass" id="resourcingclass-2" asp-items="classes" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-3" id="vendor-2-wrap" hidden>
+                    <label for="vendorid-2" class="form-label small mb-0">Vendor</label>
+                    <select name="VendorId" id="vendorid-2" asp-items="@(new SelectList(Model.RateOptions.Vendors, "Id", "Name"))" class="form-select form-select-sm" disabled></select>
+                </div>
+                <div class="col-4 form-check ms-2 mb-1">
+                    <input name="Replace" type="checkbox" value="true" class="form-check-input" id="replace" checked />
+                    <input name="Replace" type="hidden" value="false" />
+                    <label class="form-check-label small" for="replace">Replace existing</label>
+                </div>
+                <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Apply</button></div>
+            </form>
+            <script>
+                (function () {
+                    const cls2 = document.getElementById('resourcingclass-2'), wrap2 = document.getElementById('vendor-2-wrap'), vendor2 = document.getElementById('vendorid-2');
+                    function toggleVendor() {
+                        const isVendor = cls2.value === '@((int)ResourcingClass.Vendor)' || cls2.value === '@ResourcingClass.Vendor';
+                        wrap2.hidden = !isVendor;
+                        vendor2.disabled = !isVendor;
+                    }
+                    cls2.addEventListener('change', toggleVendor);
+                    toggleVendor();
+                    const method = document.getElementById('method');
+                    const key = document.getElementById('sizekey');
+                    function sync() {
+                        for (const opt of key.options) {
+                            if (!opt.value) continue;
+                            const show = opt.dataset.method === method.value;
+                            opt.hidden = !show;
+                            opt.disabled = !show;
+                            if (!show && opt.selected) key.value = '';
+                        }
+                    }
+                    method.addEventListener('change', sync);
+                    sync();
+                })();
+            </script>
+        }
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="pane-costs" role="tabpanel" aria-labelledby="tab-costs">
+        <div class="row g-4">
+            <div class="col-lg-7">
         <h2 class="h5" id="non-labor-costs">Non-labor costs</h2>
         <p class="text-muted small mb-2">Software licenses and other non-labor spend. Recurring lines bill whole months/years over the phase or initiative window (any partial period counts as a full one) unless explicit dates are set.</p>
         <div class="table-responsive" id="non-labor-table">
@@ -515,9 +635,8 @@ else
             </form>
             <partial name="_CostPreviewScript" model="@(new CostPreviewScriptModel("nl-", Model.CatalogOptions, Model.CostPreviewWindows))" />
         }
-    </div>
-
-    <div class="col-lg-5">
+            </div>
+            <div class="col-lg-5">
         <h2 class="h5">Rollup by resource type</h2>
         <div class="table-responsive">
         <table class="table table-sm">
@@ -561,87 +680,13 @@ else
             </table>
             </div>
         }
-
-        @if (Model.ScopeWritable)
-        {
-            <h2 class="h5 mt-4">Apply relative size</h2>
-            @if (fixedDuration)
-            {
-                <p class="small text-muted mb-2">Converts a size to target hours (admin conversion table), tiles the fixed window across the template's phases, and sets each allocation's staffing % so it delivers the template hours in its phase.</p>
-            }
-            else
-            {
-                <p class="small text-muted mb-2">Converts a size to hours (admin conversion table) and splits them per the matching allocation template, creating any missing phases.</p>
-            }
-            <form asp-action="ApplySize" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
-                <div class="col-5">
-                    <label for="method" class="form-label small mb-0">Method</label>
-                    <select name="Method" id="method" class="form-select form-select-sm">
-                        <option value="@SizingMethod.TShirt" selected="@(Model.ApplySize.Method == SizingMethod.TShirt)">T-shirt</option>
-                        <option value="@SizingMethod.StoryPoints" selected="@(Model.ApplySize.Method == SizingMethod.StoryPoints)">Story points</option>
-                    </select>
-                </div>
-                <div class="col-3">
-                    <label for="sizekey" class="form-label small mb-0">Size</label>
-                    <select name="SizeKey" id="sizekey" class="form-select form-select-sm" required>
-                        <option value="">Select…</option>
-                        @foreach (var o in Model.SizeOptions)
-                        {
-                            <option value="@o.Key" data-method="@o.Method" selected="@(o.Method == Model.ApplySize.Method && o.Key == Model.ApplySize.SizeKey)">@o.Label</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-4">
-                    <label for="location-2" class="form-label small mb-0">Location</label>
-                    <input name="Location" id="location-2" class="form-control form-control-sm" value="@Model.ApplySize.Location" required />
-                </div>
-                <div class="col-5">
-                    <label for="businessunitid-2" class="form-label small mb-0">Business unit</label>
-                    <select name="BusinessUnitId" id="businessunitid-2" asp-items="@(new SelectList(Model.RateOptions.BusinessUnits, "Id", "Name", Model.ApplySize.BusinessUnitId))" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-4">
-                    <label for="resourcingclass-2" class="form-label small mb-0">Class</label>
-                    <select name="ResourcingClass" id="resourcingclass-2" asp-items="classes" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-3" id="vendor-2-wrap" hidden>
-                    <label for="vendorid-2" class="form-label small mb-0">Vendor</label>
-                    <select name="VendorId" id="vendorid-2" asp-items="@(new SelectList(Model.RateOptions.Vendors, "Id", "Name"))" class="form-select form-select-sm" disabled></select>
-                </div>
-                <div class="col-4 form-check ms-2 mb-1">
-                    <input name="Replace" type="checkbox" value="true" class="form-check-input" id="replace" checked />
-                    <input name="Replace" type="hidden" value="false" />
-                    <label class="form-check-label small" for="replace">Replace existing</label>
-                </div>
-                <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Apply</button></div>
-            </form>
-            <script>
-                (function () {
-                    const cls2 = document.getElementById('resourcingclass-2'), wrap2 = document.getElementById('vendor-2-wrap'), vendor2 = document.getElementById('vendorid-2');
-                    function toggleVendor() {
-                        const isVendor = cls2.value === '@((int)ResourcingClass.Vendor)' || cls2.value === '@ResourcingClass.Vendor';
-                        wrap2.hidden = !isVendor;
-                        vendor2.disabled = !isVendor;
-                    }
-                    cls2.addEventListener('change', toggleVendor);
-                    toggleVendor();
-                    const method = document.getElementById('method');
-                    const key = document.getElementById('sizekey');
-                    function sync() {
-                        for (const opt of key.options) {
-                            if (!opt.value) continue;
-                            const show = opt.dataset.method === method.value;
-                            opt.hidden = !show;
-                            opt.disabled = !show;
-                            if (!show && opt.selected) key.value = '';
-                        }
-                    }
-                    method.addEventListener('change', sync);
-                    sync();
-                })();
-            </script>
-        }
-
-        <h2 class="h5 mt-4">Members</h2>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="pane-team" role="tabpanel" aria-labelledby="tab-team">
+        <div class="row g-4">
+            <div class="col-lg-7">
+        <h2 class="h5">Members</h2>
         <div class="table-responsive">
         <table class="table table-sm">
             <thead><tr><th>User</th><th>Role</th><th></th></tr></thead>
@@ -696,7 +741,13 @@ else
             </form>
         }
 
-        <h2 class="h5 mt-4">Actuals <a class="small fw-normal ms-2" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">details</a></h2>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="pane-actuals" role="tabpanel" aria-labelledby="tab-actuals">
+        <div class="row g-4">
+            <div class="col-lg-7">
+        <h2 class="h5">Actuals <a class="small fw-normal ms-2" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">details</a></h2>
         @{ var v = Model.Variance; }
         <div class="table-responsive">
         <table class="table table-sm">
@@ -721,7 +772,9 @@ else
         @if (v.UnpricedEntries > 0) { <div class="alert alert-warning py-1 small">@v.UnpricedEntries actual entr@(v.UnpricedEntries == 1 ? "y is" : "ies are") unpriced (no matching rate).</div> }
         @if (Model.UnmappedForMappedProjects > 0) { <div class="alert alert-warning py-1 small">@Model.UnmappedForMappedProjects imported entr@(Model.UnmappedForMappedProjects == 1 ? "y" : "ies") for this initiative's projects await person mapping and are excluded above.</div> }
 
-        <h2 class="h5 mt-4">Source mappings</h2>
+            </div>
+            <div class="col-lg-5">
+        <h2 class="h5">Source mappings</h2>
         <p class="small text-muted">External project identifiers whose actuals belong to this initiative.</p>
         <div class="table-responsive">
         <table class="table table-sm">
@@ -763,6 +816,38 @@ else
                 <div class="col-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Add</button></div>
             </form>
         }
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="pane-history" role="tabpanel" aria-labelledby="tab-history">
+        <div class="row g-4">
+            <div class="col-lg-7">
+        <h2 class="h5">Baselines <a class="small fw-normal ms-2" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">details</a></h2>
+        <div class="table-responsive">
+        <table class="table table-sm" id="baseline-history">
+            <thead><tr><th>Version</th><th>Captured</th><th>By</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th>Reason</th></tr></thead>
+            <tbody>
+            @foreach (var b in i.Baselines.OrderByDescending(b => b.Version))
+            {
+                <tr>
+                    <td>v@(b.Version) @if (b.IsCurrent) { <span class="badge text-bg-primary ms-1">current</span> }</td>
+                    <td>@b.SnapshotAt.ToString("yyyy-MM-dd")</td>
+                    <td>@Users.Display(b.SnapshotBy)</td>
+                    <td class="text-end">@b.TotalHours.ToString("N1")</td>
+                    <td class="text-end">@b.TotalCost.ToString("C0")</td>
+                    <td class="small text-muted">@b.Reason</td>
+                </tr>
+            }
+            @if (i.Baselines.Count == 0)
+            {
+                <tr><td colspan="6" class="text-muted">No baselines yet &mdash; baseline v1 is captured when the initiative is activated.</td></tr>
+            }
+            </tbody>
+        </table>
+        </div>
+        <p class="small mt-3"><a asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit log for this initiative</a></p>
         <p class="small text-muted mt-2">Created by @Users.Display(i.CreatedBy) on @i.CreatedAt.ToString("yyyy-MM-dd")</p>
+            </div>
+        </div>
     </div>
 </div>
