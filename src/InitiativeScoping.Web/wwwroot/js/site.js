@@ -127,3 +127,31 @@
         setTimeout(() => { button.disabled = true; }, 0);
     });
 })();
+
+// Tab strips with data-tab-memory: open the tab named in the URL hash (#pane-x or #x), otherwise the
+// one last used for this key, and keep both in sync so form round-trips return to the same tab.
+// An anchor inside a pane (e.g. #non-labor-costs) wins over memory and is scrolled to once its pane is shown.
+(function () {
+    if (!window.bootstrap?.Tab) return;
+    const hashId = location.hash.slice(1);
+    const anchor = hashId ? document.getElementById(hashId) : null;
+    const anchorPane = anchor?.closest('.tab-pane');
+    document.querySelectorAll('[data-tab-memory]').forEach(strip => {
+        const key = 'tab:' + strip.dataset.tabMemory;
+        const buttons = [...strip.querySelectorAll('[data-bs-toggle="tab"]')];
+        const byPane = id => id ? buttons.find(b => b.dataset.bsTarget === '#pane-' + id.replace(/^pane-/, '')) : undefined;
+        let wanted = byPane(hashId) ?? (anchorPane ? byPane(anchorPane.id) : undefined);
+        if (!wanted && !anchorPane) wanted = byPane(sessionStorage.getItem(key));
+        let revealingAnchor = false;
+        strip.addEventListener('shown.bs.tab', e => {
+            const pane = e.target.dataset.bsTarget.slice(1);
+            sessionStorage.setItem(key, pane);
+            if (revealingAnchor) { revealingAnchor = false; anchor.scrollIntoView(); }
+            else history.replaceState(null, '', '#' + pane);
+        });
+        if (wanted && !wanted.classList.contains('active')) {
+            revealingAnchor = !!anchorPane && buttons.includes(wanted);
+            bootstrap.Tab.getOrCreateInstance(wanted).show();
+        }
+    });
+})();
