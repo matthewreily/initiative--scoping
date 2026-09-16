@@ -376,6 +376,13 @@ resource "google_cloud_run_v2_service" "web" {
         }
       }
       dynamic "env" {
+        for_each = var.graph_mail_sender == "" ? [] : [1]
+        content {
+          name  = "Email__GraphSender"
+          value = var.graph_mail_sender
+        }
+      }
+      dynamic "env" {
         for_each = var.smtp.host == "" ? {} : {
           Email__Host        = var.smtp.host
           Email__Port        = tostring(var.smtp.port)

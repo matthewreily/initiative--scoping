@@ -11,3 +11,4 @@ alert_emails        = ["me@mattreily.com"]
 bootstrap_admins    = ["me@mattreily.com"]
 billing_account     = "00EDAE-09A2AC-75569D"
 monthly_budget_usd  = 25
+graph_mail_sender   = "me@mattreily.com"

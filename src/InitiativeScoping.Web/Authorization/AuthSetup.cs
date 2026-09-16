@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace InitiativeScoping.Web.Authorization;
@@ -35,7 +36,13 @@ public static class AuthSetup
             services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
                 .AddMicrosoftIdentityWebApp(config.GetSection("AzureAd"));
             services.AddRazorPages().AddMicrosoftIdentityUI();
+            services.AddSingleton<GraphAppToken>();
             services.AddHttpClient<IDirectorySearch, GraphDirectorySearch>(c => c.Timeout = TimeSpan.FromSeconds(10));
+            if (!string.IsNullOrWhiteSpace(config[GraphEmailSender.SenderKey]))
+            {
+                services.RemoveAll<IEmailSender>();
+                services.AddHttpClient<IEmailSender, GraphEmailSender>(c => c.Timeout = TimeSpan.FromSeconds(20));
+            }
         }
 
         services.AddAuthorizationBuilder()

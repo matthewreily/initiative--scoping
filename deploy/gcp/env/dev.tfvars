@@ -13,3 +13,4 @@ bootstrap_admins    = ["me@mattreily.com"]
 image_pull_members = ["serviceAccount:initiative-scoping-prod-deploy@initiative-scoping-prod.iam.gserviceaccount.com"]
 billing_account    = "00EDAE-09A2AC-75569D"
 monthly_budget_usd = 25
+graph_mail_sender  = "me@mattreily.com"

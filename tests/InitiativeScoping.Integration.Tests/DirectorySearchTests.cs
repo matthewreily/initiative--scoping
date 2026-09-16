@@ -102,8 +102,9 @@ public class DirectorySearchTests(WebAppFactory factory) : IClassFixture<WebAppF
     [Fact]
     public void Graph_search_is_unavailable_without_credentials()
     {
+        var config = Config(new() { ["AzureAd:TenantId"] = "t" });
         var search = new GraphDirectorySearch(new HttpClient(new StubHandler(_ => throw new InvalidOperationException("no call expected"))),
-            Config(new() { ["AzureAd:TenantId"] = "t" }), NullLogger<GraphDirectorySearch>.Instance);
+            config, new GraphAppToken(config), NullLogger<GraphDirectorySearch>.Instance);
         Assert.False(search.IsAvailable);
     }
 
@@ -170,14 +171,17 @@ public class DirectorySearchTests(WebAppFactory factory) : IClassFixture<WebAppF
         Assert.Contains("temporarily unavailable", result.Error);
     }
 
-    private static GraphDirectorySearch Graph(Func<HttpRequestMessage, HttpResponseMessage> handler) =>
-        new(new HttpClient(new StubHandler(handler)), Config(new()
+    private static GraphDirectorySearch Graph(Func<HttpRequestMessage, HttpResponseMessage> handler)
+    {
+        var config = Config(new()
         {
             ["AzureAd:TenantId"] = "tenant",
             ["AzureAd:ClientId"] = "client",
             ["AzureAd:ClientSecret"] = "secret",
             ["DirectorySearch:MaxResults"] = "5"
-        }), NullLogger<GraphDirectorySearch>.Instance);
+        });
+        return new(new HttpClient(new StubHandler(handler)), config, new GraphAppToken(config), NullLogger<GraphDirectorySearch>.Instance);
+    }
 
     private static IConfiguration Config(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
