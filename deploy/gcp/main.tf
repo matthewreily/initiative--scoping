@@ -17,6 +17,10 @@ terraform {
 provider "google" {
   project = var.project_id
   region  = var.region
+  # Bill/quota API calls to this project so user ADC works with billing-account-level APIs
+  # (Cloud Billing Budgets) without `gcloud auth application-default set-quota-project`.
+  user_project_override = true
+  billing_project       = var.project_id
 }
 
 locals {
