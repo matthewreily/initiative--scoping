@@ -125,3 +125,21 @@ variable "smtp" {
   })
   default = {}
 }
+
+variable "billing_account" {
+  type        = string
+  description = "Billing account id (e.g. 00EDAE-09A2AC-75569D) the project is linked to; required for the monthly budget. Empty disables the budget."
+  default     = ""
+}
+
+variable "monthly_budget_usd" {
+  type        = number
+  description = "Monthly spend budget for this project in USD. 0 disables the budget."
+  default     = 0
+}
+
+variable "budget_alert_thresholds" {
+  type        = list(number)
+  description = "Fractions of the monthly budget (actual spend) at which budget e-mails are sent; a forecasted-100% alert is always added."
+  default     = [0.5, 0.9, 1.0]
+}

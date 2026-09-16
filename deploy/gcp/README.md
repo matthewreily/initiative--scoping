@@ -130,6 +130,10 @@ ASP.NET Core Data Protection keys live in the `DataProtectionKeys` table so all 
 
 Each recipient must confirm the verification email Cloud Monitoring sends before notifications are delivered; policies are visible at https://console.cloud.google.com/monitoring/alerting. Pausing the database (`gcloud sql instances patch <instance> --activation-policy NEVER`) will fire the Cloud SQL and health policies — set `alert_emails = []` and apply first if you plan to leave dev off.
 
+### Budget
+
+`monitoring.tf` also creates a Cloud Billing budget per project when `billing_account` and `monthly_budget_usd` are set (both envs: $25/month). E-mails go to the `alert_emails` channels at 50 %, 90 % and 100 % of actual spend (`budget_alert_thresholds`) plus when the month's *forecast* reaches 100 %; the billing account's default recipients are not mailed. Budgets only notify — nothing is shut off. Applying needs Billing Account Administrator (or Costs Manager) on the billing account, which the person who ran `bootstrap-project.sh` has; the budget is listed at https://console.cloud.google.com/billing/budgets.
+
 ## Costs (rough, us-central1)
 
 - dev: Cloud Run scale-to-zero (≈ $0 idle) + `db-f1-micro` Cloud SQL (≈ $10/mo) + Artifact Registry storage.
