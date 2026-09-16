@@ -20,7 +20,8 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     {
         var client = factory.CreateClient();
         (await client.GetAsync("/Initiatives")).EnsureSuccessStatusCode();
-        (await client.GetAsync("/Initiatives/Create")).EnsureSuccessStatusCode();
+        var create = await client.GetStringAsync("/Initiatives/Create");
+        Assert.Matches("<option selected=\"selected\" value=\"TShirt\">|<option value=\"TShirt\" selected", create);
     }
 
     [Fact]
@@ -124,6 +125,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
             ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30"
         });
         Assert.Equal(HttpStatusCode.Redirect, addPhase.StatusCode);
+        Assert.Contains("No allocations yet", await client.GetStringAsync(details));
 
         var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
         var addAllocation = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
@@ -134,6 +136,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         Assert.Equal(HttpStatusCode.Redirect, addAllocation.StatusCode);
 
         var html = await client.GetStringAsync(details);
+        Assert.DoesNotContain("No allocations yet", html);
         // Seeded rate: Senior internal = 60 + 20*3 = 120/h; 2 x 100h x 120 = 24,000
         Assert.Contains("200.0", html);
         Assert.Contains("24,000", html);

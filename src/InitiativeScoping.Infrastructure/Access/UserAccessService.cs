@@ -21,6 +21,8 @@ public record AccessResolution(AppRole? EffectiveRole, UserAccountStatus? Accoun
     public bool HasAccess => EffectiveRole is not null;
 }
 
+public record AccessRequestResult(UserAccount Account, bool Created);
+
 public record SignedInUser(string ObjectId, string? Email, string DisplayName, IReadOnlyCollection<AppRole> TokenRoles);
 
 /// <summary>
@@ -124,12 +126,12 @@ public class UserAccessService(AppDbContext db, IUserDirectory directory, TimePr
     }
 
     /// <summary>Creates a Pending row for an authenticated user with no account; no-op when one exists.</summary>
-    public async Task<UserAccount> RequestAccessAsync(SignedInUser user, string? note, CancellationToken ct)
+    public async Task<AccessRequestResult> RequestAccessAsync(SignedInUser user, string? note, CancellationToken ct)
     {
         var existing = await FindAsync(user, ct);
         if (existing is not null)
         {
-            return existing;
+            return new AccessRequestResult(existing, false);
         }
 
         var account = new UserAccount
@@ -143,9 +145,9 @@ public class UserAccessService(AppDbContext db, IUserDirectory directory, TimePr
             LastSeenAt = clock.GetUtcNow(),
             Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
         };
-        account = await InsertOrReloadAsync(account, user, ct);
+        var saved = await InsertOrReloadAsync(account, user, ct);
         directory.Invalidate();
-        return account;
+        return new AccessRequestResult(saved, ReferenceEquals(saved, account));
     }
 
     public Task<UserAccount?> FindAsync(SignedInUser user, CancellationToken ct) =>
