@@ -48,8 +48,8 @@
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Initiatives</div><div class="fs-3">@p.Count</div><div class="small text-muted">@p.Baselined baselined</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3">@p.ForecastCost.ToString("C0")</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor / Non-labor</div><div class="fs-6">@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0") / @p.NonLaborForecastCost.ToString("C0")</div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3" title="@p.ForecastCost.ToString("C0")">@Money.Compact(p.ForecastCost)</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor / Non-labor</div><div class="fs-6" title="@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0") / @p.NonLaborForecastCost.ToString("C0")">@Money.Compact(p.InternalForecastCost) / @Money.Compact(p.VendorForecastCost) / @Money.Compact(p.NonLaborForecastCost)</div>
         @if (p.ForecastCost > 0)
         {
             var internalPct = Math.Round(p.InternalForecastCost / p.ForecastCost * 100m);
@@ -57,10 +57,10 @@
             <div class="progress mt-1" style="height: 6px" title="Internal @internalPct% · Vendor @vendorPct% · Non-labor @(100 - internalPct - vendorPct)%"><div class="progress-bar bg-primary" style="width: @internalPct%"></div><div class="progress-bar bg-info" style="width: @vendorPct%"></div><div class="progress-bar bg-warning" style="width: @(100 - internalPct - vendorPct)%"></div></div>
         }
     </div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Baseline cost</div><div class="fs-3">@p.BaselineCost.ToString("C0")</div><div class="small text-muted">@p.BaselineHours.ToString("N0") h</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Actual cost to date</div><div class="fs-3">@p.ActualCost.ToString("C0")</div><div class="small text-muted">@p.ActualHours.ToString("N0") h</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Baseline cost</div><div class="fs-3" title="@p.BaselineCost.ToString("C0")">@Money.Compact(p.BaselineCost)</div><div class="small text-muted">@p.BaselineHours.ToString("N0") h</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Actual cost to date</div><div class="fs-3" title="@p.ActualCost.ToString("C0")">@Money.Compact(p.ActualCost)</div><div class="small text-muted">@p.ActualHours.ToString("N0") h</div></div></div></div>
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100 @(p.OverThreshold > 0 ? "border-danger" : "")"><div class="card-body"><div class="text-muted small">Variance vs. baseline</div>
-        <div class="fs-3 @VarianceClass(p.CostVariancePct, false)">@Signed(p.CostVariance, "C0")</div>
+        <div class="fs-3 @VarianceClass(p.CostVariancePct, false)" title="@Signed(p.CostVariance, "C0")">@(p.CostVariance > 0 ? "+" : "")@Money.Compact(p.CostVariance)</div>
         <div class="small">@(p.CostVariancePct is null ? "n/a" : Signed(p.CostVariancePct.Value, "N1") + "%")
             @if (p.OverThreshold > 0) { <span class="badge bg-danger ms-1">@p.OverThreshold over threshold</span> }
             @if (p.Unpriced > 0) { <span class="badge bg-warning text-dark ms-1">@p.Unpriced unpriced</span> }

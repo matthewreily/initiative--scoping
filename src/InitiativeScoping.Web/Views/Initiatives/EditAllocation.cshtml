@@ -53,6 +53,7 @@
         <div class="col-md-3">
             <label asp-for="SeniorityId" class="form-label"></label>
             <select asp-for="SeniorityId" asp-items="@(new SelectList(seniorities, "Id", "Name"))" class="form-select"></select>
+            <span asp-validation-for="SeniorityId" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="Location" class="form-label"></label>
@@ -62,6 +63,7 @@
         <div class="col-md-3">
             <label asp-for="ResourcingClass" class="form-label"></label>
             <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
+            <span asp-validation-for="ResourcingClass" class="text-danger"></span>
         </div>
         <div class="col-md-3" data-vendor-field hidden>
             <label asp-for="VendorId" class="form-label"></label>
@@ -103,10 +105,12 @@
         <div class="col-md-3">
             <label asp-for="ContractReference" class="form-label"></label>
             <input asp-for="ContractReference" class="form-control" />
+            <span asp-validation-for="ContractReference" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="CostCenter" class="form-label"></label>
             <input asp-for="CostCenter" class="form-control" />
+            <span asp-validation-for="CostCenter" class="text-danger"></span>
         </div>
     </div>
     <button type="submit" class="btn btn-primary">Save</button>

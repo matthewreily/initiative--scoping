@@ -71,6 +71,7 @@
     <div class="mb-3">
         <label asp-for="Role" class="form-label"></label>
         <select asp-for="Role" class="form-select" asp-items="Html.GetEnumSelectList<AppRole>()"></select>
+        <span asp-validation-for="Role" class="text-danger"></span>
     </div>
     <div class="mb-3">
         <label asp-for="Note" class="form-label"></label>
