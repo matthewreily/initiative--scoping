@@ -292,8 +292,10 @@ document.addEventListener('keydown', e => {
         const key = 'is.pagesize:' + location.pathname;
         const sizes = [25, 50, 100, 0];
         let size = parseInt(table.dataset.paginate, 10) || 25;
-        try { size = parseInt(localStorage.getItem(key), 10) || size; } catch { /* storage unavailable */ }
-        if (localStorage.getItem(key) === '0') size = 0;
+        try {
+            const saved = parseInt(localStorage.getItem(key), 10);
+            if (sizes.includes(saved)) size = saved;
+        } catch { /* storage unavailable */ }
         let page = 1;
 
         const nav = document.createElement('div');
@@ -383,14 +385,27 @@ document.addEventListener('keydown', e => {
             modal.tabIndex = -1;
             modal.setAttribute('aria-labelledby', 'shortcut-help-title');
             modal.setAttribute('aria-hidden', 'true');
-            const rows = targets().map(el => `<tr><td><kbd>${el.dataset.shortcut.split(' ').join('</kbd> <kbd>')}</kbd></td><td>${(el.dataset.shortcutLabel || el.textContent).trim()}</td></tr>`).join('');
             modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content">
                 <div class="modal-header"><h2 class="modal-title h6" id="shortcut-help-title">Keyboard shortcuts</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                <div class="modal-body p-2"><table class="table table-sm mb-0"><tbody>
-                    ${document.getElementById('global-search') ? '<tr><td><kbd>/</kbd></td><td>Search</td></tr>' : ''}
-                    ${rows}
-                    <tr><td><kbd>?</kbd></td><td>This help</td></tr>
-                </tbody></table></div></div></div>`;
+                <div class="modal-body p-2"><table class="table table-sm mb-0"><tbody></tbody></table></div></div></div>`;
+            const tbody = modal.querySelector('tbody');
+            const row = (keys, text) => {
+                const tr = document.createElement('tr');
+                const keyCell = document.createElement('td');
+                keys.forEach((k, i) => {
+                    const kbd = document.createElement('kbd');
+                    kbd.textContent = k;
+                    if (i > 0) keyCell.appendChild(document.createTextNode(' '));
+                    keyCell.appendChild(kbd);
+                });
+                const textCell = document.createElement('td');
+                textCell.textContent = text;
+                tr.append(keyCell, textCell);
+                tbody.appendChild(tr);
+            };
+            if (document.getElementById('global-search')) row(['/'], 'Search');
+            targets().forEach(el => row(el.dataset.shortcut.split(' '), (el.dataset.shortcutLabel || el.textContent).trim()));
+            row(['?'], 'This help');
             document.body.appendChild(modal);
         }
         bootstrap.Modal.getOrCreateInstance(modal).toggle();
