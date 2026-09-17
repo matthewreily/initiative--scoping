@@ -258,6 +258,18 @@ public class InitiativeDetailsModel
     public int UnmappedForMappedProjects { get; init; }
 }
 
+public class InitiativeExplainModel
+{
+    public required Initiative Initiative { get; init; }
+    public required ForecastResult Forecast { get; init; }
+    public required IReadOnlyList<Phase> Phases { get; init; }
+    public required IReadOnlyDictionary<int, string> ResourceTypeNames { get; init; }
+    public decimal HoursPerDay { get; init; }
+    public required IReadOnlyDictionary<int, int> PhaseWorkingDays { get; init; }
+    public ForecastBaseline? CurrentBaseline { get; init; }
+    public bool FixedDuration => Initiative.PlanningMode == PlanningMode.FixedDuration;
+}
+
 public class InitiativeActualsModel
 {
     public required Initiative Initiative { get; init; }

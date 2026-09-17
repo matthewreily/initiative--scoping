@@ -1,0 +1,168 @@
+@model InitiativeExplainModel
+@{
+    var i = Model.Initiative;
+    var f = Model.Forecast;
+    ViewData["Title"] = $"{i.Name} – Why this number";
+    var linesByPhase = f.Lines.ToLookup(l => l.Allocation.PhaseId);
+    var nonLaborByPhase = f.NonLaborLines.ToLookup(l => l.Line.PhaseId);
+    var orphanLines = f.Lines.Where(l => Model.Phases.All(p => p.Id != l.Allocation.PhaseId)).ToList();
+
+    string Resource(InitiativeAllocation a) =>
+        $"{a.Quantity} × {Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId, "?")} / {a.Seniority?.Name} / {a.Location} / " +
+        (a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}");
+
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+    <li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>
+    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@i.Id">@i.Name</a></li>
+    <li class="breadcrumb-item active">Why this number</li>
+</ol></nav>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">@i.Name <partial name="_StatusBadge" model="i.Status" /> <small class="text-muted fs-6">Why this number</small></h1>
+        <div class="text-muted small">Every figure on the live forecast traced back to the allocations, rate cards and dates that produce it. Committed baselines keep the rates snapshotted at the time, so a later rate-card change shows up here but not in <a asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">baseline history</a>.</div>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@i.Id">Back to initiative</a>
+</div>
+
+<section class="card mb-4" id="total" aria-labelledby="total-heading">
+    <div class="card-body">
+        <h2 class="h5" id="total-heading">Forecast total @f.TotalCost.ToString("C0")</h2>
+        <table class="table table-sm w-auto mb-2 explain-sum">
+            <tbody>
+                <tr><td>Labor</td><td class="text-end">@f.LaborCost.ToString("C0")</td><td class="text-muted small">@f.Lines.Count allocation(s), @f.TotalHours.ToString("N1") h @if (!f.IsComplete) { <span class="text-warning">– @f.Lines.Count(l => l.IsUnpriced) unpriced (counted as $0)</span> }</td></tr>
+                <tr><td>+ Non-labor</td><td class="text-end">@f.NonLaborCost.ToString("C0")</td><td class="text-muted small">@f.NonLaborLines.Count line(s)</td></tr>
+                <tr class="fw-semibold border-top"><td>= Forecast</td><td class="text-end" data-testid="explain-total">@f.TotalCost.ToString("C0")</td><td></td></tr>
+                @if (f.ContingencyPct > 0)
+                {
+                    <tr><td>+ Contingency</td><td class="text-end">@f.ContingencyCost.ToString("C0")</td><td class="text-muted small">@f.ContingencyPct.ToString("0.##")% of forecast, rounded to cents</td></tr>
+                    <tr class="fw-semibold border-top"><td>= With contingency</td><td class="text-end">@f.TotalCostWithContingency.ToString("C0")</td><td></td></tr>
+                }
+            </tbody>
+        </table>
+        @if (Model.CurrentBaseline is { } b)
+        {
+            var d = f.TotalCost - b.TotalCost;
+            <div class="small text-muted">Current baseline v@(b.Version): @b.TotalCost.ToString("C0") &rarr; live forecast is <span class="@(d > 0 ? "text-danger" : d < 0 ? "text-success" : "")">@(d >= 0 ? "+" : "")@d.ToString("C0")</span>. <a asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Compare line by line</a>.</div>
+        }
+        <div class="small text-muted mt-2">
+            Labor line = quantity × hours each × hourly rate. @if (Model.FixedDuration) { <text>Hours each = staffing % × working days in the phase × @Model.HoursPerDay.ToString("0.##") h/day (Mon–Fri minus holidays).</text> }
+            The hourly rate comes from the rate card whose effective window covers each day of the phase; when a phase spans two cards the rate is the day-weighted average.
+            Non-labor line = quantity × unit cost × billable periods in the line's window.
+        </div>
+    </div>
+</section>
+
+@foreach (var p in Model.Phases)
+{
+    var lines = linesByPhase[p.Id].OrderBy(l => l.Allocation.ResourceTypeId).ThenBy(l => l.Allocation.Seniority?.SortOrder).ToList();
+    var nonLabor = nonLaborByPhase[p.Id].OrderBy(l => l.Line.Description).ToList();
+    var laborCost = lines.Sum(l => l.Cost);
+    var nonLaborCost = nonLabor.Sum(l => l.Cost);
+    var days = p.PlannedEnd.DayNumber - p.PlannedStart.DayNumber + 1;
+    <section class="card mb-4 explain-phase" id="phase-@p.Id" aria-labelledby="phase-@p.Id-heading">
+        <div class="card-body">
+            <h2 class="h5 mb-1" id="phase-@p.Id-heading">Phase @p.Sequence – @p.Name <span class="text-muted fw-normal">@laborCost.ToString("C0") labor@(nonLabor.Count > 0 ? $" + {nonLaborCost:C0} non-labor = {(laborCost + nonLaborCost):C0}" : "")</span></h2>
+            <div class="text-muted small mb-3">@p.PlannedStart.ToString("yyyy-MM-dd") → @p.PlannedEnd.ToString("yyyy-MM-dd") (@days calendar days@(Model.FixedDuration ? $", {Model.PhaseWorkingDays.GetValueOrDefault(p.Id)} working days" : ""))
+                &middot; @lines.Sum(l => l.Hours).ToString("N1") h across @lines.Count allocation(s)</div>
+
+            @if (lines.Count == 0)
+            {
+                <p class="text-muted small mb-0">No allocations in this phase, so it contributes no labor cost.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                <table class="table table-sm align-middle mb-3">
+                    <thead><tr><th>Allocation</th><th>Hours</th><th>Hourly rate</th><th class="text-end">Cost</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in lines)
+                    {
+                        var a = l.Allocation;
+                        <tr id="allocation-@a.Id" class="explain-allocation @(l.IsUnpriced ? "table-warning" : "")">
+                            <td>
+                                <div>@Resource(a)</div>
+                                <div class="small text-muted">Supplied by @a.BusinessUnit?.Name</div>
+                            </td>
+                            <td>
+                                <div><strong>@l.Hours.ToString("N1") h</strong></div>
+                                <div class="small text-muted">
+                                    @a.Quantity × @a.EstimatedHours.ToString("N2") h each
+                                    @if (Model.FixedDuration && a.AllocationPercent is decimal pct)
+                                    {
+                                        <div>@pct.ToString("0.##")% × @Model.PhaseWorkingDays.GetValueOrDefault(p.Id) working days × @Model.HoursPerDay.ToString("0.##") h/day = @a.EstimatedHours.ToString("N2") h</div>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                @if (l.IsUnpriced)
+                                {
+                                    <div class="text-danger"><strong>Unpriced</strong></div>
+                                    <div class="small text-muted">
+                                        @if (l.RateSegments is { Count: > 0 } segs)
+                                        {
+                                            @foreach (var s in segs)
+                                            {
+                                                <div>@s.Start.ToString("yyyy-MM-dd") → @s.End.ToString("yyyy-MM-dd") (@s.Days d): @(s.Card is null ? "no rate card covers these dates" : s.HourlyRate is null ? $"{s.Card.Name} has no row for this resource type / seniority / location / class (and vendor)" : $"{s.Card.Name} {s.HourlyRate.Value:C2}")</div>
+                                            }
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div><strong>@l.HourlyRate!.Value.ToString("C2")</strong>@if (l.IsBlendedRate) { <span class="badge bg-light text-dark border ms-1" title="The phase spans more than one rate card">blended</span> }</div>
+                                    <div class="small text-muted">
+                                        @foreach (var s in l.RateSegments!)
+                                        {
+                                            <div>
+                                                <a asp-area="Admin" asp-controller="RateCards" asp-action="Details" asp-route-id="@s.Card!.Id">@s.Card!.Name</a>
+                                                (@s.Card.EffectiveStart.ToString("yyyy-MM-dd") – @(s.Card.EffectiveEnd?.ToString("yyyy-MM-dd") ?? "open")@(s.Card.Status == RateCardStatus.Retired ? ", retired" : ""))
+                                                @if (l.IsBlendedRate) { <text>: @s.Start.ToString("yyyy-MM-dd") → @s.End.ToString("yyyy-MM-dd"), @s.Days d @@ @s.HourlyRate!.Value.ToString("C2")</text> }
+                                            </div>
+                                        }
+                                        @if (l.IsBlendedRate)
+                                        {
+                                            <div>(@string.Join(" + ", l.RateSegments!.Select(s => $"{s.Days} × {s.HourlyRate!.Value:C2}"))) ÷ @l.RateSegments!.Sum(s => s.Days) d = @l.HourlyRate.Value.ToString("C4")</div>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div><strong>@l.Cost.ToString("C0")</strong></div>
+                                @if (!l.IsUnpriced) { <div class="small text-muted text-nowrap">@l.Hours.ToString("N1") h × @l.HourlyRate!.Value.ToString("C2")</div> }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                    <tfoot class="fw-semibold"><tr><td colspan="3" class="text-end">Phase labor</td><td class="text-end">@laborCost.ToString("C0")</td></tr></tfoot>
+                </table>
+                </div>
+            }
+
+            @if (nonLabor.Count > 0)
+            {
+                <partial name="_ExplainNonLabor" model="nonLabor" />
+            }
+        </div>
+    </section>
+}
+
+@{
+    var initiativeLevel = nonLaborByPhase[null].OrderBy(l => l.Line.Description).ToList();
+}
+@if (initiativeLevel.Count > 0 || orphanLines.Count > 0)
+{
+    <section class="card mb-4" id="initiative-level" aria-labelledby="initiative-level-heading">
+        <div class="card-body">
+            <h2 class="h5" id="initiative-level-heading">Initiative-level lines</h2>
+            @if (orphanLines.Count > 0)
+            {
+                <p class="small text-warning">@orphanLines.Count allocation(s) reference a phase that no longer exists; they are priced from the target start (@orphanLines.Sum(l => l.Cost).ToString("C0")).</p>
+            }
+            @if (initiativeLevel.Count > 0)
+            {
+                <partial name="_ExplainNonLabor" model="initiativeLevel" />
+            }
+        </div>
+    </section>
+}

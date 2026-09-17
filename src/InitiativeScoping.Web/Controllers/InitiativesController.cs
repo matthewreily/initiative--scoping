@@ -346,6 +346,31 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return View(model);
     }
 
+    /// <summary>Read-only "why this number" page: every forecast figure traced back to its allocations, rate cards and dates.</summary>
+    public async Task<IActionResult> Explain(int id, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        var cards = await LoadRateCardsAsync(ct);
+        var forecast = ForecastCalculator.Calculate(initiative, cards);
+        var calendar = await workCalendar.GetAsync(ct);
+        var phases = initiative.Phases.OrderBy(p => p.Sequence).ThenBy(p => p.PlannedStart).ToList();
+        return View(new InitiativeExplainModel
+        {
+            Initiative = initiative,
+            Forecast = forecast,
+            Phases = phases,
+            ResourceTypeNames = await db.ResourceTypeNamesAsync(ct),
+            HoursPerDay = calendar.HoursPerDay,
+            PhaseWorkingDays = phases.ToDictionary(p => p.Id, p => DurationCalculator.WorkingDays(p.PlannedStart, p.PlannedEnd, calendar.Holidays)),
+            CurrentBaseline = initiative.CurrentBaseline
+        });
+    }
+
     // ----- Phases -----
 
     [HttpPost]
