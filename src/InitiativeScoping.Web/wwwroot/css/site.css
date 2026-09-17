@@ -218,3 +218,8 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 .explain-sum td { padding-right: 1.5rem; }
 .explain-phase:target { box-shadow: 0 0 0 .2rem rgba(var(--bs-primary-rgb), .35); }
 .explain-allocation:target > td, .explain-nonlabor:target > td { background: #fff3cd; }
+
+/* Wide tables: keep cells on one line and scroll sideways inside the card instead of wrapping into tall rows */
+.table-scroll { overflow-x: auto; scrollbar-gutter: stable; }
+.table-scroll > .table { white-space: nowrap; }
+.table-scroll > .table td.text-wrap { white-space: normal; }
