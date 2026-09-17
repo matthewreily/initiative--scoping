@@ -211,3 +211,10 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 .heat-4 { background: #ffc98a; }
 .heat-over { background: #f4a6a6; font-weight: 600; }
 .heat-none { background: repeating-linear-gradient(45deg, #f0f0f0 0 4px, #e2e2e2 4px 8px); }
+
+/* "Why this number" drill-down */
+.explain-link { color: inherit; text-decoration: underline dotted; text-underline-offset: .2em; }
+.explain-link:hover { color: var(--bs-link-color); text-decoration-style: solid; }
+.explain-sum td { padding-right: 1.5rem; }
+.explain-phase:target { box-shadow: 0 0 0 .2rem rgba(var(--bs-primary-rgb), .35); }
+.explain-allocation:target > td, .explain-nonlabor:target > td { background: #fff3cd; }

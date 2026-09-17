@@ -180,6 +180,58 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
+    public async Task Explain_traces_a_priced_line_to_its_rate_card_hours_and_formula()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "Explain test");
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
+        await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
+            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+        });
+
+        var detailsHtml = await client.GetStringAsync(details);
+        Assert.Contains($"/Initiatives/Explain/{id}#phase-{phaseId}", detailsHtml);
+        Assert.Contains($"/Initiatives/Explain/{id}#allocation-", detailsHtml);
+        Assert.Contains("Why this number?", detailsHtml);
+
+        var html = await client.GetStringAsync($"/Initiatives/Explain/{id}");
+        Assert.Contains($"id=\"phase-{phaseId}\"", html);
+        Assert.Contains("2 × 100.00 h each", html);
+        Assert.Contains("200.0 h × $120.00", html);
+        Assert.Contains("$24,000", html);
+        Assert.Contains("/Admin/RateCards/Details/", html);
+        Assert.Contains("2026-03-01 → 2026-04-30 (61 calendar days", html);
+        Assert.DoesNotContain("blended", html);
+        Assert.DoesNotContain("Unpriced", html);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/Initiatives/Explain/999999")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Explain_says_why_a_line_is_unpriced()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "Explain unpriced");
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2020-03-01", ["PlannedEnd"] = "2020-04-30" });
+        var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
+        await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
+            ["Location"] = "Offshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+        });
+
+        var html = await client.GetStringAsync($"/Initiatives/Explain/{id}");
+        Assert.Contains("Unpriced", html);
+        Assert.Contains("no rate card covers these dates", html);
+        Assert.Contains("1 unpriced (counted as $0)", html);
+    }
+
+    [Fact]
     public async Task Any_combination_is_accepted_but_unpriced_when_no_card_prices_the_business_unit_on_the_phase_start()
     {
         var client = factory.CreateClient(NoRedirect);

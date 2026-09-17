@@ -1,0 +1,41 @@
+@model IReadOnlyList<NonLaborForecastLine>
+@{
+    string Period(BillingModel m) => m switch { BillingModel.OneTime => "one-time", BillingModel.Monthly => "month", _ => "year" };
+}
+<div class="table-responsive">
+<table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Non-labor line</th><th>Window</th><th>Periods</th><th class="text-end">Cost</th></tr></thead>
+    <tbody>
+    @foreach (var nl in Model)
+    {
+        var line = nl.Line;
+        <tr id="nonlabor-@line.Id" class="explain-nonlabor @(nl.HasWindow ? "" : "table-warning")">
+            <td>
+                <div>@line.Description</div>
+                <div class="small text-muted">@VarianceCalculator.CategoryLabel(line.Category)@(line.CostCatalogItem is not null ? $" · {line.CostCatalogItem.Name}" : "")</div>
+            </td>
+            <td>
+                @if (nl.HasWindow)
+                {
+                    <div>@nl.Start!.Value.ToString("yyyy-MM-dd") → @nl.End!.Value.ToString("yyyy-MM-dd")</div>
+                    <div class="small text-muted">@(line.StartDate is not null || line.EndDate is not null ? "Dates set on the line" : line.PhaseId is not null ? "Phase planned window" : "Initiative target window")</div>
+                }
+                else
+                {
+                    <span class="text-danger">Phase no longer exists – not priced</span>
+                }
+            </td>
+            <td>
+                <div>@nl.Periods × @Period(line.BillingModel)</div>
+                @if (line.BillingModel != BillingModel.OneTime) { <div class="small text-muted">counted from the start date's day-of-month anniversary</div> }
+            </td>
+            <td class="text-end">
+                <div><strong>@nl.Cost.ToString("C0")</strong></div>
+                <div class="small text-muted text-nowrap">@line.Quantity × @line.UnitCost.ToString("C2") × @nl.Periods</div>
+            </td>
+        </tr>
+    }
+    </tbody>
+    <tfoot class="fw-semibold"><tr><td colspan="3" class="text-end">Non-labor</td><td class="text-end">@Model.Sum(l => l.Cost).ToString("C0")</td></tr></tfoot>
+</table>
+</div>
