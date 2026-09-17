@@ -21,6 +21,10 @@ public class Initiative
     /// <summary>Risk reserve added on top of the priced forecast, as a percentage of forecast cost (labor + non-labor).</summary>
     public decimal ContingencyPct { get; set; }
     public EstimateConfidence? EstimateConfidence { get; set; }
+    /// <summary>Set on what-if scenarios: the initiative whose plan this is an alternative to. Scenarios stay Draft until promoted.</summary>
+    public int? ScenarioOfId { get; set; }
+    public Initiative? ScenarioOf { get; set; }
+    public List<Initiative> Scenarios { get; set; } = [];
     public required string CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     /// <summary>Business units that may supply resources to this initiative; always includes the sponsoring <see cref="BusinessUnitId"/>.</summary>
@@ -32,6 +36,8 @@ public class Initiative
     public List<ForecastBaseline> Baselines { get; set; } = [];
     public List<RebaselineRequest> RebaselineRequests { get; set; } = [];
     public List<InitiativeSourceMapping> SourceMappings { get; set; } = [];
+
+    public bool IsScenario => ScenarioOfId is not null;
 
     public ForecastBaseline? CurrentBaseline => Baselines.FirstOrDefault(b => b.IsCurrent);
 

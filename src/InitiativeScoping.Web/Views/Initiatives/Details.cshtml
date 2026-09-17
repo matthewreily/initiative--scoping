@@ -15,10 +15,10 @@
     var fixedDuration = i.PlanningMode == PlanningMode.FixedDuration;
     var fd = Model.FixedDuration;
 }
-<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li><li class="breadcrumb-item active">@i.Name</li></ol></nav>
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>@if (i.ScenarioOf is { } parentCrumb) { <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@parentCrumb.Id">@parentCrumb.Name</a></li> }<li class="breadcrumb-item active">@i.Name</li></ol></nav>
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
     <div>
-        <h1 class="h3 mb-1">@i.Name <partial name="_StatusBadge" model="i.Status" /></h1>
+        <h1 class="h3 mb-1">@i.Name @if (i.IsScenario) { <span class="badge text-bg-info">Scenario</span> } <partial name="_StatusBadge" model="i.Status" /></h1>
         <div class="text-muted small">
             @i.BusinessUnit?.Name
             @if (!string.IsNullOrEmpty(i.SponsoringTeam)) { <span> &middot; @i.SponsoringTeam</span> }
@@ -38,23 +38,34 @@
         <div class="mt-2"><partial name="_Lifecycle" model="i.Status" /></div>
     </div>
     <div class="d-flex flex-wrap gap-1">
-        <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
-        <a class="btn btn-outline-secondary btn-sm" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a>
+        @if (i.IsScenario)
+        {
+            <a class="btn btn-outline-primary btn-sm" asp-controller="Scenarios" asp-action="Compare" asp-route-id="@i.Id">Compare scenarios</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary btn-sm" asp-controller="Scenarios" asp-action="Compare" asp-route-id="@i.Id">Scenarios (@i.Scenarios.Count)</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a>
+        }
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit</a>
-        <div class="btn-group">
-            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="xlsx">Excel (.xlsx)</a></li>
-                <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="csv">CSV</a></li>
-            </ul>
-        </div>
+        @if (!i.IsScenario)
+        {
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="xlsx">Excel (.xlsx)</a></li>
+                    <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="csv">CSV</a></li>
+                </ul>
+            </div>
+        }
         @if (Model.CanEdit)
         {
             <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@i.Id">Edit</a>
         }
         @if (Model.CanManage && i.Status == InitiativeStatus.Draft)
         {
-            <form asp-action="Delete" asp-route-id="@i.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this initiative and all its scope?');">
+            <form asp-action="Delete" asp-route-id="@i.Id" method="post" class="d-inline" onsubmit="return confirm('@(i.IsScenario ? "Discard this scenario?" : i.Scenarios.Count > 0 ? $"Delete this initiative, its {i.Scenarios.Count} scenario(s) and all its scope?" : "Delete this initiative and all its scope?")');">
                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
             </form>
         }
@@ -68,7 +79,18 @@
     var open = i.OpenRebaseline;
     var current = i.CurrentBaseline;
 }
-@if (i.Status == InitiativeStatus.Draft)
+@if (i.ScenarioOf is { } parent)
+{
+    <div class="alert alert-info py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <strong>What-if scenario</strong> of <a asp-action="Details" asp-route-id="@parent.Id">@parent.Name</a>.
+            Edit phases, allocations and costs here without touching the live plan; it never appears on the Portfolio or Capacity views.
+            When it wins, promote it from the comparison page to replace the live plan.
+        </div>
+        <a class="btn btn-primary btn-sm text-nowrap" asp-controller="Scenarios" asp-action="Compare" asp-route-id="@i.Id">Compare &amp; promote</a>
+    </div>
+}
+else if (i.Status == InitiativeStatus.Draft)
 {
     <div class="alert @(Model.ActivationBlockers.Count == 0 ? "alert-info" : "alert-warning") py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
@@ -155,7 +177,7 @@ else
         }
     </div>
 }
-@if (Model.CanManage && Model.StatusTransitions.Count > 0)
+@if (Model.CanManage && !i.IsScenario && Model.StatusTransitions.Count > 0)
 {
     <form asp-controller="Lifecycle" asp-action="ChangeStatus" asp-route-id="@i.Id" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3 small inline-form" onsubmit="return confirm('Change status to ' + this.to.value + '?');">
         <span class="text-muted">Change status:</span>

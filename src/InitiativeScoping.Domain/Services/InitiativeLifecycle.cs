@@ -25,6 +25,11 @@ public static class InitiativeLifecycle
     public static IReadOnlyList<string> BaselineBlockers(Initiative initiative, ForecastResult forecast)
     {
         var errors = new List<string>();
+        if (initiative.IsScenario)
+        {
+            errors.Add("Scenarios cannot be activated; promote it to its parent initiative instead.");
+        }
+
         if (initiative.Phases.Count == 0)
         {
             errors.Add("At least one phase is required.");

@@ -44,10 +44,10 @@ public static class ForecastCalculator
     /// </summary>
     public static ForecastResult Calculate(Initiative initiative, IReadOnlyCollection<RateCard> rateCards)
     {
-        var phases = initiative.Phases.ToDictionary(p => p.Id);
+        var phases = initiative.Phases.Where(p => p.Id != 0).ToDictionary(p => p.Id);
         var lines = initiative.Allocations.Select(a =>
         {
-            var asOf = phases.TryGetValue(a.PhaseId, out var phase) ? phase.PlannedStart : initiative.TargetStart;
+            var asOf = (a.Phase ?? phases.GetValueOrDefault(a.PhaseId))?.PlannedStart ?? initiative.TargetStart;
             var rate = RateResolver.Resolve(rateCards,
                 new RateKey(a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId),
                 asOf);

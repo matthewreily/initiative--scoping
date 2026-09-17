@@ -159,7 +159,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.VarianceThresholdPct).HasPrecision(5, 2);
             e.Property(x => x.ContingencyPct).HasPrecision(5, 2);
             e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.ScenarioOfId);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ScenarioOf).WithMany(x => x.Scenarios).HasForeignKey(x => x.ScenarioOfId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.ParticipatingBusinessUnits).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Phases).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
             e.HasMany(x => x.Allocations).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);

@@ -73,6 +73,11 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             return Forbid();
         }
 
+        if (initiative.IsScenario)
+        {
+            return RedirectWithError("Scenarios stay Draft; promote or delete them instead of changing status.", id);
+        }
+
         if (to == InitiativeStatus.Active && initiative.Status == InitiativeStatus.Draft)
         {
             return RedirectWithError("Use Activate to move a Draft initiative to Active.", id);

@@ -43,9 +43,9 @@ public static class NonLaborCostCalculator
     public static (DateOnly Start, DateOnly End)? Window(InitiativeNonLaborCost line, Initiative initiative)
     {
         DateOnly start, end;
-        if (line.PhaseId is { } phaseId)
+        if (line.Phase is not null || line.PhaseId is not null)
         {
-            var phase = line.Phase ?? initiative.Phases.FirstOrDefault(p => p.Id == phaseId);
+            var phase = line.Phase ?? initiative.Phases.FirstOrDefault(p => p.Id == line.PhaseId);
             if (phase is null)
             {
                 return null;

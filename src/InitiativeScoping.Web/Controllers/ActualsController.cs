@@ -62,6 +62,11 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
             return Forbid();
         }
 
+        if (initiative.IsScenario)
+        {
+            return RedirectToInitiative(id, error: "Actuals are tracked on the live initiative, not on what-if scenarios.");
+        }
+
         if (!ModelState.IsValid)
         {
             return RedirectToInitiative(id, error: ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault() ?? "Invalid adjustment.");
@@ -217,7 +222,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
             return RedirectBack(returnUrl, error: "Choose an initiative and/or a person.");
         }
 
-        if (initiativeId is not null && !await db.Initiatives.AnyAsync(i => i.Id == initiativeId, ct))
+        if (initiativeId is not null && !await db.Initiatives.AnyAsync(i => i.Id == initiativeId && i.ScenarioOfId == null, ct))
         {
             return RedirectBack(returnUrl, error: "Unknown initiative.");
         }
@@ -248,7 +253,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
             return RedirectBack(returnUrl, error: "Choose an initiative and/or a person to assign to the selected entries.");
         }
 
-        if (initiativeId is not null && !await db.Initiatives.AnyAsync(i => i.Id == initiativeId, ct))
+        if (initiativeId is not null && !await db.Initiatives.AnyAsync(i => i.Id == initiativeId && i.ScenarioOfId == null, ct))
         {
             return RedirectBack(returnUrl, error: "Unknown initiative.");
         }
@@ -351,7 +356,7 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
             Total = total,
             Page = page,
             PageSize = PageSize,
-            Initiatives = new SelectList(await db.Initiatives.OrderBy(i => i.Name).Select(i => new { i.Id, i.Name }).ToListAsync(ct), "Id", "Name"),
+            Initiatives = new SelectList(await db.Initiatives.Where(i => i.ScenarioOfId == null).OrderBy(i => i.Name).Select(i => new { i.Id, i.Name }).ToListAsync(ct), "Id", "Name"),
             People = new SelectList(await db.People.Where(p => p.IsActive).OrderBy(p => p.DisplayName).Select(p => new { p.Id, p.DisplayName }).ToListAsync(ct), "Id", "DisplayName")
         };
     }
