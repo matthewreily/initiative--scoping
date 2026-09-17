@@ -35,6 +35,7 @@ public class Initiative
     public List<InitiativeMember> Members { get; set; } = [];
     public List<ForecastBaseline> Baselines { get; set; } = [];
     public List<RebaselineRequest> RebaselineRequests { get; set; } = [];
+    public List<ActivationRequest> ActivationRequests { get; set; } = [];
     public List<InitiativeSourceMapping> SourceMappings { get; set; } = [];
 
     public bool IsScenario => ScenarioOfId is not null;
@@ -44,6 +45,10 @@ public class Initiative
     /// <summary>An approved re-baseline that has not yet been finalised into a new baseline version.</summary>
     public RebaselineRequest? OpenRebaseline =>
         RebaselineRequests.FirstOrDefault(r => r.Status is RebaselineStatus.Pending or RebaselineStatus.Approved);
+
+    /// <summary>An activation request awaiting an Admin decision.</summary>
+    public ActivationRequest? PendingActivation =>
+        ActivationRequests.FirstOrDefault(r => r.Status == ActivationRequestStatus.Pending);
 
     /// <summary>Sponsor plus explicitly added participants, without duplicates.</summary>
     public IEnumerable<int> ParticipatingBusinessUnitIds =>
@@ -56,6 +61,21 @@ public class InitiativeBusinessUnit
     public Initiative? Initiative { get; set; }
     public int BusinessUnitId { get; set; }
     public BusinessUnit? BusinessUnit { get; set; }
+}
+
+/// <summary>Owner's request to activate a Draft initiative; an Admin approves (which activates and captures baseline v1) or rejects.</summary>
+public class ActivationRequest
+{
+    public int Id { get; set; }
+    public int InitiativeId { get; set; }
+    public Initiative? Initiative { get; set; }
+    public ActivationRequestStatus Status { get; set; } = ActivationRequestStatus.Pending;
+    public string? Reason { get; set; }
+    public required string RequestedBy { get; set; }
+    public DateTimeOffset RequestedAt { get; set; }
+    public string? DecidedBy { get; set; }
+    public DateTimeOffset? DecidedAt { get; set; }
+    public string? DecisionNote { get; set; }
 }
 
 /// <summary>Owner-initiated, Admin-approved request to unlock scope on an Active initiative and cut a new baseline.</summary>

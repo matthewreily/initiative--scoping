@@ -27,4 +27,7 @@ public static class InitiativeAccess
 
     /// <summary>Only Admins approve or reject re-baseline requests.</summary>
     public static bool CanApproveRebaseline(ICurrentUser user) => user.IsInRole(AppRoles.Admin);
+
+    /// <summary>Only Admins activate directly or approve/reject activation requests; other managers request activation.</summary>
+    public static bool CanApproveActivation(ICurrentUser user) => user.IsInRole(AppRoles.Admin);
 }

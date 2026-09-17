@@ -11,7 +11,8 @@ Three application roles, granted in-app at `Admin → Users`:
 | View initiatives, portfolio, variance, audit log | x | x | x |
 | Export CSV / XLSX | x | x | x |
 | Create initiatives / edit scope (phases, allocations, non-labor costs) | x | x* | |
-| Activate, change status, request re-baseline, manage members | x | x* | |
+| Request activation, change status, request re-baseline, manage members | x | x* | |
+| Activate directly / approve or reject activation requests | x | | |
 | Record actual adjustments on an initiative | x | x* | |
 | Approve / reject re-baseline | x | | |
 | Manage BUs, resource types, rate cards, sizing, vendors, cost catalog, people, work calendar | x | | |
@@ -63,14 +64,14 @@ The comparison shows the live plan first and every scenario beside it – schedu
 
 ## 3. Activate and baseline (Owner)
 
-1. When the forecast is complete, click **Activate**. Guards: at least one phase and one allocation, valid dates, no unpriced lines.
+1. When the forecast is complete, an Administrator clicks **Activate**; an Owner clicks **Request activation** (optional note) instead – administrators are e-mailed and decide on the initiative page or under **Approvals** (nav bar). **Approve & activate** activates on the spot; **Reject** (with a note) leaves the initiative in Draft and e-mails the requester. Guards: at least one phase and one allocation, valid dates, no unpriced lines.
 2. Activation snapshots the forecast as **Baseline v1** and locks scope (phases/allocations become read-only).
 3. Status transitions: Active → On hold → Active, Active → Complete / Cancelled. Complete/Cancelled initiatives drop off the default portfolio view.
 
 ### Re-baseline
 
 1. Owner: **Request re-baseline** with a reason.
-2. Administrator: **Re-baselines** (nav bar) → **Approve** (scope unlocks) or **Reject**.
+2. Administrator: **Approvals** (nav bar) → **Approve** (scope unlocks) or **Reject**.
 3. Owner edits phases/allocations, then **Finalize** to snapshot **v2**. All versions remain in `Baselines` with deltas; variance is always measured against the *current* version. Baseline lines store the phase, business unit, resource type, seniority and vendor **names as of the snapshot**, so renaming a catalog entry later does not relabel historical baselines.
 
 ## 4. Load actuals (FinancePmo / Administrator)

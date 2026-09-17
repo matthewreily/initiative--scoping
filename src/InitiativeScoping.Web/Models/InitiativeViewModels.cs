@@ -249,6 +249,7 @@ public class InitiativeDetailsModel
     public bool ScopeEditable { get; init; }
     public bool ScopeWritable => CanEdit && ScopeEditable;
     public bool CanApproveRebaseline { get; init; }
+    public bool CanApproveActivation { get; init; }
     public IReadOnlyList<string> ActivationBlockers { get; init; } = [];
     public IReadOnlyList<InitiativeStatus> StatusTransitions { get; init; } = [];
     public required VarianceResult Variance { get; init; }
@@ -290,6 +291,12 @@ public class BaselinesModel
     public required IReadOnlyList<RebaselineRequest> Requests { get; init; }
     public bool CanManage { get; init; }
     public bool CanApprove { get; init; }
+}
+
+public class ApprovalsModel
+{
+    public required IReadOnlyList<ActivationRequest> Activations { get; init; }
+    public required IReadOnlyList<RebaselineRequest> Rebaselines { get; init; }
 }
 
 public sealed record BaselineLineRow(

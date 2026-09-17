@@ -334,6 +334,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
             ScopeEditable = InitiativeAccess.IsScopeEditable(initiative),
             CanApproveRebaseline = InitiativeAccess.CanApproveRebaseline(currentUser),
+            CanApproveActivation = InitiativeAccess.CanApproveActivation(currentUser),
             ActivationBlockers = initiative.Status == InitiativeStatus.Draft ? InitiativeLifecycle.BaselineBlockers(initiative, forecast) : [],
             StatusTransitions = InitiativeLifecycle.AllowedTransitions(initiative.Status)
                 .Where(s => !(initiative.Status == InitiativeStatus.Draft && s == InitiativeStatus.Active)).ToList(),
@@ -1191,6 +1192,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
             .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)
             .Include(i => i.RebaselineRequests)
+            .Include(i => i.ActivationRequests)
             .Include(i => i.SourceMappings)
             .Include(i => i.ScenarioOf)
             .Include(i => i.Scenarios)

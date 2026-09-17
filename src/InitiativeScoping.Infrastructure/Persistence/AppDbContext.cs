@@ -31,6 +31,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ForecastBaselineLine> ForecastBaselineLines => Set<ForecastBaselineLine>();
     public DbSet<ForecastBaselineNonLaborLine> ForecastBaselineNonLaborLines => Set<ForecastBaselineNonLaborLine>();
     public DbSet<RebaselineRequest> RebaselineRequests => Set<RebaselineRequest>();
+    public DbSet<ActivationRequest> ActivationRequests => Set<ActivationRequest>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<InitiativeSourceMapping> InitiativeSourceMappings => Set<InitiativeSourceMapping>();
     public DbSet<ActualsImport> ActualsImports => Set<ActualsImport>();
@@ -242,6 +243,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => new { x.InitiativeId, x.Status });
             e.HasOne(x => x.Initiative).WithMany(i => i.RebaselineRequests).HasForeignKey(x => x.InitiativeId);
             e.HasOne(x => x.ResultingBaseline).WithMany().HasForeignKey(x => x.ResultingBaselineId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<ActivationRequest>(e =>
+        {
+            e.Property(x => x.Reason).HasMaxLength(1000);
+            e.Property(x => x.RequestedBy).HasMaxLength(200);
+            e.Property(x => x.DecidedBy).HasMaxLength(200);
+            e.Property(x => x.DecisionNote).HasMaxLength(1000);
+            e.HasIndex(x => new { x.InitiativeId, x.Status });
+            e.HasOne(x => x.Initiative).WithMany(i => i.ActivationRequests).HasForeignKey(x => x.InitiativeId);
         });
 
         b.Entity<ForecastBaselineLine>(e =>

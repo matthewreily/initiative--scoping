@@ -77,6 +77,7 @@ public static class DependencyInjection
         });
         services.TryAddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddScoped<AccessRequestNotifier>();
+        services.AddScoped<ActivationNotifier>();
         services.AddScoped<IWorkCalendar, DbWorkCalendar>();
         services.AddScoped<IActualsImporter, ActualsImporter>();
         services.AddSingleton<IExportWriter, CsvExportWriter>();
