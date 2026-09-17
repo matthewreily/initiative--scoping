@@ -8,3 +8,4 @@
 deploy/
 tests/
 *.md
+e2e/
