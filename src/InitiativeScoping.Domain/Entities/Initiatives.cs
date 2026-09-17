@@ -36,6 +36,7 @@ public class Initiative
     public List<ForecastBaseline> Baselines { get; set; } = [];
     public List<RebaselineRequest> RebaselineRequests { get; set; } = [];
     public List<ActivationRequest> ActivationRequests { get; set; } = [];
+    public List<InitiativeNote> Notes { get; set; } = [];
     public List<InitiativeSourceMapping> SourceMappings { get; set; } = [];
 
     public bool IsScenario => ScenarioOfId is not null;
@@ -76,6 +77,19 @@ public class ActivationRequest
     public string? DecidedBy { get; set; }
     public DateTimeOffset? DecidedAt { get; set; }
     public string? DecisionNote { get; set; }
+}
+
+/// <summary>Free-text note on an initiative, optionally attached to one baseline version.</summary>
+public class InitiativeNote
+{
+    public int Id { get; set; }
+    public int InitiativeId { get; set; }
+    public Initiative? Initiative { get; set; }
+    public int? ForecastBaselineId { get; set; }
+    public ForecastBaseline? ForecastBaseline { get; set; }
+    public required string Body { get; set; }
+    public required string CreatedBy { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 /// <summary>Owner-initiated, Admin-approved request to unlock scope on an Active initiative and cut a new baseline.</summary>

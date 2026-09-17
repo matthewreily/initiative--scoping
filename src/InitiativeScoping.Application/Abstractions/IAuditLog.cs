@@ -20,6 +20,8 @@ public static class AuditActions
     public const string RebaselineDecision = "RebaselineDecision";
     public const string ActivationRequest = "ActivationRequest";
     public const string ActivationDecision = "ActivationDecision";
+    public const string NoteAdded = "NoteAdded";
+    public const string NoteDeleted = "NoteDeleted";
     public const string Remap = "Remap";
     public const string Adjustment = "Adjustment";
     public const string Export = "Export";

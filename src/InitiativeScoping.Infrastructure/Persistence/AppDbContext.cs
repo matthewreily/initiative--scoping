@@ -32,6 +32,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ForecastBaselineNonLaborLine> ForecastBaselineNonLaborLines => Set<ForecastBaselineNonLaborLine>();
     public DbSet<RebaselineRequest> RebaselineRequests => Set<RebaselineRequest>();
     public DbSet<ActivationRequest> ActivationRequests => Set<ActivationRequest>();
+    public DbSet<InitiativeNote> InitiativeNotes => Set<InitiativeNote>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<InitiativeSourceMapping> InitiativeSourceMappings => Set<InitiativeSourceMapping>();
     public DbSet<ActualsImport> ActualsImports => Set<ActualsImport>();
@@ -253,6 +254,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.DecisionNote).HasMaxLength(1000);
             e.HasIndex(x => new { x.InitiativeId, x.Status });
             e.HasOne(x => x.Initiative).WithMany(i => i.ActivationRequests).HasForeignKey(x => x.InitiativeId);
+        });
+
+        b.Entity<InitiativeNote>(e =>
+        {
+            e.Property(x => x.Body).HasMaxLength(4000);
+            e.Property(x => x.CreatedBy).HasMaxLength(200);
+            e.HasIndex(x => new { x.InitiativeId, x.CreatedAt });
+            e.HasOne(x => x.Initiative).WithMany(i => i.Notes).HasForeignKey(x => x.InitiativeId);
+            e.HasOne(x => x.ForecastBaseline).WithMany().HasForeignKey(x => x.ForecastBaselineId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<ForecastBaselineLine>(e =>
