@@ -190,3 +190,10 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 .phasing-actual { background: #198754; }
 .phasing-label { font-size: .7rem; text-align: center; color: var(--is-text-muted); padding-top: .2rem; white-space: nowrap; }
 .phasing-swatch { display: inline-block; width: .75rem; height: .75rem; border-radius: 2px; vertical-align: -1px; margin-right: .2rem; }
+
+/* Column visibility + client pagination */
+.col-hidden { display: none !important; }
+.page-hidden { display: none !important; }
+.column-picker .dropdown-menu { min-width: 12rem; }
+.setup-mark { flex: 0 0 1.25rem; height: 1.25rem; margin-top: .15rem; border: 2px solid var(--is-border); border-radius: 50%; font-size: .75rem; line-height: 1rem; text-align: center; }
+.setup-mark.done { background: var(--bs-success); border-color: var(--bs-success); color: #fff; }

@@ -12,3 +12,33 @@
     <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Published Rate Cards</div><div class="fs-2">@Model.PublishedRateCardCount</div></div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Initiatives</div><div class="fs-2"><a asp-controller="Initiatives" asp-action="Index" class="text-decoration-none">@Model.InitiativeCount</a></div></div></div></div>
 </div>
+
+@if (Model.ShowSetupChecklist)
+{
+    var done = Model.SetupSteps.Count(s => s.Done);
+    <section class="card mt-4 setup-checklist" aria-labelledby="setup-title">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h5 mb-0" id="setup-title">Getting started</h2>
+                <span class="small text-muted">@done of @Model.SetupSteps.Count done</span>
+            </div>
+            <div class="progress mb-3" style="height: 6px" role="progressbar" aria-label="Setup progress" aria-valuenow="@done" aria-valuemin="0" aria-valuemax="@Model.SetupSteps.Count">
+                <div class="progress-bar" style="width: @(100 * done / Model.SetupSteps.Count)%"></div>
+            </div>
+            <ol class="list-unstyled mb-0">
+                @foreach (var step in Model.SetupSteps)
+                {
+                    <li class="d-flex align-items-start gap-2 py-1 @(step.Done ? "text-muted" : "")">
+                        <span class="setup-mark @(step.Done ? "done" : "")" aria-hidden="true">@(step.Done ? "✓" : "")</span>
+                        <div>
+                            <a asp-area="@step.Area" asp-controller="@step.Controller" asp-action="@step.Action" class="@(step.Done ? "text-decoration-line-through" : "fw-semibold")">@step.Title</a>
+                            <span class="visually-hidden">@(step.Done ? "(done)" : "(to do)")</span>
+                            <div class="small text-muted">@step.Hint</div>
+                        </div>
+                    </li>
+                }
+            </ol>
+        </div>
+    </section>
+}
+<p class="small text-muted mt-4">Tip: press <kbd>?</kbd> for keyboard shortcuts.</p>
