@@ -6,10 +6,12 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
     "@playwright/test": "1.49.1",
-    "@types/node": "20.17.10"
+    "@types/node": "20.17.10",
+    "typescript": "5.7.2"
   }
 }

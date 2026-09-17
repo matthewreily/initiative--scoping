@@ -61,7 +61,7 @@ jobs:
         working-directory: e2e
       - run: npx playwright install --with-deps chromium
         working-directory: e2e
-      - run: npx tsc --noEmit -p .
+      - run: npm run typecheck
         working-directory: e2e
       - run: npx playwright test
         working-directory: e2e
