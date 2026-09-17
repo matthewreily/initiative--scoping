@@ -13,6 +13,23 @@ public static class PortfolioQueries
 {
     public static async Task<PortfolioResult> LoadPortfolioAsync(this AppDbContext db, PortfolioFilter filter, decimal? defaultThresholdPct, CancellationToken ct)
     {
+        var initiatives = await db.FilteredInitiatives(filter).ToListAsync(ct);
+        var ids = initiatives.Select(i => i.Id).ToList();
+        var entries = await db.ActualEntries
+            .Include(e => e.Person)
+            .Where(e => e.InitiativeId != null && ids.Contains(e.InitiativeId.Value) && !e.IsUnmapped)
+            .AsNoTracking()
+            .ToListAsync(ct);
+        var adjustments = await db.ActualAdjustments.Where(a => ids.Contains(a.InitiativeId)).AsNoTracking().ToListAsync(ct);
+        var typeNames = await db.ResourceTypeNamesAsync(ct);
+        var cards = await db.PublishedRateCardsAsync(ct);
+
+        return PortfolioCalculator.Calculate(initiatives, cards, entries, adjustments, typeNames, defaultThresholdPct);
+    }
+
+    /// <summary>Portfolio initiatives matching the dashboard filters, ordered by business unit then name.</summary>
+    public static IQueryable<Initiative> FilteredInitiatives(this AppDbContext db, PortfolioFilter filter)
+    {
         var query = db.PortfolioInitiatives();
         if (filter.Status is not null)
         {
@@ -28,18 +45,7 @@ public static class PortfolioQueries
             query = query.Where(i => i.BusinessUnitId == filter.BusinessUnitId);
         }
 
-        var initiatives = await query.OrderBy(i => i.BusinessUnit!.Name).ThenBy(i => i.Name).ToListAsync(ct);
-        var ids = initiatives.Select(i => i.Id).ToList();
-        var entries = await db.ActualEntries
-            .Include(e => e.Person)
-            .Where(e => e.InitiativeId != null && ids.Contains(e.InitiativeId.Value) && !e.IsUnmapped)
-            .AsNoTracking()
-            .ToListAsync(ct);
-        var adjustments = await db.ActualAdjustments.Where(a => ids.Contains(a.InitiativeId)).AsNoTracking().ToListAsync(ct);
-        var typeNames = await db.ResourceTypeNamesAsync(ct);
-        var cards = await db.PublishedRateCardsAsync(ct);
-
-        return PortfolioCalculator.Calculate(initiatives, cards, entries, adjustments, typeNames, defaultThresholdPct);
+        return query.OrderBy(i => i.BusinessUnit!.Name).ThenBy(i => i.Name);
     }
 
     public static IQueryable<Initiative> PortfolioInitiatives(this AppDbContext db) =>
