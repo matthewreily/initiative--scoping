@@ -47,7 +47,7 @@
         </div>
         <span asp-validation-for="ParticipatingBusinessUnitIds" class="text-danger"></span>
     </fieldset>
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 align-items-end">
         <div class="col-md-4">
             <label asp-for="SizingMethod" class="form-label"></label>
             <select asp-for="SizingMethod" class="form-select" id="sizing-method">
@@ -76,9 +76,9 @@
         </div>
         <div class="col-md-2">
             <label asp-for="ContingencyPct" class="form-label"></label>
-            <input asp-for="ContingencyPct" class="form-control" type="number" step="0.5" min="0" max="100" aria-describedby="contingency-help" />
+            <input asp-for="ContingencyPct" class="form-control" type="number" step="0.5" min="0" max="100" aria-describedby="contingency-help" title="Reserve added on top of the priced forecast." />
             <span asp-validation-for="ContingencyPct" class="text-danger"></span>
-            <div class="form-text" id="contingency-help">Reserve added on top of the priced forecast.</div>
+            <span class="visually-hidden" id="contingency-help">Reserve added on top of the priced forecast.</span>
         </div>
         <div class="col-md-2">
             <label asp-for="EstimateConfidence" class="form-label"></label>
