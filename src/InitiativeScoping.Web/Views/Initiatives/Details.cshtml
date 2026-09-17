@@ -294,7 +294,7 @@ else
 <div class="tab-content pt-3">
     <div class="tab-pane fade show active" id="pane-plan" role="tabpanel" aria-labelledby="tab-plan">
         <div class="row g-4">
-            <div class="col-lg-7">
+            <div class="col-12">
         <h2 class="h5">Phases</h2>
         @if (fd is not null)
         {
@@ -377,7 +377,7 @@ else
         }
 
         <h2 class="h5">Allocations</h2>
-        <div class="table-responsive" id="allocations-table">
+        <div class="table-responsive table-scroll" id="allocations-table">
         <table class="table table-sm align-middle" data-sortable>
             <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
             <tbody>
@@ -518,7 +518,7 @@ else
         }
 
             </div>
-            <div class="col-lg-5">
+            <div class="col-12 col-xl-7">
         @if (Model.ScopeWritable)
         {
             <h2 class="h5">Apply relative size</h2>
@@ -605,7 +605,7 @@ else
             <div class="col-lg-7">
         <h2 class="h5" id="non-labor-costs">Non-labor costs</h2>
         <p class="text-muted small mb-2">Software licenses and other non-labor spend. Recurring lines bill whole months/years over the phase or initiative window (any partial period counts as a full one) unless explicit dates are set.</p>
-        <div class="table-responsive" id="non-labor-table">
+        <div class="table-responsive table-scroll" id="non-labor-table">
         <table class="table table-sm align-middle" data-sortable>
             <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all non-labor costs" /></th> }<th>Scope</th><th>Category</th><th>Description</th><th>Billing</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th>Window</th><th class="text-end">Periods</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
             <tbody>
