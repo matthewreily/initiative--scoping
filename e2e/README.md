@@ -44,7 +44,7 @@ dotnet run --project src/InitiativeScoping.Web     # in another terminal → htt
 E2E_BASE_URL=http://localhost:5086 npm test
 ```
 
-`npx tsc --noEmit -p .` type-checks the specs (CI runs this before the tests).
+`npm run typecheck` type-checks the specs (CI runs this before the tests).
 
 ## What is covered
 
