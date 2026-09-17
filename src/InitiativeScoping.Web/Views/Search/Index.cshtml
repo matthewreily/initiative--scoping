@@ -1,0 +1,32 @@
+@model SearchResultsModel
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Query) ? "Search" : $"Search: {Model.Query}";
+    var isAdmin = User.IsInRole(InitiativeScoping.Application.AppRoles.Admin);
+}
+<h1 class="h3">Search</h1>
+<form method="get" class="row g-2 mb-4" role="search">
+    <div class="col-md-6">
+        <input type="search" name="q" value="@Model.Query" class="form-control" placeholder="Initiatives@(isAdmin ? ", people, rate cards, vendors" : "")" aria-label="Search" autofocus minlength="2" />
+    </div>
+    <div class="col-auto"><button type="submit" class="btn btn-primary">Search</button></div>
+</form>
+
+@if (Model.Query.Length < 2)
+{
+    <p class="text-muted">Type at least two characters. Tip: press <kbd>/</kbd> anywhere to jump to the search box.</p>
+}
+else if (Model.Total == 0)
+{
+    <div class="empty-state">
+        <p class="mb-1">No results for <strong>@Model.Query</strong>.</p>
+        <p class="text-muted small mb-0">Try a shorter term or a different spelling.</p>
+    </div>
+}
+else
+{
+    <p class="text-muted small">@Model.Total result@(Model.Total == 1 ? "" : "s") for <strong>@Model.Query</strong></p>
+    @await Html.PartialAsync("_ResultGroup", ("Initiatives", Model.Initiatives, "", "Initiatives", "Details"))
+    @await Html.PartialAsync("_ResultGroup", ("People", Model.People, "Admin", "People", "Edit"))
+    @await Html.PartialAsync("_ResultGroup", ("Rate cards", Model.RateCards, "Admin", "RateCards", "Details"))
+    @await Html.PartialAsync("_ResultGroup", ("Vendors", Model.Vendors, "Admin", "Vendors", "Edit"))
+}

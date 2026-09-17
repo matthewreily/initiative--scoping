@@ -44,6 +44,20 @@
         });
     }
 
+    const sortKey = table => 'is.sort:' + location.pathname + '#' + (table.id || Array.from(document.querySelectorAll('table[data-sortable]')).indexOf(table));
+    function remember(table, index, direction) {
+        try { localStorage.setItem(sortKey(table), index + ':' + direction); } catch { /* storage unavailable */ }
+    }
+    function restore(table) {
+        try {
+            const saved = localStorage.getItem(sortKey(table));
+            if (!saved) return;
+            const [index, direction] = saved.split(':').map(Number);
+            const th = table.tHead && table.tHead.rows[0].cells[index];
+            if (th && th.classList.contains('sortable')) sort(table, index, direction);
+        } catch { /* storage unavailable */ }
+    }
+
     document.querySelectorAll('table[data-sortable]').forEach(table => {
         const head = table.tHead;
         if (!head) return;
@@ -54,12 +68,53 @@
             th.setAttribute('role', 'button');
             const sortHint = 'Sort by ' + th.textContent.trim();
             th.title = th.title ? th.title + ' — ' + sortHint : sortHint;
-            const toggle = () => sort(table, index, th.classList.contains('sorted-asc') ? -1 : 1);
+            const toggle = () => {
+                const direction = th.classList.contains('sorted-asc') ? -1 : 1;
+                sort(table, index, direction);
+                remember(table, index, direction);
+            };
             th.addEventListener('click', e => { if (!e.target.closest('input,button,a,select')) toggle(); });
             th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
         });
+        restore(table);
     });
 })();
+
+// Remembered filters: a GET <form data-remember-filters> stores its last submitted query string per
+// page; opening the page with no query string re-applies it. [data-filter-clear] links forget it.
+(function () {
+    const key = 'is.filters:' + location.pathname;
+    const form = document.querySelector('form[method="get"][data-remember-filters]');
+    if (!form) return;
+    let saved = null;
+    try { saved = localStorage.getItem(key); } catch { return; }
+
+    form.addEventListener('submit', () => {
+        const query = new URLSearchParams(new FormData(form));
+        for (const [name, value] of Array.from(query.entries())) { if (value === '') query.delete(name); }
+        const text = query.toString();
+        try { text ? localStorage.setItem(key, text) : localStorage.removeItem(key); } catch { /* storage unavailable */ }
+    });
+    document.querySelectorAll('[data-filter-clear]').forEach(a => a.addEventListener('click', () => {
+        try { localStorage.removeItem(key); } catch { /* storage unavailable */ }
+    }));
+
+    if (saved && !location.search && !document.referrer.startsWith(location.origin + location.pathname)) {
+        location.replace(location.pathname + '?' + saved);
+    }
+})();
+
+// Keyboard: "/" focuses the global search box (unless typing in a field).
+document.addEventListener('keydown', e => {
+    if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.matches('input, textarea, select, [contenteditable]') || t.isContentEditable)) return;
+    const box = document.getElementById('global-search');
+    if (!box) return;
+    e.preventDefault();
+    box.focus();
+    box.select();
+});
 
 // Bulk selection: a <form data-bulk> containing (or, with data-bulk="container-id", pointing at an
 // element containing) a table with one [data-bulk-all] header checkbox and per-row [data-bulk-item]
