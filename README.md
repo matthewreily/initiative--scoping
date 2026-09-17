@@ -13,6 +13,7 @@ src/
 tests/
   InitiativeScoping.Domain.Tests        xUnit unit tests for domain rules
   InitiativeScoping.Integration.Tests   WebApplicationFactory tests (SQLite, dev auth)
+e2e/                                    Playwright end-to-end tests (real browser, see e2e/README.md)
 ```
 
 ## Local development
@@ -35,6 +36,20 @@ python3 tests/coverage-check.py TestResults 80
 ```
 
 The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes delete `src/InitiativeScoping.Web/initiative-scoping.dev.db*` and restart to rebuild and reseed it.
+
+### End-to-end tests (Playwright)
+
+`e2e/` drives the real app in Chromium (create → phase → size → forecast → activate, rate-card CSV import/export, portfolio export, notes, layout regressions). Playwright starts the web app itself in `Development` mode (dev auth, throw-away SQLite DB under `e2e/.e2e-data/`). Requires Node 20+ in addition to the .NET SDK:
+
+```bash
+cd e2e
+npm ci
+npx playwright install --with-deps chromium   # first time only
+npm test                                       # headless; `npm run test:headed` / `npm run test:ui` to watch
+npm run report                                 # open the HTML report of the last run
+```
+
+Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running. CI runs the suite in the `e2e` job and uploads the report + failure traces as the `playwright-report` artifact. Details in [`e2e/README.md`](e2e/README.md).
 
 ### Administration
 
