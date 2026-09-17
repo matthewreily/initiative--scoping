@@ -12,6 +12,10 @@ public sealed record PortfolioRow(
 {
     public decimal ForecastHours => Forecast.TotalHours;
     public decimal ForecastCost => Forecast.TotalCost;
+    public decimal ContingencyPct => Forecast.ContingencyPct;
+    public decimal ContingencyCost => Forecast.ContingencyCost;
+    public decimal ForecastCostWithContingency => Forecast.TotalCostWithContingency;
+    public EstimateConfidence? Confidence => Initiative.EstimateConfidence;
     public decimal InternalForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte).Sum(l => l.Cost);
     public decimal VendorForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.Vendor).Sum(l => l.Cost);
     public decimal NonLaborForecastCost => Forecast.NonLaborCost;
@@ -53,6 +57,10 @@ public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
     public int Count => Rows.Count;
     public decimal ForecastHours => Rows.Sum(r => r.ForecastHours);
     public decimal ForecastCost => Rows.Sum(r => r.ForecastCost);
+    public decimal ContingencyCost => Rows.Sum(r => r.ContingencyCost);
+    public decimal ForecastCostWithContingency => Rows.Sum(r => r.ForecastCostWithContingency);
+    public int LowConfidence => Rows.Count(r => r.Confidence == EstimateConfidence.Low);
+    public int UnratedConfidence => Rows.Count(r => r.Confidence is null);
     public decimal InternalForecastCost => Rows.Sum(r => r.InternalForecastCost);
     public decimal VendorForecastCost => Rows.Sum(r => r.VendorForecastCost);
     public decimal NonLaborForecastCost => Rows.Sum(r => r.NonLaborForecastCost);

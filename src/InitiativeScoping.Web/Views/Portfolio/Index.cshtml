@@ -48,7 +48,9 @@
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Initiatives</div><div class="fs-3">@p.Count</div><div class="small text-muted">@p.Baselined baselined</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3" title="@p.ForecastCost.ToString("C0")">@Money.Compact(p.ForecastCost)</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3" title="@p.ForecastCost.ToString("C0")">@Money.Compact(p.ForecastCost)</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div>
+        @if (p.ContingencyCost > 0) { <div class="small text-muted" id="portfolio-contingency" title="@p.ForecastCostWithContingency.ToString("C0")">@Money.Compact(p.ForecastCostWithContingency) incl. @Money.Compact(p.ContingencyCost) contingency</div> }
+        @if (p.LowConfidence > 0) { <div class="small text-danger">@p.LowConfidence low-confidence</div> }</div></div></div>
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor / Non-labor</div><div class="fs-6" title="@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0") / @p.NonLaborForecastCost.ToString("C0")">@Money.Compact(p.InternalForecastCost) / @Money.Compact(p.VendorForecastCost) / @Money.Compact(p.NonLaborForecastCost)</div>
         @if (p.ForecastCost > 0)
         {
@@ -97,7 +99,7 @@ else
     <table data-sortable data-columns data-paginate="25" class="table table-sm align-middle">
         <thead>
         <tr>
-            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th style="min-width: 110px">Burn</th><th>Flags</th>
+            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast</th><th class="text-end d-none d-xl-table-cell">Contingency</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th style="min-width: 110px">Burn</th><th>Flags</th>
         </tr>
         </thead>
         <tbody>
@@ -109,6 +111,10 @@ else
                 <td class="d-none d-md-table-cell">@i.BusinessUnit?.Name</td>
                 <td class="d-none d-md-table-cell"><partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="i.Status" /></td>
                 <td class="text-end d-none d-lg-table-cell" data-sort="@Inv(r.ForecastCost)">@r.ForecastCost.ToString("C0")<div class="small text-muted">@r.ForecastHours.ToString("N0") h</div></td>
+                <td class="text-end d-none d-xl-table-cell" data-sort="@Inv(r.ContingencyCost)">
+                    @if (r.ContingencyPct > 0) { @r.ContingencyCost.ToString("C0") <div class="small text-muted">@r.ContingencyPct.ToString("0.##")% &middot; @r.ForecastCostWithContingency.ToString("C0") total</div> }
+                    else { <span class="text-muted">—</span> }
+                </td>
                 <td class="text-end" data-sort="@(r.HasBaseline ? Inv(r.BaselineCost) : "")">
                     @if (r.HasBaseline) { @r.BaselineCost.ToString("C0") <div class="small text-muted">v@(r.BaselineVersion) &middot; @r.BaselineHours.ToString("N0") h</div> }
                     else { <span class="text-muted">—</span> }
@@ -131,6 +137,7 @@ else
                     @if (r.HasUnpricedForecast) { <span class="badge bg-warning text-dark" title="One or more allocations have no matching rate">Unpriced forecast</span> }
                     @if (r.HasUnpricedActuals) { <span class="badge bg-warning text-dark" title="@r.Variance.UnpricedEntries actual rows without a rate">Unpriced actuals</span> }
                     @if (i.OpenRebaseline is not null) { <span class="badge bg-info text-dark">Re-baseline @i.OpenRebaseline.Status.ToString().ToLower()</span> }
+                    <partial name="_Confidence" model="r.Confidence" />
                 </td>
             </tr>
         }
@@ -141,6 +148,7 @@ else
             <td class="d-none d-md-table-cell"></td>
             <td class="d-none d-md-table-cell"></td>
             <td class="text-end d-none d-lg-table-cell">@p.ForecastCost.ToString("C0")</td>
+            <td class="text-end d-none d-xl-table-cell">@p.ContingencyCost.ToString("C0")</td>
             <td class="text-end">@p.BaselineCost.ToString("C0")</td>
             <td class="text-end">@p.ActualCost.ToString("C0")</td>
             <td class="text-end @VarianceClass(p.CostVariancePct, false)">@Signed(p.CostVariance, "C0")</td>

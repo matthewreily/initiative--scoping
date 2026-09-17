@@ -18,6 +18,9 @@ public class Initiative
     /// <summary>Fixed end date; required when <see cref="PlanningMode"/> is <see cref="PlanningMode.FixedDuration"/>.</summary>
     public DateOnly? TargetEnd { get; set; }
     public decimal? VarianceThresholdPct { get; set; }
+    /// <summary>Risk reserve added on top of the priced forecast, as a percentage of forecast cost (labor + non-labor).</summary>
+    public decimal ContingencyPct { get; set; }
+    public EstimateConfidence? EstimateConfidence { get; set; }
     public required string CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     /// <summary>Business units that may supply resources to this initiative; always includes the sponsoring <see cref="BusinessUnitId"/>.</summary>
@@ -162,11 +165,15 @@ public class ForecastBaseline
     public bool IsCurrent { get; set; }
     public decimal TotalHours { get; set; }
     public decimal TotalCost { get; set; }
+    public decimal ContingencyPct { get; set; }
+    public decimal ContingencyCost { get; set; }
+    public EstimateConfidence? EstimateConfidence { get; set; }
     public List<ForecastBaselineLine> Lines { get; set; } = [];
     public List<ForecastBaselineNonLaborLine> NonLaborLines { get; set; } = [];
 
     public decimal LaborCost => Lines.Sum(l => l.Cost);
     public decimal NonLaborCost => NonLaborLines.Sum(l => l.Cost);
+    public decimal TotalCostWithContingency => TotalCost + ContingencyCost;
 }
 
 public class ForecastBaselineNonLaborLine

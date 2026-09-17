@@ -157,6 +157,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.SizeKey).HasMaxLength(50);
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.Property(x => x.VarianceThresholdPct).HasPrecision(5, 2);
+            e.Property(x => x.ContingencyPct).HasPrecision(5, 2);
             e.HasIndex(x => x.Status);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.ParticipatingBusinessUnits).WithOne(x => x.Initiative).HasForeignKey(x => x.InitiativeId);
@@ -214,6 +215,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.SnapshotBy).HasMaxLength(200);
             e.Property(x => x.TotalHours).HasPrecision(18, 2);
             e.Property(x => x.TotalCost).HasPrecision(18, 2);
+            e.Property(x => x.ContingencyPct).HasPrecision(5, 2);
+            e.Property(x => x.ContingencyCost).HasPrecision(18, 2);
             e.HasIndex(x => new { x.InitiativeId, x.Version }).IsUnique();
             e.HasIndex(x => new { x.InitiativeId, x.IsCurrent });
             e.HasMany(x => x.Lines).WithOne(x => x.ForecastBaseline).HasForeignKey(x => x.ForecastBaselineId);

@@ -34,6 +34,9 @@ public static class BaselineSnapshot
             IsCurrent = true,
             TotalHours = forecast.TotalHours,
             TotalCost = forecast.TotalCost,
+            ContingencyPct = forecast.ContingencyPct,
+            ContingencyCost = forecast.ContingencyCost,
+            EstimateConfidence = initiative.EstimateConfidence,
             Lines = forecast.Lines.Select(l => new ForecastBaselineLine
             {
                 PhaseId = l.Allocation.PhaseId,

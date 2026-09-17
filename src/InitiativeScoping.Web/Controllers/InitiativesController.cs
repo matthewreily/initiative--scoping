@@ -92,6 +92,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             TargetStart = model.TargetStart,
             TargetEnd = model.PlanningMode == PlanningMode.FixedDuration ? model.TargetEnd : null,
             VarianceThresholdPct = model.VarianceThresholdPct,
+            ContingencyPct = model.ContingencyPct,
+            EstimateConfidence = model.EstimateConfidence,
             CreatedBy = currentUser.UserId,
             CreatedAt = clock.GetUtcNow()
         };
@@ -124,7 +126,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ParticipatingBusinessUnitIds = initiative.ParticipatingBusinessUnits.Select(p => p.BusinessUnitId).ToList(),
             SponsoringTeam = initiative.SponsoringTeam, SizingMethod = initiative.SizingMethod, SizeKey = initiative.SizeKey,
             PlanningMode = initiative.PlanningMode, TargetStart = initiative.TargetStart, TargetEnd = initiative.TargetEnd,
-            VarianceThresholdPct = initiative.VarianceThresholdPct
+            VarianceThresholdPct = initiative.VarianceThresholdPct, ContingencyPct = initiative.ContingencyPct, EstimateConfidence = initiative.EstimateConfidence
         });
     }
 
@@ -193,6 +195,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         initiative.TargetStart = model.TargetStart;
         initiative.TargetEnd = model.PlanningMode == PlanningMode.FixedDuration ? model.TargetEnd : null;
         initiative.VarianceThresholdPct = model.VarianceThresholdPct;
+        initiative.ContingencyPct = model.ContingencyPct;
+        initiative.EstimateConfidence = model.EstimateConfidence;
         var recomputed = 0;
         if (scheduleChanged && initiative.PlanningMode == PlanningMode.FixedDuration)
         {
@@ -1575,7 +1579,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     }
 
     private static object Snapshot(Initiative i) =>
-        new { i.Name, i.Description, i.BusinessUnitId, ParticipatingBusinessUnitIds = i.ParticipatingBusinessUnitIds.ToList(), i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct };
+        new { i.Name, i.Description, i.BusinessUnitId, ParticipatingBusinessUnitIds = i.ParticipatingBusinessUnitIds.ToList(), i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct, i.ContingencyPct, i.EstimateConfidence };
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
         new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
