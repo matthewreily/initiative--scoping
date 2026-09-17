@@ -182,7 +182,7 @@ public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 /// <summary>One priced (resource type, seniority, location, class, vendor) combination from a published rate card; rates are global across business units.</summary>
 public sealed record RateOption(int ResourceTypeId, string ResourceType, int SeniorityId, string Location, ResourcingClass ResourcingClass, int? VendorId, decimal Rate);
 
-public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, IReadOnlyList<RateOption> Options);
+public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, DateOnly? EffectiveEnd, IReadOnlyList<RateOption> Options);
 
 /// <summary>Data for the allocation form: priced combinations per published card, and phase start dates to pick the effective card.</summary>
 public sealed record RateOptionsScriptModel(

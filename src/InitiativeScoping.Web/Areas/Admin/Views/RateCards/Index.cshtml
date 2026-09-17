@@ -6,16 +6,17 @@
     <h2 class="h4 mb-0">Rate Cards</h2>
     <a class="btn btn-primary btn-sm" asp-action="Create">New rate card</a>
 </div>
-<p class="text-muted small">Forecasts use the latest <em>published</em> card whose effective start is on or before the phase start date.</p>
+<p class="text-muted small">Each day of a phase is priced from the card in effect on that day: the latest <em>published</em> card whose window (effective start &ndash; end) covers it. Retired cards keep pricing their window, so a card change never rewrites earlier plans.</p>
 <div class="table-responsive">
 <table data-sortable class="table table-sm align-middle">
-    <thead><tr><th>Name</th><th>Effective start</th><th>Status</th><th>Entries</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Effective start</th><th>Effective end</th><th>Status</th><th>Entries</th><th></th></tr></thead>
     <tbody>
     @foreach (var card in Model)
     {
         <tr>
             <td><a asp-action="Details" asp-route-id="@card.Id">@card.Name</a></td>
             <td>@card.EffectiveStart.ToString("yyyy-MM-dd")</td>
+            <td>@(card.EffectiveEnd?.ToString("yyyy-MM-dd") ?? "—")</td>
             <td><partial name="_StatusBadge" model="card.Status" /></td>
             <td>@card.Entries.Count</td>
             <td class="text-end">
@@ -32,7 +33,7 @@
     }
     @if (Model.Count == 0)
     {
-        <tr data-nosort><td colspan="5" class="text-muted">No rate cards yet.</td></tr>
+        <tr data-nosort><td colspan="6" class="text-muted">No rate cards yet.</td></tr>
     }
     </tbody>
 </table>

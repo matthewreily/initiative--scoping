@@ -69,7 +69,7 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
             return NotFound();
         }
 
-        var cards = await db.PublishedRateCardsAsync(ct);
+        var cards = await db.PricingRateCardsAsync(ct);
         var forecast = ForecastCalculator.Calculate(initiative, cards);
         var actuals = await db.LoadActualsAsync(initiative, DefaultThreshold, ct);
         var typeNames = await db.ResourceTypeNamesAsync(ct);

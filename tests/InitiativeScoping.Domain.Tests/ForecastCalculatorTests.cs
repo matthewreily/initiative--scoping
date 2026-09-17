@@ -87,3 +87,49 @@ public class ForecastCalculatorTests
         Assert.False(result.IsComplete);
     }
 }
+
+public class ForecastEffectiveDateTests
+{
+    private static RateCard Card(int id, DateOnly start, DateOnly? end, decimal rate, RateCardStatus status = RateCardStatus.Published) => new()
+    {
+        Id = id, Name = $"c{id}", EffectiveStart = start, EffectiveEnd = end, Status = status,
+        Entries = [new() { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
+    };
+
+    private static Initiative Plan(DateOnly start, DateOnly end) => new()
+    {
+        Name = "Test", BusinessUnitId = 1, CreatedBy = "t", TargetStart = start,
+        Phases = [new Phase { Id = 10, Name = "Build", Sequence = 1, PlannedStart = start, PlannedEnd = end }],
+        Allocations =
+        [
+            new InitiativeAllocation
+            {
+                PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
+                ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 100
+            }
+        ]
+    };
+
+    [Fact]
+    public void Phase_spanning_a_rate_change_is_priced_day_by_day()
+    {
+        var cards = new[] { Card(1, new(2026, 1, 1), null, 100m), Card(2, new(2027, 1, 1), null, 200m) };
+        var line = Assert.Single(ForecastCalculator.Calculate(Plan(new(2026, 12, 22), new(2027, 1, 10)), cards).Lines);
+
+        Assert.True(line.IsBlendedRate);
+        Assert.Equal(150m, line.HourlyRate);
+        Assert.Equal(15_000m, line.Cost);
+        Assert.Equal(2, line.RateSegments!.Count);
+    }
+
+    [Fact]
+    public void Retiring_a_card_with_an_end_date_does_not_reprice_work_in_its_window()
+    {
+        var before = new[] { Card(1, new(2026, 1, 1), null, 100m) };
+        var after = new[] { Card(1, new(2026, 1, 1), new(2026, 12, 31), 100m, RateCardStatus.Retired), Card(2, new(2027, 1, 1), null, 200m) };
+        var plan = Plan(new(2026, 3, 1), new(2026, 3, 31));
+
+        Assert.Equal(ForecastCalculator.Calculate(plan, before).TotalCost, ForecastCalculator.Calculate(plan, after).TotalCost);
+        Assert.False(Assert.Single(ForecastCalculator.Calculate(plan, after).Lines).IsBlendedRate);
+    }
+}

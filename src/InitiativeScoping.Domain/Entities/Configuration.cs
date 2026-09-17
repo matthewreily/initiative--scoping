@@ -56,6 +56,8 @@ public class RateCard
     public int Id { get; set; }
     public required string Name { get; set; }
     public DateOnly EffectiveStart { get; set; }
+    /// <summary>Last day this card prices work; null = open-ended until a later card starts.</summary>
+    public DateOnly? EffectiveEnd { get; set; }
     public RateCardStatus Status { get; set; } = RateCardStatus.Draft;
     public List<RateCardEntry> Entries { get; set; } = [];
 }

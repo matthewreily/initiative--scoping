@@ -3,7 +3,9 @@ using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
+using InitiativeScoping.Domain.Services;
 using InitiativeScoping.Infrastructure.Persistence;
+using InitiativeScoping.Web.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -276,6 +278,54 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
             .Where(a => a.Entity == nameof(RateCard) && a.EntityId == id.ToString())
             .Select(a => a.Action).ToListAsync();
         Assert.Equal(["Create", "Publish", "Retire"], actions);
+    }
+
+    [Fact]
+    public async Task Retire_records_an_effective_end_and_the_card_keeps_pricing_its_window()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var name = $"Win-{Guid.NewGuid():N}"[..14];
+        var create = await PostFormAsync(client, "/Admin/RateCards/Create", "/Admin/RateCards/Create",
+            new() { ["Name"] = name, ["EffectiveStart"] = "2027-01-01" });
+        var detailsUrl = create.Headers.Location!.ToString();
+        var id = int.Parse(detailsUrl.Split('/').Last());
+
+        int typeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            typeId = await db.ResourceTypes.Select(t => t.Id).FirstAsync();
+        }
+
+        await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/AddEntry/{id}", new()
+        {
+            ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
+            ["Location"] = "Onshore", ["ResourcingClass"] = "InternalFte", ["HourlyRate"] = "150"
+        });
+        await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Publish/{id}", new());
+
+        // An end before the start is rejected on edit.
+        var edit = await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Edit/{id}",
+            new() { ["Name"] = name, ["EffectiveStart"] = "2027-01-01", ["EffectiveEnd"] = "2026-12-31" });
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
+        Assert.Contains("on or after the effective start", await edit.Content.ReadAsStringAsync());
+
+        await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Retire/{id}", new() { ["effectiveEnd"] = "2027-06-30" });
+
+        using var scope2 = factory.Services.CreateScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var card = await db2.RateCards.Include(c => c.Entries).SingleAsync(c => c.Id == id);
+        Assert.Equal(RateCardStatus.Retired, card.Status);
+        Assert.Equal(new DateOnly(2027, 6, 30), card.EffectiveEnd);
+
+        var pricing = await db2.PricingRateCardsAsync(CancellationToken.None);
+        Assert.Contains(pricing, c => c.Id == id);
+        var key = new RateKey(typeId, 3, "Onshore", ResourcingClass.InternalFte);
+        Assert.Equal(150m, RateResolver.Resolve([card], key, new DateOnly(2027, 3, 1)));
+        Assert.Null(RateResolver.Resolve([card], key, new DateOnly(2027, 7, 1)));
+
+        var details = await client.GetStringAsync(detailsUrl);
+        Assert.Contains("still prices work dated 2027-01-01 &ndash; 2027-06-30", details);
     }
 
     [Fact]

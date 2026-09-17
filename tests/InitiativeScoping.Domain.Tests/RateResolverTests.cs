@@ -117,3 +117,85 @@ public class VendorRateResolverTests
         Assert.Equal(4, RateResolver.PricedEntries(Cards, new DateOnly(2026, 6, 1)).Count);
     }
 }
+
+public class EffectiveWindowResolverTests
+{
+    private static RateCard Card(int id, string name, DateOnly start, DateOnly? end, decimal rate, RateCardStatus status = RateCardStatus.Published) => new()
+    {
+        Id = id, Name = name, EffectiveStart = start, EffectiveEnd = end, Status = status,
+        Entries = [new() { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
+    };
+
+    private static readonly RateKey Key = new(1, 3, "Onshore", ResourcingClass.InternalFte);
+
+    [Fact]
+    public void Retired_card_with_an_end_keeps_pricing_its_window()
+    {
+        RateCard[] cards =
+        [
+            Card(1, "H1", new(2026, 1, 1), new(2026, 6, 30), 100m, RateCardStatus.Retired),
+            Card(2, "H2", new(2026, 7, 1), null, 120m)
+        ];
+
+        Assert.Equal(100m, RateResolver.Resolve(cards, Key, new(2026, 3, 1)));
+        Assert.Equal(120m, RateResolver.Resolve(cards, Key, new(2026, 7, 1)));
+    }
+
+    [Fact]
+    public void Retired_card_without_an_end_never_prices()
+    {
+        RateCard[] cards = [Card(1, "old", new(2026, 1, 1), null, 100m, RateCardStatus.Retired)];
+        Assert.Null(RateResolver.Resolve(cards, Key, new(2026, 3, 1)));
+        Assert.False(RateResolver.IsPricing(cards[0]));
+    }
+
+    [Fact]
+    public void Published_card_stops_pricing_after_its_end()
+    {
+        RateCard[] cards =
+        [
+            Card(1, "base", new(2026, 1, 1), null, 100m),
+            Card(2, "promo", new(2026, 3, 1), new(2026, 3, 31), 50m)
+        ];
+
+        Assert.Equal(50m, RateResolver.Resolve(cards, Key, new(2026, 3, 15)));
+        Assert.Equal(100m, RateResolver.Resolve(cards, Key, new(2026, 4, 1)));
+        Assert.Equal(100m, RateResolver.Resolve(cards, Key, new(2026, 2, 1)));
+    }
+
+    [Fact]
+    public void Blended_rate_is_day_weighted_across_card_boundaries()
+    {
+        RateCard[] cards =
+        [
+            Card(1, "2026", new(2026, 1, 1), null, 100m),
+            Card(2, "2027", new(2027, 1, 1), null, 200m)
+        ];
+
+        // 10 days at 100 (Dec 22-31) + 10 days at 200 (Jan 1-10) = 150.
+        var segments = RateResolver.Segments(cards, Key, new(2026, 12, 22), new(2027, 1, 10));
+        Assert.Equal(2, segments.Count);
+        Assert.Equal((new DateOnly(2026, 12, 22), new DateOnly(2026, 12, 31), 10, 100m), (segments[0].Start, segments[0].End, segments[0].Days, segments[0].HourlyRate));
+        Assert.Equal((new DateOnly(2027, 1, 1), new DateOnly(2027, 1, 10), 10, 200m), (segments[1].Start, segments[1].End, segments[1].Days, segments[1].HourlyRate));
+        Assert.Equal(150m, RateResolver.ResolveBlended(cards, Key, new(2026, 12, 22), new(2027, 1, 10)));
+
+        Assert.Equal(100m, RateResolver.ResolveBlended(cards, Key, new(2026, 3, 1), new(2026, 3, 31)));
+        Assert.Single(RateResolver.Segments(cards, Key, new(2026, 3, 1), new(2026, 3, 31)));
+    }
+
+    [Fact]
+    public void Blended_rate_is_null_when_any_day_is_unpriced()
+    {
+        RateCard[] cards = [Card(1, "2027", new(2027, 1, 1), null, 200m)];
+        Assert.Null(RateResolver.ResolveBlended(cards, Key, new(2026, 12, 25), new(2027, 1, 5)));
+        Assert.Equal(200m, RateResolver.ResolveBlended(cards, Key, new(2027, 1, 1), new(2027, 1, 5)));
+    }
+
+    [Fact]
+    public void End_before_start_prices_a_single_day()
+    {
+        RateCard[] cards = [Card(1, "2026", new(2026, 1, 1), null, 100m)];
+        var seg = Assert.Single(RateResolver.Segments(cards, Key, new(2026, 5, 5), new(2026, 5, 1)));
+        Assert.Equal(1, seg.Days);
+    }
+}

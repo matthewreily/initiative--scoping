@@ -479,7 +479,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
-    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) => db.PublishedRateCardsAsync(ct);
+    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) => db.PricingRateCardsAsync(ct);
 
     private static object BaselineDiff(ForecastBaseline b, int? requestId = null) =>
         new { b.Version, b.TotalHours, b.TotalCost, LineCount = b.Lines.Count, b.Reason, RequestId = requestId };
