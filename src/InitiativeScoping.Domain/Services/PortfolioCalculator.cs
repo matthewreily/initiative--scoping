@@ -7,7 +7,8 @@ namespace InitiativeScoping.Domain.Services;
 public sealed record PortfolioRow(
     Initiative Initiative,
     ForecastResult Forecast,
-    VarianceResult Variance)
+    VarianceResult Variance,
+    MonthlyPhasing Phasing)
 {
     public decimal ForecastHours => Forecast.TotalHours;
     public decimal ForecastCost => Forecast.TotalCost;
@@ -66,6 +67,9 @@ public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
     public int OverThreshold => Rows.Count(r => r.ExceedsThreshold);
     public int Unpriced => Rows.Count(r => r.HasUnpricedForecast || r.HasUnpricedActuals);
 
+    /// <summary>Forecast, baseline and actual cost of the whole portfolio month by month.</summary>
+    public MonthlyPhasing ByMonth => MonthlyPhasing.Combine(Rows.Select(r => r.Phasing));
+
     public IReadOnlyList<PortfolioGroup> ByBusinessUnit =>
         Group(r => r.Initiative.BusinessUnit?.Name ?? "?").OrderByDescending(g => g.ForecastCost).ToList();
 
@@ -116,10 +120,17 @@ public static class PortfolioCalculator
         var entriesByInitiative = entries.Where(e => e.InitiativeId is not null).ToLookup(e => e.InitiativeId!.Value);
         var adjustmentsByInitiative = adjustments.ToLookup(a => a.InitiativeId);
 
-        var rows = initiatives.Select(i => new PortfolioRow(
-                i,
-                ForecastCalculator.Calculate(i, rateCards),
-                VarianceCalculator.Calculate(i, entriesByInitiative[i.Id].ToList(), adjustmentsByInitiative[i.Id].ToList(), resourceTypeNames, defaultThresholdPct)))
+        var rows = initiatives.Select(i =>
+            {
+                var entriesFor = entriesByInitiative[i.Id].ToList();
+                var adjustmentsFor = adjustmentsByInitiative[i.Id].ToList();
+                var forecast = ForecastCalculator.Calculate(i, rateCards);
+                return new PortfolioRow(
+                    i,
+                    forecast,
+                    VarianceCalculator.Calculate(i, entriesFor, adjustmentsFor, resourceTypeNames, defaultThresholdPct),
+                    MonthlyPhasingCalculator.Calculate(i, forecast, i.CurrentBaseline, entriesFor, adjustmentsFor));
+            })
             .ToList();
 
         return new PortfolioResult(rows);

@@ -248,6 +248,7 @@ public class InitiativeDetailsModel
     public IReadOnlyList<string> ActivationBlockers { get; init; } = [];
     public IReadOnlyList<InitiativeStatus> StatusTransitions { get; init; } = [];
     public required VarianceResult Variance { get; init; }
+    public required MonthlyPhasing Phasing { get; init; }
     public int UnmappedForMappedProjects { get; init; }
 }
 

@@ -1,0 +1,103 @@
+@using System.Globalization
+@using InitiativeScoping.Domain.Services
+@model MonthlyPhasing
+@{
+    var id = ViewData["Id"] as string ?? "phasing";
+    var hasBaseline = Model.BaselineCost != 0m;
+    var hasActuals = Model.ActualCost != 0m;
+    var peak = Model.PeakMonthCost;
+    var years = Model.ByYear;
+    string Pct(decimal v) => peak <= 0 ? "0" : Math.Round(Math.Max(0m, v) / peak * 100m, 2).ToString("0.##", CultureInfo.InvariantCulture);
+}
+@if (Model.IsEmpty)
+{
+    <p class="text-muted" id="@id-empty">Nothing to phase yet – add phases with allocations or non-labor costs to see cost by month.</p>
+}
+else
+{
+    <div class="phasing-chart mb-3" id="@id-chart" role="img" aria-label="Monthly cost chart: forecast@(hasBaseline ? ", baseline" : "")@(hasActuals ? " and actual" : "") cost per month; values in the table below.">
+        @foreach (var m in Model.Months)
+        {
+            <div class="phasing-col" title="@m.Month.ToString("MMM yyyy"): forecast @m.ForecastCost.ToString("C0")@(hasBaseline ? $", baseline {m.BaselineCost:C0}" : "")@(hasActuals ? $", actual {m.ActualCost:C0}" : "")">
+                <div class="phasing-bars">
+                    <div class="phasing-bar phasing-forecast" style="height:@Pct(m.ForecastCost)%"></div>
+                    @if (hasBaseline) { <div class="phasing-bar phasing-baseline" style="height:@Pct(m.BaselineCost)%"></div> }
+                    @if (hasActuals) { <div class="phasing-bar phasing-actual" style="height:@Pct(m.ActualCost)%"></div> }
+                </div>
+                <div class="phasing-label">@m.Month.ToString("MMM")@(m.Month.Month == 1 || m == Model.Months[0] ? $" '{m.Month:yy}" : "")</div>
+            </div>
+        }
+    </div>
+    <div class="small text-muted mb-2 d-flex flex-wrap gap-3" aria-hidden="true">
+        <span><span class="phasing-swatch phasing-forecast"></span> Forecast</span>
+        @if (hasBaseline) { <span><span class="phasing-swatch phasing-baseline"></span> Baseline</span> }
+        @if (hasActuals) { <span><span class="phasing-swatch phasing-actual"></span> Actual</span> }
+    </div>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" id="@id-table">
+        <thead>
+            <tr>
+                <th scope="col">Month</th>
+                <th scope="col" class="text-end">Hours</th>
+                <th scope="col" class="text-end">Labor</th>
+                <th scope="col" class="text-end">Non-labor</th>
+                <th scope="col" class="text-end">Forecast</th>
+                @if (hasBaseline) { <th scope="col" class="text-end">Baseline</th><th scope="col" class="text-end">Δ vs. baseline</th> }
+                @if (hasActuals) { <th scope="col" class="text-end">Actual</th> }
+                <th scope="col" class="text-end">Cumulative forecast</th>
+                @if (hasActuals) { <th scope="col" class="text-end">Cumulative actual</th> }
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var m in Model.Months)
+        {
+            <tr>
+                <th scope="row" class="fw-normal text-nowrap">@m.Month.ToString("MMM yyyy")</th>
+                <td class="text-end">@m.ForecastHours.ToString("N1")</td>
+                <td class="text-end">@m.ForecastLaborCost.ToString("C0")</td>
+                <td class="text-end">@m.ForecastNonLaborCost.ToString("C0")</td>
+                <td class="text-end fw-semibold">@m.ForecastCost.ToString("C0")</td>
+                @if (hasBaseline)
+                {
+                    <td class="text-end">@m.BaselineCost.ToString("C0")</td>
+                    <td class="text-end @(m.VarianceToBaseline > 0 ? "text-danger" : m.VarianceToBaseline < 0 ? "text-success" : "text-muted")">@(m.VarianceToBaseline > 0 ? "+" : "")@m.VarianceToBaseline.ToString("C0")</td>
+                }
+                @if (hasActuals) { <td class="text-end">@m.ActualCost.ToString("C0")</td> }
+                <td class="text-end text-muted">@m.CumulativeForecastCost.ToString("C0")</td>
+                @if (hasActuals) { <td class="text-end text-muted">@m.CumulativeActualCost.ToString("C0")</td> }
+            </tr>
+        }
+        </tbody>
+        <tfoot class="fw-semibold">
+        @if (years.Count > 1)
+        {
+            foreach (var y in years)
+            {
+                <tr class="table-light">
+                    <th scope="row" class="fw-semibold">@y.Year</th>
+                    <td class="text-end">@Model.Months.Where(m => m.Month.Year == y.Year).Sum(m => m.ForecastHours).ToString("N1")</td>
+                    <td class="text-end">@Model.Months.Where(m => m.Month.Year == y.Year).Sum(m => m.ForecastLaborCost).ToString("C0")</td>
+                    <td class="text-end">@Model.Months.Where(m => m.Month.Year == y.Year).Sum(m => m.ForecastNonLaborCost).ToString("C0")</td>
+                    <td class="text-end">@y.ForecastCost.ToString("C0")</td>
+                    @if (hasBaseline) { <td class="text-end">@y.BaselineCost.ToString("C0")</td><td class="text-end">@((y.ForecastCost - y.BaselineCost) > 0 ? "+" : "")@((y.ForecastCost - y.BaselineCost).ToString("C0"))</td> }
+                    @if (hasActuals) { <td class="text-end">@y.ActualCost.ToString("C0")</td> }
+                    <td></td>
+                    @if (hasActuals) { <td></td> }
+                </tr>
+            }
+        }
+            <tr>
+                <th scope="row">Total</th>
+                <td class="text-end">@Model.Months.Sum(m => m.ForecastHours).ToString("N1")</td>
+                <td class="text-end">@Model.Months.Sum(m => m.ForecastLaborCost).ToString("C0")</td>
+                <td class="text-end">@Model.Months.Sum(m => m.ForecastNonLaborCost).ToString("C0")</td>
+                <td class="text-end">@Model.ForecastCost.ToString("C0")</td>
+                @if (hasBaseline) { <td class="text-end">@Model.BaselineCost.ToString("C0")</td><td class="text-end">@((Model.ForecastCost - Model.BaselineCost) > 0 ? "+" : "")@((Model.ForecastCost - Model.BaselineCost).ToString("C0"))</td> }
+                @if (hasActuals) { <td class="text-end">@Model.ActualCost.ToString("C0")</td> }
+                <td></td>
+                @if (hasActuals) { <td></td> }
+            </tr>
+        </tfoot>
+    </table>
+    </div>
+}

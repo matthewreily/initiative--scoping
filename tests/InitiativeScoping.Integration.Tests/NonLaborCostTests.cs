@@ -317,7 +317,8 @@ public class NonLaborCostTests(WebAppFactory factory) : IClassFixture<WebAppFact
 
         var portfolioCsv = await (await client.GetAsync("/Portfolio/Export?format=csv")).Content.ReadAsStringAsync();
         Assert.Contains("Non-labor forecast cost", portfolioCsv);
-        var row = Assert.Single(portfolioCsv.Split('\n'), l => l.StartsWith($"{id},Baseline NL {tag},"));
+        var initiativesSection = portfolioCsv[..portfolioCsv.IndexOf("\n# ", StringComparison.Ordinal)];
+        var row = Assert.Single(initiativesSection.Split('\n'), l => l.StartsWith($"{id},Baseline NL {tag},"));
         Assert.Contains(",200", row);
         Assert.Contains("Non-labor", await client.GetStringAsync("/Portfolio"));
     }
@@ -340,6 +341,14 @@ public class NonLaborCostTests(WebAppFactory factory) : IClassFixture<WebAppFact
         var html = await client.GetStringAsync($"/Initiatives/Details/{id}");
         Assert.Contains($"Active {tag}", html);
         Assert.DoesNotContain($"Retired {tag}", html);
+        Assert.Contains("Cost by month", html);
+        Assert.Contains("id=\"initiative-phasing-empty\"", html);
+
+        await AddPhaseAndAllocationAsync(client, id);
+        var phased = await client.GetStringAsync($"/Initiatives/Details/{id}");
+        Assert.Contains("id=\"initiative-phasing-chart\"", phased);
+        Assert.Contains("Mar 2026", phased);
+        Assert.Contains("Apr 2026", phased);
     }
 
     private async Task<(int PhaseId, int TypeId)> AddPhaseAndAllocationAsync(HttpClient client, int id)

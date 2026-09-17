@@ -317,6 +317,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             StatusTransitions = InitiativeLifecycle.AllowedTransitions(initiative.Status)
                 .Where(s => !(initiative.Status == InitiativeStatus.Draft && s == InitiativeStatus.Active)).ToList(),
             Variance = actuals.Variance,
+            Phasing = MonthlyPhasingCalculator.Calculate(initiative, forecast, initiative.CurrentBaseline, actuals.Entries, actuals.Adjustments),
             UnmappedForMappedProjects = unmappedForProjects
         };
         return View(model);

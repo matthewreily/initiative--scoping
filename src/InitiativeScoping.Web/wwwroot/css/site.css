@@ -179,3 +179,14 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, .form-cont
 .nav-search .form-control { width: 12rem; }
 @media (max-width: 575.98px) { .nav-search { margin: .5rem 0; } .nav-search .form-control { width: 100%; } }
 kbd { font-size: .8em; padding: .1rem .35rem; }
+
+/* Monthly cost phasing chart (pure CSS bars; values live in the table below it) */
+.phasing-chart { display: flex; align-items: stretch; gap: .35rem; height: 9rem; padding: .5rem .5rem 0; overflow-x: auto; background: var(--is-surface); border: 1px solid var(--is-border); border-radius: var(--is-radius); }
+.phasing-col { display: flex; flex-direction: column; flex: 1 0 2rem; min-width: 2rem; }
+.phasing-bars { flex: 1 1 auto; display: flex; align-items: flex-end; justify-content: center; gap: 2px; border-bottom: 1px solid var(--is-border); }
+.phasing-bar { flex: 1 1 0; min-height: 1px; border-radius: 2px 2px 0 0; }
+.phasing-forecast { background: #0d6efd; }
+.phasing-baseline { background: #adb5bd; }
+.phasing-actual { background: #198754; }
+.phasing-label { font-size: .7rem; text-align: center; color: var(--is-text-muted); padding-top: .2rem; white-space: nowrap; }
+.phasing-swatch { display: inline-block; width: .75rem; height: .75rem; border-radius: 2px; vertical-align: -1px; margin-right: .2rem; }
