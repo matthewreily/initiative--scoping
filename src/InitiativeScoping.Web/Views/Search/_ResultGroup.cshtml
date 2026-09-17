@@ -1,0 +1,16 @@
+@model (string Heading, IReadOnlyList<SearchHit> Hits, string Area, string Controller, string Action)
+@if (Model.Hits.Count > 0)
+{
+    <section class="mb-4" aria-labelledby="search-@Model.Controller">
+        <h2 class="h6 text-uppercase text-muted" id="search-@Model.Controller">@Model.Heading <span class="badge bg-secondary rounded-pill">@Model.Hits.Count</span></h2>
+        <div class="list-group">
+            @foreach (var hit in Model.Hits)
+            {
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" asp-area="@Model.Area" asp-controller="@Model.Controller" asp-action="@Model.Action" asp-route-id="@hit.Id">
+                    <span>@hit.Title</span>
+                    <span class="small text-muted">@hit.Subtitle</span>
+                </a>
+            }
+        </div>
+    </section>
+}

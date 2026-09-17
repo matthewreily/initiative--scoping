@@ -10,7 +10,7 @@
     }
 </div>
 
-<form method="get" class="row g-2 mb-3">
+<form method="get" data-remember-filters class="row g-2 mb-3">
     <div class="col-md-4">
         <input name="search" aria-label="Search by name" value="@Model.Search" class="form-control form-control-sm" placeholder="Search by name" />
     </div>
@@ -26,7 +26,7 @@
     </div>
     <div class="col-md-2">
         <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
-        <a asp-action="Index" class="btn btn-link btn-sm">Clear</a>
+        <a asp-action="Index" class="btn btn-link btn-sm" data-filter-clear>Clear</a>
     </div>
 </form>
 
