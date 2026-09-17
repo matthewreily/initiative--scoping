@@ -86,6 +86,16 @@ public class SearchTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     }
 
     [Fact]
+    public async Task Pending_user_does_not_see_search_box()
+    {
+        await using var f = new NoRoleFactory();
+        var client = f.CreateClient(NoRedirect);
+        var page = await client.GetStringAsync("/Access");
+        Assert.DoesNotContain("id=\"global-search\"", page);
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/Search?q=zz")).StatusCode);
+    }
+
+    [Fact]
     public async Task Layout_has_global_search_box_and_skip_link()
     {
         var client = factory.CreateClient();

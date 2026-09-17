@@ -56,10 +56,13 @@
                     </ul>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <form asp-area="" asp-controller="Search" asp-action="Index" method="get" role="search" class="d-flex align-items-center me-3 nav-search">
-                            <label for="global-search" class="visually-hidden">Search</label>
-                            <input id="global-search" type="search" name="q" class="form-control form-control-sm" placeholder="Search…  /" aria-keyshortcuts="/" minlength="2" autocomplete="off" value="@(controller == "Search" ? Context.Request.Query["q"].ToString() : "")" />
-                        </form>
+                        @if (InitiativeScoping.Application.AppRoles.All.Any(User.IsInRole))
+                        {
+                            <form asp-area="" asp-controller="Search" asp-action="Index" method="get" role="search" class="d-flex align-items-center me-3 nav-search">
+                                <label for="global-search" class="visually-hidden">Search</label>
+                                <input id="global-search" type="search" name="q" class="form-control form-control-sm" placeholder="Search…  /" aria-keyshortcuts="/" minlength="2" autocomplete="off" value="@(controller == "Search" ? Context.Request.Query["q"].ToString() : "")" />
+                            </form>
+                        }
                         <form asp-area="" asp-controller="Access" asp-action="EndSession" method="post" class="d-flex align-items-center gap-2">
                             <span class="navbar-text small text-muted">@User.Identity.Name</span>
                             <button type="submit" class="btn btn-link btn-sm p-0 text-dark">Sign out</button>

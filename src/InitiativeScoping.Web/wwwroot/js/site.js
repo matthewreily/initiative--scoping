@@ -45,17 +45,18 @@
     }
 
     const sortKey = table => 'is.sort:' + location.pathname + '#' + (table.id || Array.from(document.querySelectorAll('table[data-sortable]')).indexOf(table));
-    function remember(table, index, direction) {
-        try { localStorage.setItem(sortKey(table), index + ':' + direction); } catch { /* storage unavailable */ }
+    const headerId = th => th.dataset.sortId || th.textContent.trim();
+    function remember(table, th, direction) {
+        try { localStorage.setItem(sortKey(table), JSON.stringify({ column: headerId(th), direction })); } catch { /* storage unavailable */ }
     }
     function restore(table) {
         try {
-            const saved = localStorage.getItem(sortKey(table));
+            const saved = JSON.parse(localStorage.getItem(sortKey(table)) || 'null');
             if (!saved) return;
-            const [index, direction] = saved.split(':').map(Number);
-            const th = table.tHead && table.tHead.rows[0].cells[index];
-            if (th && th.classList.contains('sortable')) sort(table, index, direction);
-        } catch { /* storage unavailable */ }
+            const cells = Array.from(table.tHead.rows[0].cells);
+            const index = cells.findIndex(th => th.classList.contains('sortable') && headerId(th) === saved.column);
+            if (index >= 0) sort(table, index, saved.direction === -1 ? -1 : 1);
+        } catch { /* storage unavailable or stale value */ }
     }
 
     document.querySelectorAll('table[data-sortable]').forEach(table => {
@@ -71,7 +72,7 @@
             const toggle = () => {
                 const direction = th.classList.contains('sorted-asc') ? -1 : 1;
                 sort(table, index, direction);
-                remember(table, index, direction);
+                remember(table, th, direction);
             };
             th.addEventListener('click', e => { if (!e.target.closest('input,button,a,select')) toggle(); });
             th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
@@ -99,7 +100,10 @@
         try { localStorage.removeItem(key); } catch { /* storage unavailable */ }
     }));
 
-    if (saved && !location.search && !document.referrer.startsWith(location.origin + location.pathname)) {
+    let referrer = null;
+    try { referrer = document.referrer ? new URL(document.referrer) : null; } catch { /* invalid referrer */ }
+    const fromSamePage = referrer !== null && referrer.origin === location.origin && referrer.pathname === location.pathname;
+    if (saved && !location.search && !fromSamePage) {
         location.replace(location.pathname + '?' + saved);
     }
 })();
