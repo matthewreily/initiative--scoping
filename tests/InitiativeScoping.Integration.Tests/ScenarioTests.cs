@@ -68,6 +68,20 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
             Assert.False(await db.ForecastBaselines.AnyAsync(b => b.InitiativeId == scenarioId));
         }
 
+        // Scenarios stay Draft and carry no operational data: status changes, source mappings and adjustments are refused.
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, $"/Initiatives/Details/{scenarioId}", $"/Initiatives/{scenarioId}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Cancelled) })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, $"/Initiatives/Details/{scenarioId}", $"/Initiatives/AddSourceMapping/{scenarioId}", new() { ["source"] = "Planview", ["externalProjectId"] = $"PV-{tag}" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, $"/Initiatives/Details/{scenarioId}", $"/Initiatives/{scenarioId}/Adjustments", new() { ["InitiativeId"] = scenarioId.ToString(), ["Hours"] = "5", ["Cost"] = "0", ["Reason"] = "x" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/{id}/Scenarios", new() { ["Name"] = new string('A', 301) })).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(InitiativeStatus.Draft, (await db.Initiatives.SingleAsync(i => i.Id == scenarioId)).Status);
+            Assert.False(await db.InitiativeSourceMappings.AnyAsync(m => m.InitiativeId == scenarioId));
+            Assert.False(await db.ActualAdjustments.AnyAsync(a => a.InitiativeId == scenarioId));
+            Assert.Equal(1, await db.Initiatives.CountAsync(i => i.ScenarioOfId == id));
+        }
+
         // Edit the scenario only: 2 -> 1 person. Live plan stays 2 x 100h = 24,000.
         int typeId;
         using (var scope = factory.Services.CreateScope())

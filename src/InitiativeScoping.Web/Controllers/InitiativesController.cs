@@ -1121,6 +1121,11 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return Forbid();
         }
 
+        if (initiative.IsScenario)
+        {
+            return RedirectWithError("Source mappings belong to the live initiative, not to what-if scenarios.", id);
+        }
+
         if (!ActualsSources.All.Contains(source) || string.IsNullOrWhiteSpace(externalProjectId))
         {
             return RedirectWithError("Choose a source and enter the external project id.", id);

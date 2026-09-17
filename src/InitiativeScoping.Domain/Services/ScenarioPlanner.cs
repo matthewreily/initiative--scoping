@@ -40,13 +40,17 @@ public static class ScenarioPlanner
 
     /// <summary>
     /// Replaces <paramref name="target"/>'s plan with a copy of <paramref name="scenario"/>'s. The caller removes the target's previous
-    /// phases/allocations/non-labor lines from the store; baselines, actuals, members and source mappings are untouched.
+    /// phases/allocations/non-labor lines and participating BUs from the store; baselines, actuals, members and source mappings are untouched.
     /// </summary>
     public static PlanCopy Promote(Initiative scenario, Initiative target)
     {
         var plan = CopyPlan(scenario);
         CopyPlanningFields(scenario, target);
         target.Description = scenario.Description;
+        target.BusinessUnitId = scenario.BusinessUnitId;
+        target.SponsoringTeam = scenario.SponsoringTeam;
+        target.ParticipatingBusinessUnits = scenario.ParticipatingBusinessUnits
+            .Select(p => new InitiativeBusinessUnit { BusinessUnitId = p.BusinessUnitId }).ToList();
         target.Phases = plan.Phases;
         target.Allocations = plan.Allocations;
         target.NonLaborCosts = plan.NonLaborCosts;

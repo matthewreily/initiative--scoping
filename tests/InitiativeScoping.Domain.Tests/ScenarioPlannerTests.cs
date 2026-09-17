@@ -123,6 +123,8 @@ public class ScenarioPlannerTests
         scenario.ContingencyPct = 20m;
         scenario.EstimateConfidence = EstimateConfidence.High;
         scenario.Description = "leaner";
+        scenario.BusinessUnitId = 9;
+        scenario.ParticipatingBusinessUnits.Add(new InitiativeBusinessUnit { BusinessUnitId = 9 });
         scenario.Members.Add(new InitiativeMember { UserId = "bob", Role = InitiativeMemberRole.Contributor });
 
         var plan = ScenarioPlanner.Promote(scenario, live);
@@ -141,6 +143,8 @@ public class ScenarioPlannerTests
         Assert.Equal(3, live.Allocations[0].Quantity);
         Assert.Same(live.Phases[0], live.Allocations[0].Phase);
         Assert.Empty(live.NonLaborCosts);
+        Assert.Equal(9, live.BusinessUnitId);
+        Assert.Contains(live.ParticipatingBusinessUnits, p => p.BusinessUnitId == 9);
 
         Assert.Single(live.Members);
         Assert.Single(live.Baselines);

@@ -70,6 +70,11 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
             return RedirectWithError("Give the scenario a name.", id);
         }
 
+        if (!ModelState.IsValid)
+        {
+            return RedirectWithError(ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault() ?? "Invalid scenario.", id);
+        }
+
         var scenario = ScenarioPlanner.Clone(source, name, currentUser.UserId, clock.GetUtcNow());
         db.Initiatives.Add(scenario);
         await db.SaveChangesAsync(ct);
@@ -100,6 +105,16 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
             return RedirectWithError("Scope is locked; a scenario can only be promoted in Draft or during an approved re-baseline.", id);
         }
 
+        if (scenario.Status != InitiativeStatus.Draft)
+        {
+            return RedirectWithError($"Scenario '{scenario.Name}' is {scenario.Status} and cannot be promoted.", id);
+        }
+
+        if (await HasOperationalDataAsync(scenario.Id, ct))
+        {
+            return RedirectWithError($"Scenario '{scenario.Name}' has actuals, source mappings or baselines attached; remove them before promoting.", id);
+        }
+
         var cards = await db.PublishedRateCardsAsync(ct);
         var before = ForecastCalculator.Calculate(parent, cards);
         var after = ForecastCalculator.Calculate(scenario, cards);
@@ -107,7 +122,9 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
         db.InitiativeAllocations.RemoveRange(parent.Allocations);
         db.InitiativeNonLaborCosts.RemoveRange(parent.NonLaborCosts);
         db.Phases.RemoveRange(parent.Phases);
+        db.InitiativeBusinessUnits.RemoveRange(parent.ParticipatingBusinessUnits);
         var plan = ScenarioPlanner.Promote(scenario, parent);
+        db.InitiativeBusinessUnits.AddRange(parent.ParticipatingBusinessUnits);
         db.Phases.AddRange(plan.Phases);
         db.InitiativeAllocations.AddRange(plan.Allocations);
         db.InitiativeNonLaborCosts.AddRange(plan.NonLaborCosts);
@@ -123,6 +140,12 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
         TempData["Success"] = $"Scenario '{scenario.Name}' promoted: plan is now {after.TotalHours:N1} h / {after.TotalCost:C0} (was {before.TotalHours:N1} h / {before.TotalCost:C0}).";
         return RedirectToAction("Details", "Initiatives", new { id });
     }
+
+    private async Task<bool> HasOperationalDataAsync(int initiativeId, CancellationToken ct) =>
+        await db.ActualEntries.AnyAsync(e => e.InitiativeId == initiativeId, ct)
+        || await db.ActualAdjustments.AnyAsync(a => a.InitiativeId == initiativeId, ct)
+        || await db.InitiativeSourceMappings.AnyAsync(m => m.InitiativeId == initiativeId, ct)
+        || await db.ForecastBaselines.AnyAsync(b => b.InitiativeId == initiativeId, ct);
 
     private void RemoveGraph(Initiative initiative)
     {
