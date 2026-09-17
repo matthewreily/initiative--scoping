@@ -123,6 +123,19 @@ else
                     </div>
                 }
                 <p class="fw-semibold text-end mb-0">Baseline total @sel.TotalCost.ToString("C0")</p>
+                var notesModel = new NotesPanelModel
+                {
+                    InitiativeId = i.Id,
+                    BaselineId = sel.Id,
+                    Notes = Model.Notes,
+                    CanAdd = Model.CanAddNote,
+                    ReturnUrl = Url.Action("Baselines", "Lifecycle", new { id = i.Id, version = sel.Version }) + $"#notes-baseline-{sel.Id}",
+                    Heading = $"Notes on baseline v{sel.Version}",
+                    EmptyText = "No notes on this baseline yet."
+                };
+                <div class="mt-4">
+                    <partial name="~/Views/Shared/_Notes.cshtml" model="notesModel" />
+                </div>
             }
         </div>
     </div>

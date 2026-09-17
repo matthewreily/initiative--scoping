@@ -1,0 +1,50 @@
+@using InitiativeScoping.Application.Initiatives
+@model NotesPanelModel
+@inject InitiativeScoping.Application.Abstractions.ICurrentUser CurrentUser
+@{
+    var panelId = Model.BaselineId is null ? "notes" : $"notes-baseline-{Model.BaselineId}";
+}
+<section id="@panelId" aria-labelledby="@panelId-heading">
+    <h2 class="h5" id="@panelId-heading">@Model.Heading <span class="badge rounded-pill text-bg-light ms-1">@Model.Notes.Count</span></h2>
+    @if (Model.CanAdd)
+    {
+        <form asp-controller="Notes" asp-action="Add" asp-route-id="@Model.InitiativeId" method="post" class="mb-3">
+            <input type="hidden" name="baselineId" value="@Model.BaselineId" />
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <label for="@panelId-body" class="form-label small text-muted">Add a note</label>
+            <textarea id="@panelId-body" name="body" class="form-control form-control-sm" rows="3" maxlength="@InitiativeScoping.Web.Controllers.NotesController.MaxBodyLength" required
+                      placeholder="@(Model.BaselineId is null ? "Context, decisions, assumptions…" : "Why this baseline changed, sign-offs, caveats…")"></textarea>
+            <div class="mt-2 text-end"><button type="submit" class="btn btn-primary btn-sm">Add note</button></div>
+        </form>
+    }
+    @if (Model.Notes.Count == 0)
+    {
+        <p class="text-muted small mb-0">@Model.EmptyText</p>
+    }
+    else
+    {
+        <ul class="list-unstyled mb-0 notes-list">
+        @foreach (var n in Model.Notes)
+        {
+            <li class="border rounded p-2 mb-2 note-item" id="note-@n.Id">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="small text-muted">
+                        <span class="fw-semibold text-body">@Users.Display(n.CreatedBy)</span>
+                        &middot; <time datetime="@n.CreatedAt.ToString("o")" title="@n.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC">@n.CreatedAt.ToString("yyyy-MM-dd HH:mm")</time>
+                        @if (n.ForecastBaseline is { } nb && Model.BaselineId is null) { <span class="badge text-bg-light border ms-1">baseline v@(nb.Version)</span> }
+                    </div>
+                    @if (InitiativeAccess.CanDeleteNote(CurrentUser, n))
+                    {
+                        <form asp-controller="Notes" asp-action="Delete" asp-route-id="@Model.InitiativeId" asp-route-noteId="@n.Id" method="post" class="d-inline"
+                              onsubmit="return confirm('Delete this note?');">
+                            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                            <button type="submit" class="btn btn-link btn-sm text-danger p-0" aria-label="Delete note">Delete</button>
+                        </form>
+                    }
+                </div>
+                <div class="note-body mt-1" style="white-space: pre-wrap;">@n.Body</div>
+            </li>
+        }
+        </ul>
+    }
+</section>

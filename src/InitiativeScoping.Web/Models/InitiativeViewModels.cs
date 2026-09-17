@@ -250,6 +250,7 @@ public class InitiativeDetailsModel
     public bool ScopeWritable => CanEdit && ScopeEditable;
     public bool CanApproveRebaseline { get; init; }
     public bool CanApproveActivation { get; init; }
+    public bool CanAddNote { get; init; }
     public IReadOnlyList<string> ActivationBlockers { get; init; } = [];
     public IReadOnlyList<InitiativeStatus> StatusTransitions { get; init; } = [];
     public required VarianceResult Variance { get; init; }
@@ -289,8 +290,21 @@ public class BaselinesModel
     public required ForecastResult LiveForecast { get; init; }
     public required IReadOnlyList<BaselineLineRow> Lines { get; init; }
     public required IReadOnlyList<RebaselineRequest> Requests { get; init; }
+    public IReadOnlyList<InitiativeNote> Notes { get; init; } = [];
     public bool CanManage { get; init; }
     public bool CanApprove { get; init; }
+    public bool CanAddNote { get; init; }
+}
+
+public class NotesPanelModel
+{
+    public int InitiativeId { get; init; }
+    public int? BaselineId { get; init; }
+    public required IReadOnlyList<InitiativeNote> Notes { get; init; }
+    public bool CanAdd { get; init; }
+    public string? ReturnUrl { get; init; }
+    public string Heading { get; init; } = "Notes";
+    public string EmptyText { get; init; } = "No notes yet.";
 }
 
 public class ApprovalsModel

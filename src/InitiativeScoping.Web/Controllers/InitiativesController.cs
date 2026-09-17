@@ -335,6 +335,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ScopeEditable = InitiativeAccess.IsScopeEditable(initiative),
             CanApproveRebaseline = InitiativeAccess.CanApproveRebaseline(currentUser),
             CanApproveActivation = InitiativeAccess.CanApproveActivation(currentUser),
+            CanAddNote = InitiativeAccess.CanAddNote(currentUser),
             ActivationBlockers = initiative.Status == InitiativeStatus.Draft ? InitiativeLifecycle.BaselineBlockers(initiative, forecast) : [],
             StatusTransitions = InitiativeLifecycle.AllowedTransitions(initiative.Status)
                 .Where(s => !(initiative.Status == InitiativeStatus.Draft && s == InitiativeStatus.Active)).ToList(),
@@ -1199,7 +1200,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .AsSplitQuery();
         if (includeHistory)
         {
-            query = query.Include(i => i.Phases).ThenInclude(p => p.DateHistory);
+            query = query.Include(i => i.Phases).ThenInclude(p => p.DateHistory)
+                .Include(i => i.Notes).ThenInclude(n => n.ForecastBaseline);
         }
 
         return query.FirstOrDefaultAsync(i => i.Id == id, ct);

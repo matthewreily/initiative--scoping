@@ -255,6 +255,9 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
 
         var previous = selected is null ? null : baselines.FirstOrDefault(b => b.Version < selected.Version);
         var forecast = ForecastCalculator.Calculate(initiative, await LoadRateCardsAsync(ct));
+        var notes = selected is null ? new List<InitiativeNote>() : (await db.InitiativeNotes.AsNoTracking()
+            .Where(n => n.ForecastBaselineId == selected.Id).ToListAsync(ct))
+            .OrderByDescending(n => n.CreatedAt).ThenByDescending(n => n.Id).ToList();
 
         return View(new BaselinesModel
         {
@@ -265,8 +268,10 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             LiveForecast = forecast,
             Lines = selected is null ? [] : BaselineLines(selected, previous),
             Requests = initiative.RebaselineRequests.OrderByDescending(r => r.Id).ToList(),
+            Notes = notes,
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
-            CanApprove = InitiativeAccess.CanApproveRebaseline(currentUser)
+            CanApprove = InitiativeAccess.CanApproveRebaseline(currentUser),
+            CanAddNote = InitiativeAccess.CanAddNote(currentUser)
         });
     }
 

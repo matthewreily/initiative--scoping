@@ -30,4 +30,11 @@ public static class InitiativeAccess
 
     /// <summary>Only Admins activate directly or approve/reject activation requests; other managers request activation.</summary>
     public static bool CanApproveActivation(ICurrentUser user) => user.IsInRole(AppRoles.Admin);
+
+    /// <summary>Admins and Users may add notes; Viewers read only.</summary>
+    public static bool CanAddNote(ICurrentUser user) => CanCreate(user);
+
+    /// <summary>Authors delete their own notes; Admins delete any.</summary>
+    public static bool CanDeleteNote(ICurrentUser user, InitiativeNote note) =>
+        user.IsInRole(AppRoles.Admin) || CanCreate(user) && note.CreatedBy == user.UserId;
 }

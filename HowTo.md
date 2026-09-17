@@ -74,6 +74,10 @@ The comparison shows the live plan first and every scenario beside it – schedu
 2. Administrator: **Approvals** (nav bar) → **Approve** (scope unlocks) or **Reject**.
 3. Owner edits phases/allocations, then **Finalize** to snapshot **v2**. All versions remain in `Baselines` with deltas; variance is always measured against the *current* version. Baseline lines store the phase, business unit, resource type, seniority and vendor **names as of the snapshot**, so renaming a catalog entry later does not relabel historical baselines.
 
+### Notes
+
+The **Notes** tab on an initiative holds free-text notes (context, decisions, assumptions) with author and UTC timestamp; the `Baselines` page has a separate **Notes on baseline vN** panel under each selected version for sign-offs and caveats, and those notes also appear on the initiative's Notes tab with a *baseline vN* badge (the History tab shows a per-version note count). Users and Administrators add notes (max 4,000 characters); authors delete their own, Administrators delete any; Viewers read only. Adding and deleting are recorded in the audit log.
+
 ## 4. Load actuals (FinancePmo / Administrator)
 
 1. Map each initiative to its external project: initiative page → **Source mappings** → source (`planview`, `jira`, `csv`) + external project id.
