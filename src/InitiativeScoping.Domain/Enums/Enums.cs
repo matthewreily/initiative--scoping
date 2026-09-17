@@ -40,6 +40,14 @@ public enum RebaselineStatus
     Withdrawn = 5
 }
 
+public enum ActivationRequestStatus
+{
+    Pending = 1,
+    Approved = 2,
+    Rejected = 3,
+    Withdrawn = 4
+}
+
 public enum InitiativeMemberRole
 {
     Owner = 1,

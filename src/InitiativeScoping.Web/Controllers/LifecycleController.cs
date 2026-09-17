@@ -4,6 +4,7 @@ using InitiativeScoping.Application.Initiatives;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Domain.Services;
+using InitiativeScoping.Infrastructure.Access;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Services;
 using InitiativeScoping.Web.Models;
@@ -13,15 +14,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InitiativeScoping.Web.Controllers;
 
-/// <summary>Initiative lifecycle: activation, status transitions, baselines and the re-baseline workflow.</summary>
+/// <summary>Initiative lifecycle: activation (direct or via Admin-approved request), status transitions, baselines and the re-baseline workflow.</summary>
 [Authorize(Policy = AppPolicies.CanView)]
 [AutoValidateAntiforgeryToken]
-public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock) : Controller
+public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, ActivationNotifier notifier) : Controller
 {
     private const string Entity = nameof(Initiative);
 
     // ----- Activation / status -----
 
+    /// <summary>Admins activate directly; a pending activation request (if any) is recorded as approved by them.</summary>
     [HttpPost("Initiatives/{id:int}/Activate")]
     public async Task<IActionResult> Activate(int id, string? reason, CancellationToken ct)
     {
@@ -36,27 +38,142 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             return Forbid();
         }
 
-        if (initiative.Status != InitiativeStatus.Draft)
+        if (!InitiativeAccess.CanApproveActivation(currentUser))
         {
-            return RedirectWithError($"Only Draft initiatives can be activated (current status: {initiative.Status}).", id);
+            return RedirectWithError("Activation needs Administrator approval: use Request activation.", id);
+        }
+
+        var readiness = ActivationReadiness(initiative);
+        if (readiness is not null)
+        {
+            return RedirectWithError(readiness, id);
+        }
+
+        var pending = initiative.PendingActivation;
+        if (pending is not null)
+        {
+            Decide(pending, ActivationRequestStatus.Approved, "Activated directly");
+        }
+
+        var result = await TryActivateAsync(initiative, string.IsNullOrWhiteSpace(reason) ? "Activation" : reason.Trim(), pending?.Id, ct);
+        return result.Baseline is null
+            ? RedirectWithError("Cannot activate: " + result.Error, id)
+            : RedirectWithSuccess($"Initiative activated. Forecast baseline v{result.Baseline.Version} captured ({result.Baseline.TotalHours:N1} h, {result.Baseline.TotalCost:C0}).", id);
+    }
+
+    [HttpPost("Initiatives/{id:int}/RequestActivation")]
+    public async Task<IActionResult> RequestActivation(int id, string? reason, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanManage(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        var readiness = ActivationReadiness(initiative);
+        if (readiness is not null)
+        {
+            return RedirectWithError(readiness, id);
+        }
+
+        if (initiative.PendingActivation is not null)
+        {
+            return RedirectWithError("An activation request is already awaiting approval.", id);
         }
 
         var forecast = ForecastCalculator.Calculate(initiative, await LoadRateCardsAsync(ct));
         var blockers = InitiativeLifecycle.BaselineBlockers(initiative, forecast);
         if (blockers.Count > 0)
         {
-            return RedirectWithError("Cannot activate: " + string.Join(" ", blockers), id);
+            return RedirectWithError("Cannot request activation: " + string.Join(" ", blockers), id);
         }
 
-        var baseline = BaselineSnapshot.Create(initiative, forecast, currentUser.UserId, clock.GetUtcNow(),
-            string.IsNullOrWhiteSpace(reason) ? "Activation" : reason.Trim());
-        initiative.Status = InitiativeStatus.Active;
-        audit.Record(Entity, id, AuditActions.StatusChange, new { From = InitiativeStatus.Draft, To = InitiativeStatus.Active });
-        audit.Record(Entity, id, AuditActions.Baseline, BaselineDiff(baseline));
+        var request = new ActivationRequest
+        {
+            InitiativeId = id,
+            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
+            RequestedBy = currentUser.UserId,
+            RequestedAt = clock.GetUtcNow()
+        };
+        initiative.ActivationRequests.Add(request);
         await db.SaveChangesAsync(ct);
-        AppTelemetry.StatusChanges.Add(1, new KeyValuePair<string, object?>("to", nameof(InitiativeStatus.Active)));
-        AppTelemetry.BaselinesCaptured.Add(1, new KeyValuePair<string, object?>("kind", "activation"));
-        return RedirectWithSuccess($"Initiative activated. Forecast baseline v{baseline.Version} captured ({baseline.TotalHours:N1} h, {baseline.TotalCost:C0}).", id);
+        audit.Record(Entity, id, AuditActions.ActivationRequest, new { RequestId = request.Id, request.Reason });
+        await db.SaveChangesAsync(ct);
+        await notifier.NotifyRequestedAsync(initiative, request, currentUser.DisplayName, DetailsUrl(id), ct);
+        return RedirectWithSuccess("Activation requested; an Administrator must approve before the initiative becomes Active.", id);
+    }
+
+    /// <summary>Approving activates the initiative and captures baseline v1 in the same step; rejecting leaves it in Draft.</summary>
+    [HttpPost("Initiatives/{id:int}/DecideActivation")]
+    [Authorize(Policy = AppPolicies.Admin)]
+    public async Task<IActionResult> DecideActivation(int id, int requestId, bool approve, string? note, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        var request = initiative?.ActivationRequests.FirstOrDefault(r => r.Id == requestId);
+        if (initiative is null || request is null)
+        {
+            return NotFound();
+        }
+
+        if (request.Status != ActivationRequestStatus.Pending)
+        {
+            return RedirectWithError($"Request is already {request.Status}.", id);
+        }
+
+        var decisionNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        if (!approve)
+        {
+            Decide(request, ActivationRequestStatus.Rejected, decisionNote);
+            await db.SaveChangesAsync(ct);
+            await notifier.NotifyDecidedAsync(initiative, request, currentUser.DisplayName, DetailsUrl(id), ct);
+            return RedirectWithSuccess("Activation request rejected; the initiative stays in Draft.", id);
+        }
+
+        var readiness = ActivationReadiness(initiative);
+        if (readiness is not null)
+        {
+            return RedirectWithError(readiness, id);
+        }
+
+        Decide(request, ActivationRequestStatus.Approved, decisionNote);
+        var result = await TryActivateAsync(initiative, request.Reason ?? "Activation", request.Id, ct);
+        if (result.Baseline is null)
+        {
+            return RedirectWithError("Cannot approve: " + result.Error + " The request stays pending until the Owner fixes the plan.", id);
+        }
+
+        await notifier.NotifyDecidedAsync(initiative, request, currentUser.DisplayName, DetailsUrl(id), ct);
+        return RedirectWithSuccess($"Activation approved. Forecast baseline v{result.Baseline.Version} captured ({result.Baseline.TotalHours:N1} h, {result.Baseline.TotalCost:C0}).", id);
+    }
+
+    [HttpPost("Initiatives/{id:int}/WithdrawActivation")]
+    public async Task<IActionResult> WithdrawActivation(int id, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanManage(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        var pending = initiative.PendingActivation;
+        if (pending is null)
+        {
+            return RedirectWithError("No activation request is awaiting approval.", id);
+        }
+
+        Decide(pending, ActivationRequestStatus.Withdrawn, null);
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess("Activation request withdrawn.", id);
     }
 
     [HttpPost("Initiatives/{id:int}/ChangeStatus")]
@@ -100,6 +217,11 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             open.DecidedBy = currentUser.UserId;
             open.DecidedAt = clock.GetUtcNow();
             open.DecisionNote = "Initiative cancelled";
+        }
+
+        if (initiative.PendingActivation is { } pendingActivation)
+        {
+            Decide(pendingActivation, ActivationRequestStatus.Withdrawn, "Initiative cancelled");
         }
 
         var from = initiative.Status;
@@ -281,17 +403,60 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         return RedirectWithSuccess($"Forecast baseline v{baseline.Version} captured ({baseline.TotalHours:N1} h, {baseline.TotalCost:C0}). Scope is locked.", id);
     }
 
-    /// <summary>Administrator queue of pending re-baseline requests.</summary>
-    [HttpGet("Rebaselines")]
+    /// <summary>Administrator queue of pending activation and re-baseline requests.</summary>
+    [HttpGet("Approvals")]
     [Authorize(Policy = AppPolicies.Admin)]
     public async Task<IActionResult> Pending(CancellationToken ct)
     {
-        var pending = await db.RebaselineRequests.Include(r => r.Initiative)
+        var activations = await db.ActivationRequests.Include(r => r.Initiative)
+            .Where(r => r.Status == ActivationRequestStatus.Pending).AsNoTracking().ToListAsync(ct);
+        var rebaselines = await db.RebaselineRequests.Include(r => r.Initiative)
             .Where(r => r.Status == RebaselineStatus.Pending).AsNoTracking().ToListAsync(ct);
-        return View(pending.OrderBy(r => r.Id).ToList());
+        return View(new ApprovalsModel
+        {
+            Activations = activations.OrderBy(r => r.Id).ToList(),
+            Rebaselines = rebaselines.OrderBy(r => r.Id).ToList()
+        });
     }
 
     // ----- Helpers -----
+
+    private static string? ActivationReadiness(Initiative initiative) =>
+        initiative.IsScenario ? "Scenarios cannot be activated; promote the scenario to the live plan first."
+        : initiative.Status != InitiativeStatus.Draft ? $"Only Draft initiatives can be activated (current status: {initiative.Status})."
+        : null;
+
+    private void Decide(ActivationRequest request, ActivationRequestStatus status, string? note)
+    {
+        request.Status = status;
+        request.DecidedBy = currentUser.UserId;
+        request.DecidedAt = clock.GetUtcNow();
+        request.DecisionNote = note;
+        audit.Record(Entity, request.InitiativeId, AuditActions.ActivationDecision, new { RequestId = request.Id, request.Status, request.DecisionNote });
+    }
+
+    /// <summary>Freezes the forecast as baseline v1 and moves the Draft initiative to Active; returns the blockers instead when the plan is not ready.</summary>
+    private async Task<(ForecastBaseline? Baseline, string? Error)> TryActivateAsync(Initiative initiative, string reason, int? requestId, CancellationToken ct)
+    {
+        var forecast = ForecastCalculator.Calculate(initiative, await LoadRateCardsAsync(ct));
+        var blockers = InitiativeLifecycle.BaselineBlockers(initiative, forecast);
+        if (blockers.Count > 0)
+        {
+            return (null, string.Join(" ", blockers));
+        }
+
+        var baseline = BaselineSnapshot.Create(initiative, forecast, currentUser.UserId, clock.GetUtcNow(), reason);
+        initiative.Status = InitiativeStatus.Active;
+        audit.Record(Entity, initiative.Id, AuditActions.StatusChange, new { From = InitiativeStatus.Draft, To = InitiativeStatus.Active, RequestId = requestId });
+        audit.Record(Entity, initiative.Id, AuditActions.Baseline, BaselineDiff(baseline, requestId));
+        await db.SaveChangesAsync(ct);
+        AppTelemetry.StatusChanges.Add(1, new KeyValuePair<string, object?>("to", nameof(InitiativeStatus.Active)));
+        AppTelemetry.BaselinesCaptured.Add(1, new KeyValuePair<string, object?>("kind", "activation"));
+        return (baseline, null);
+    }
+
+    private string DetailsUrl(int id) =>
+        Url.Action(nameof(InitiativesController.Details), "Initiatives", new { id }, Request.Scheme, Request.Host.Value)!;
 
     private Task<Initiative?> LoadAsync(int id, CancellationToken ct) =>
         db.Initiatives
@@ -305,6 +470,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines)
             .Include(i => i.RebaselineRequests)
+            .Include(i => i.ActivationRequests)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 

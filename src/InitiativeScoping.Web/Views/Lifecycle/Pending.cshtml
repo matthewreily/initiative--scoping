@@ -1,11 +1,46 @@
-@model IReadOnlyList<RebaselineRequest>
+@model ApprovalsModel
 @{
-    ViewData["Title"] = "Pending re-baseline requests";
+    ViewData["Title"] = "Approvals";
 }
-<h1 class="h3">Pending re-baseline requests</h1>
-@if (Model.Count == 0)
+<h1 class="h3">Approvals</h1>
+<p class="text-muted">Requests from initiative Owners that need an Administrator decision.</p>
+
+<h2 class="h5 mt-4">Activation requests</h2>
+@if (Model.Activations.Count == 0)
 {
-    <p class="text-muted">No requests awaiting approval.</p>
+    <p class="text-muted">No activation requests awaiting approval.</p>
+}
+else
+{
+    <div class="table-responsive">
+    <table data-sortable class="table table-sm align-middle">
+        <thead><tr><th>Initiative</th><th>Requested</th><th>Note</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Activations)
+        {
+            <tr>
+                <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@r.InitiativeId">@r.Initiative?.Name</a></td>
+                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @Users.Display(r.RequestedBy)</td>
+                <td>@r.Reason</td>
+                <td class="text-end">
+                    <form asp-action="DecideActivation" asp-route-id="@r.InitiativeId" method="post" class="d-flex gap-2 justify-content-end">
+                        <input type="hidden" name="requestId" value="@r.Id" />
+                        <input name="note" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 12rem" />
+                        <button type="submit" name="approve" value="true" class="btn btn-success btn-sm text-nowrap">Approve &amp; activate</button>
+                        <button type="submit" name="approve" value="false" class="btn btn-outline-danger btn-sm">Reject</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    </div>
+}
+
+<h2 class="h5 mt-4">Re-baseline requests</h2>
+@if (Model.Rebaselines.Count == 0)
+{
+    <p class="text-muted">No re-baseline requests awaiting approval.</p>
 }
 else
 {
@@ -13,7 +48,7 @@ else
     <table data-sortable class="table table-sm align-middle">
         <thead><tr><th>Initiative</th><th>Requested</th><th>Reason</th><th></th></tr></thead>
         <tbody>
-        @foreach (var r in Model)
+        @foreach (var r in Model.Rebaselines)
         {
             <tr>
                 <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@r.InitiativeId">@r.Initiative?.Name</a></td>

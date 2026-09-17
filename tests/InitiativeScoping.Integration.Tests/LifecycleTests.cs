@@ -1,10 +1,12 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +21,27 @@ public class OwnerOnlyFactory : WebAppFactory
         for (var i = 0; i < 5; i++)
         {
             builder.UseSetting($"Auth:Dev:Roles:{i}", "InitiativeOwner");
+        }
+    }
+}
+
+/// <summary>Dev user with a chosen Entra role on a caller-supplied SQLite file, so two users (e.g. Owner and Admin) can share one database.</summary>
+public class SharedDbFactory : WebAppFactory
+{
+    public required string DbPath { get; init; }
+    public required string UserId { get; init; }
+    public required string Role { get; init; }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("ConnectionStrings:Default", $"Data Source={DbPath}");
+        builder.UseSetting("Auth:Dev:UserId", UserId);
+        builder.UseSetting("Auth:Dev:DisplayName", $"{Role} {UserId}");
+        builder.UseSetting("Auth:Dev:Email", $"{UserId}@example.com");
+        for (var i = 0; i < 5; i++)
+        {
+            builder.UseSetting($"Auth:Dev:Roles:{i}", Role);
         }
     }
 }
@@ -129,7 +152,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
 
         // Pending queue lists it; admin approves.
         var requestId = (await RequestsAsync(factory, id)).Single().Id;
-        Assert.Contains("Rebaseline flow", await client.GetStringAsync("/Rebaselines"));
+        Assert.Contains("Rebaseline flow", await client.GetStringAsync("/Approvals"));
         await PostFormAsync(client, details, $"/Initiatives/{id}/DecideRebaseline", new() { ["requestId"] = requestId.ToString(), ["approve"] = "true", ["note"] = "ok" });
         html = await client.GetStringAsync(details);
         Assert.Contains("scope is unlocked", html);
@@ -186,8 +209,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         var id = await CreateInitiativeAsync(client, ownerFactory, "Owner approval");
         var details = $"/Initiatives/Details/{id}";
         await AddPhaseAndAllocationAsync(client, ownerFactory, id, location: "Onshore");
-        await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new());
-        Assert.Equal(InitiativeStatus.Active, await StatusAsync(ownerFactory, id));
+        await SetStatusAsync(ownerFactory, id, InitiativeStatus.Active);
 
         await PostFormAsync(client, details, $"/Initiatives/{id}/RequestRebaseline", new() { ["reason"] = "Need change" });
         var requestId = (await RequestsAsync(ownerFactory, id)).Single().Id;
@@ -196,7 +218,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
 
         var decide = await PostFormAsync(client, details, $"/Initiatives/{id}/DecideRebaseline", new() { ["requestId"] = requestId.ToString(), ["approve"] = "true" });
         Assert.Equal(HttpStatusCode.Forbidden, decide.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Rebaselines")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/Approvals")).StatusCode);
 
         await PostFormAsync(client, details, $"/Initiatives/{id}/WithdrawRebaseline", new());
         Assert.Equal(RebaselineStatus.Withdrawn, (await RequestsAsync(ownerFactory, id)).Single().Status);
@@ -279,13 +301,149 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
 
     // ----- helpers -----
 
+    [Fact]
+    public async Task Owner_requests_activation_and_admin_approval_activates_with_emails_and_audit()
+    {
+        var sender = new RecordingEmailSender();
+        var dbPath = Path.Combine(Path.GetTempPath(), $"is-test-{Guid.NewGuid():N}.db");
+        await using var ownerFactory = new SharedDbFactory { DbPath = dbPath, UserId = "owner-1", Role = "User" }
+            .WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<IEmailSender>(sender)));
+        await using var adminFactory = new SharedDbFactory { DbPath = dbPath, UserId = "admin-1", Role = "Admin" }
+            .WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<IEmailSender>(sender)));
+        var owner = ownerFactory.CreateClient(NoRedirect);
+        var admin = adminFactory.CreateClient(NoRedirect);
+        Assert.Contains("Signed in as", await admin.GetStringAsync("/")); // materialises the admin's account so it receives request mail
+
+        var id = await CreateInitiativeAsync(owner, ownerFactory, "Needs approval");
+        var details = $"/Initiatives/Details/{id}";
+
+        // Not ready: no request button enabled, and a forged request is refused.
+        var html = await owner.GetStringAsync(details);
+        Assert.Contains("Not ready to activate", html);
+        Assert.DoesNotContain($"/Initiatives/{id}/Activate\"", html);
+        await PostFormAsync(owner, details, $"/Initiatives/{id}/RequestActivation", new());
+        Assert.Empty(await ActivationRequestsAsync(ownerFactory, id));
+
+        await AddPhaseAndAllocationAsync(owner, ownerFactory, id, location: "Onshore");
+        html = await owner.GetStringAsync(details);
+        Assert.Contains("Ready for activation: an Administrator approves", html);
+        Assert.Contains("RequestActivation", html);
+
+        // Owner cannot bypass approval.
+        await PostFormAsync(owner, details, $"/Initiatives/{id}/Activate", new());
+        Assert.Equal(InitiativeStatus.Draft, await StatusAsync(ownerFactory, id));
+        Assert.Contains("Activation needs Administrator approval", await owner.GetStringAsync(details));
+
+        var request = await PostFormAsync(owner, details, $"/Initiatives/{id}/RequestActivation", new() { ["reason"] = "Steering signed off" });
+        Assert.Equal(HttpStatusCode.Redirect, request.StatusCode);
+        var pending = Assert.Single(await ActivationRequestsAsync(ownerFactory, id));
+        Assert.Equal(ActivationRequestStatus.Pending, pending.Status);
+        Assert.Equal("owner-1", pending.RequestedBy);
+        var requestMail = Assert.Single(sender.Sent);
+        Assert.Contains("admin-1@example.com", requestMail.To);
+        Assert.DoesNotContain("owner-1@example.com", requestMail.To);
+        Assert.Contains("Activation requested: Needs approval", requestMail.Subject);
+        Assert.Contains("Steering signed off", requestMail.TextBody);
+        Assert.Contains(details, requestMail.TextBody);
+
+        // Duplicate request is refused; owner sees pending state with withdraw but no decision controls.
+        await PostFormAsync(owner, details, $"/Initiatives/{id}/RequestActivation", new());
+        Assert.Single(await ActivationRequestsAsync(ownerFactory, id));
+        html = await owner.GetStringAsync(details);
+        Assert.Contains("Activation requested", html);
+        Assert.Contains("WithdrawActivation", html);
+        Assert.DoesNotContain("DecideActivation", html);
+        var forged = await PostFormAsync(owner, details, $"/Initiatives/{id}/DecideActivation", new() { ["requestId"] = pending.Id.ToString(), ["approve"] = "true" });
+        Assert.Equal(HttpStatusCode.Forbidden, forged.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync("/Approvals")).StatusCode);
+
+        // Admin sees it in the queue and approves; approval activates and captures v1.
+        var queue = await admin.GetStringAsync("/Approvals");
+        Assert.Contains("Needs approval", queue);
+        Assert.Contains("Steering signed off", queue);
+        var approve = await PostFormAsync(admin, "/Approvals", $"/Initiatives/{id}/DecideActivation", new() { ["requestId"] = pending.Id.ToString(), ["approve"] = "true", ["note"] = "Go" });
+        Assert.Equal(HttpStatusCode.Redirect, approve.StatusCode);
+        Assert.Equal(InitiativeStatus.Active, await StatusAsync(adminFactory, id));
+        var decided = Assert.Single(await ActivationRequestsAsync(adminFactory, id));
+        Assert.Equal(ActivationRequestStatus.Approved, decided.Status);
+        Assert.Equal("admin-1", decided.DecidedBy);
+        Assert.Equal("Go", decided.DecisionNote);
+        html = await admin.GetStringAsync(details);
+        Assert.Contains("Baseline v1", html);
+        Assert.Contains("Scope is locked", html);
+        Assert.DoesNotContain("Needs approval", await admin.GetStringAsync("/Approvals"));
+
+        Assert.Equal(2, sender.Sent.Count);
+        var decisionMail = sender.Sent[1];
+        Assert.Equal(["owner-1@example.com"], decisionMail.To);
+        Assert.Contains("Activation approved", decisionMail.Subject);
+        Assert.Contains("Go", decisionMail.TextBody);
+
+        using var scope = adminFactory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var actions = await db.AuditEvents.Where(a => a.Entity == nameof(Initiative) && a.EntityId == id.ToString()).Select(a => a.Action).ToListAsync();
+        Assert.Contains(AuditActions.ActivationRequest, actions);
+        Assert.Contains(AuditActions.ActivationDecision, actions);
+        Assert.Contains(AuditActions.StatusChange, actions);
+        Assert.Contains(AuditActions.Baseline, actions);
+    }
+
+    [Fact]
+    public async Task Rejected_activation_stays_draft_and_owner_can_request_again_or_withdraw()
+    {
+        var sender = new RecordingEmailSender { IsEnabled = false };
+        var dbPath = Path.Combine(Path.GetTempPath(), $"is-test-{Guid.NewGuid():N}.db");
+        await using var ownerFactory = new SharedDbFactory { DbPath = dbPath, UserId = "owner-2", Role = "User" }
+            .WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<IEmailSender>(sender)));
+        await using var adminFactory = new SharedDbFactory { DbPath = dbPath, UserId = "admin-2", Role = "Admin" }
+            .WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<IEmailSender>(sender)));
+        var owner = ownerFactory.CreateClient(NoRedirect);
+        var admin = adminFactory.CreateClient(NoRedirect);
+
+        var id = await CreateInitiativeAsync(owner, ownerFactory, "Rejected once");
+        var details = $"/Initiatives/Details/{id}";
+        await AddPhaseAndAllocationAsync(owner, ownerFactory, id, location: "Onshore");
+        await PostFormAsync(owner, details, $"/Initiatives/{id}/RequestActivation", new() { ["reason"] = "First try" });
+        var first = Assert.Single(await ActivationRequestsAsync(ownerFactory, id));
+
+        var reject = await PostFormAsync(admin, details, $"/Initiatives/{id}/DecideActivation", new() { ["requestId"] = first.Id.ToString(), ["approve"] = "false", ["note"] = "Add QA" });
+        Assert.Equal(HttpStatusCode.Redirect, reject.StatusCode);
+        Assert.Equal(InitiativeStatus.Draft, await StatusAsync(adminFactory, id));
+        Assert.Equal(ActivationRequestStatus.Rejected, Assert.Single(await ActivationRequestsAsync(adminFactory, id)).Status);
+        Assert.Empty(sender.Sent); // e-mail disabled: decision still recorded, nothing sent
+
+        var html = await owner.GetStringAsync(details);
+        Assert.Contains("Last request rejected", html);
+        Assert.Contains("Add QA", html);
+        Assert.Contains("RequestActivation", html);
+
+        // Deciding the same request twice is refused.
+        await PostFormAsync(admin, details, $"/Initiatives/{id}/DecideActivation", new() { ["requestId"] = first.Id.ToString(), ["approve"] = "true" });
+        Assert.Equal(InitiativeStatus.Draft, await StatusAsync(adminFactory, id));
+
+        // Owner requests again, then withdraws.
+        await PostFormAsync(owner, details, $"/Initiatives/{id}/RequestActivation", new());
+        Assert.Equal(2, (await ActivationRequestsAsync(ownerFactory, id)).Count);
+        await PostFormAsync(owner, details, $"/Initiatives/{id}/WithdrawActivation", new());
+        var statuses = (await ActivationRequestsAsync(ownerFactory, id)).OrderBy(r => r.Id).Select(r => r.Status).ToList();
+        Assert.Equal([ActivationRequestStatus.Rejected, ActivationRequestStatus.Withdrawn], statuses);
+        Assert.DoesNotContain("Rejected once", await admin.GetStringAsync("/Approvals"));
+
+        // Admin still activates directly; a pending request (if any) is closed as approved on the way.
+        await PostFormAsync(owner, details, $"/Initiatives/{id}/RequestActivation", new());
+        var direct = await PostFormAsync(admin, details, $"/Initiatives/{id}/Activate", new());
+        Assert.Equal(HttpStatusCode.Redirect, direct.StatusCode);
+        Assert.Equal(InitiativeStatus.Active, await StatusAsync(adminFactory, id));
+        Assert.Equal(ActivationRequestStatus.Approved, (await ActivationRequestsAsync(adminFactory, id)).OrderBy(r => r.Id).Last().Status);
+    }
+
     private static Dictionary<string, string> NewAllocation(int phaseId, int typeId) => new()
     {
         ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
         ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "50"
     };
 
-    private static async Task<(int PhaseId, int TypeId)> AddPhaseAndAllocationAsync(HttpClient client, WebAppFactory f, int id, string location, int phaseYear = 2026)
+    private static async Task<(int PhaseId, int TypeId)> AddPhaseAndAllocationAsync(HttpClient client, WebApplicationFactory<Program> f, int id, string location, int phaseYear = 2026)
     {
         var details = $"/Initiatives/Details/{id}";
         await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = $"{phaseYear}-03-01", ["PlannedEnd"] = $"{phaseYear}-04-30" });
@@ -303,7 +461,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         return (phaseId, typeId);
     }
 
-    private static async Task<int> CreateInitiativeAsync(HttpClient client, WebAppFactory f, string name)
+    private static async Task<int> CreateInitiativeAsync(HttpClient client, WebApplicationFactory<Program> f, string name)
     {
         int buId;
         using (var scope = f.Services.CreateScope())
@@ -321,19 +479,33 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         return int.Parse(match.Groups[1].Value);
     }
 
-    private static async Task<InitiativeStatus> StatusAsync(WebAppFactory f, int id)
+    private static async Task<InitiativeStatus> StatusAsync(WebApplicationFactory<Program> f, int id)
     {
         using var scope = f.Services.CreateScope();
         return (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Initiatives.AsNoTracking().SingleAsync(i => i.Id == id)).Status;
     }
 
-    private static async Task<int> AllocationCountAsync(WebAppFactory f, int id)
+    private static async Task<int> AllocationCountAsync(WebApplicationFactory<Program> f, int id)
     {
         using var scope = f.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.CountAsync(a => a.InitiativeId == id);
     }
 
-    private static async Task<List<RebaselineRequest>> RequestsAsync(WebAppFactory f, int id)
+    private static async Task SetStatusAsync(WebApplicationFactory<Program> f, int id, InitiativeStatus status)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Initiatives.SingleAsync(i => i.Id == id)).Status = status;
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<List<ActivationRequest>> ActivationRequestsAsync(WebApplicationFactory<Program> f, int id)
+    {
+        using var scope = f.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().ActivationRequests.AsNoTracking().Where(r => r.InitiativeId == id).ToListAsync();
+    }
+
+    private static async Task<List<RebaselineRequest>> RequestsAsync(WebApplicationFactory<Program> f, int id)
     {
         using var scope = f.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<AppDbContext>().RebaselineRequests.AsNoTracking().Where(r => r.InitiativeId == id).ToListAsync();
