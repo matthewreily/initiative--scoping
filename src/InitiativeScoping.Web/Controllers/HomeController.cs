@@ -19,7 +19,7 @@ public class HomeController(AppDbContext db, ICurrentUser currentUser) : Control
             BusinessUnitCount = await db.BusinessUnits.CountAsync(ct),
             ResourceTypeCount = await db.ResourceTypes.CountAsync(ct),
             PublishedRateCardCount = await db.RateCards.CountAsync(r => r.Status == RateCardStatus.Published, ct),
-            InitiativeCount = await db.Initiatives.CountAsync(ct),
+            InitiativeCount = await db.Initiatives.CountAsync(i => i.ScenarioOfId == null, ct),
             SetupSteps = currentUser.IsInRole(AppRoles.Admin) ? await SetupStepsAsync(ct) : []
         };
         return View(model);
@@ -33,7 +33,7 @@ public class HomeController(AppDbContext db, ICurrentUser currentUser) : Control
         new("Allocation templates", "Default staffing per T-shirt size, used by Apply size.", await db.AllocationTemplates.AnyAsync(ct), "Admin", "Sizing", "Index"),
         new("Work calendar", "Hours per day and holidays for fixed-duration planning.", await db.WorkCalendarSettings.AnyAsync(ct), "Admin", "WorkCalendar", "Index"),
         new("Users", "Grant access to at least one other person.", await db.UserAccounts.AnyAsync(u => u.Status == UserAccountStatus.Active && u.ObjectId != currentUser.UserId, ct), "Admin", "Users", "Index"),
-        new("First initiative", "Create an initiative and apply a size.", await db.Initiatives.AnyAsync(ct), "", "Initiatives", "Create"),
+        new("First initiative", "Create an initiative and apply a size.", await db.Initiatives.AnyAsync(i => i.ScenarioOfId == null, ct), "", "Initiatives", "Create"),
     ];
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

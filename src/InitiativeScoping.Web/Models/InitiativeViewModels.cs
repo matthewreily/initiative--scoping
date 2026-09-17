@@ -327,3 +327,21 @@ public class CapacityModel
     public required SelectList BusinessUnits { get; init; }
     public required IReadOnlyList<string> Formats { get; init; }
 }
+
+public class NewScenarioModel
+{
+    public int InitiativeId { get; set; }
+
+    [Required, StringLength(300), Display(Name = "Scenario name")]
+    public string? Name { get; set; }
+}
+
+public class ScenarioCompareModel
+{
+    public required Initiative Parent { get; init; }
+    public required ScenarioComparison Comparison { get; init; }
+    public required IReadOnlyDictionary<int, string> ResourceTypeNames { get; init; }
+    public required NewScenarioModel NewScenario { get; init; }
+    public bool CanEdit { get; init; }
+    public bool CanPromote { get; init; }
+}

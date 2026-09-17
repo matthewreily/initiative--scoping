@@ -26,6 +26,7 @@ public class SearchController(AppDbContext db, ICurrentUser currentUser) : Contr
         var isAdmin = currentUser.IsInRole(AppRoles.Admin);
 
         model.Initiatives = (await db.Initiatives
+            .Where(i => i.ScenarioOfId == null)
             .Where(i => i.Name.ToLower().Contains(lowered) || (i.Description != null && i.Description.ToLower().Contains(lowered)))
             .OrderBy(i => i.Name)
             .Take(MaxPerGroup)

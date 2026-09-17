@@ -50,6 +50,7 @@ public static class PortfolioQueries
 
     public static IQueryable<Initiative> PortfolioInitiatives(this AppDbContext db) =>
         db.Initiatives
+            .Where(i => i.ScenarioOfId == null)
             .Include(i => i.BusinessUnit)
             .Include(i => i.Members)
             .Include(i => i.Phases)
