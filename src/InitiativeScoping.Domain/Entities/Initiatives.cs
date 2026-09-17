@@ -21,6 +21,10 @@ public class Initiative
     /// <summary>Risk reserve added on top of the priced forecast, as a percentage of forecast cost (labor + non-labor).</summary>
     public decimal ContingencyPct { get; set; }
     public EstimateConfidence? EstimateConfidence { get; set; }
+    /// <summary>Approved funding for the initiative (total, all years). Null when no budget has been approved yet.</summary>
+    public decimal? ApprovedBudget { get; set; }
+    /// <summary>Label of the budget's fiscal year(s), e.g. "FY26"; free text so it matches the organisation's calendar.</summary>
+    public string? BudgetFiscalYear { get; set; }
     /// <summary>Set on what-if scenarios: the initiative whose plan this is an alternative to. Scenarios stay Draft until promoted.</summary>
     public int? ScenarioOfId { get; set; }
     public Initiative? ScenarioOf { get; set; }

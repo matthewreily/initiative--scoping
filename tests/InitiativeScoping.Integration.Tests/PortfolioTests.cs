@@ -238,6 +238,79 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.Contains("Estimate confidence,Low", initiativeCsv);
     }
 
+    [Fact]
+    public async Task Approved_budget_is_compared_against_forecast_on_details_portfolio_and_exports()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var id = await CreateInitiativeAsync(client, $"Budget {tag}");
+        string name; int buId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var i = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Initiatives.SingleAsync(x => x.Id == id);
+            name = i.Name; buId = i.BusinessUnitId;
+        }
+
+        var details = $"/Initiatives/Details/{id}";
+        Assert.DoesNotContain("id=\"budget-card\"", await client.GetStringAsync(details));
+
+        var negative = await PostFormAsync(client, $"/Initiatives/Edit/{id}", $"/Initiatives/Edit/{id}", new()
+        {
+            ["Id"] = id.ToString(), ["Name"] = name, ["BusinessUnitId"] = buId.ToString(), ["SizingMethod"] = nameof(SizingMethod.Direct),
+            ["PlanningMode"] = nameof(PlanningMode.EffortDriven), ["TargetStart"] = "2026-03-01", ["ApprovedBudget"] = "-5"
+        });
+        Assert.Equal(HttpStatusCode.OK, negative.StatusCode);
+
+        // Seeded rate: Senior internal Onshore = 120/h; 2 x 100h = 24,000 forecast against a 20,000 budget.
+        var edit = await PostFormAsync(client, $"/Initiatives/Edit/{id}", $"/Initiatives/Edit/{id}", new()
+        {
+            ["Id"] = id.ToString(), ["Name"] = name, ["BusinessUnitId"] = buId.ToString(), ["SizingMethod"] = nameof(SizingMethod.Direct),
+            ["PlanningMode"] = nameof(PlanningMode.EffortDriven), ["TargetStart"] = "2026-03-01",
+            ["ApprovedBudget"] = "20000", ["BudgetFiscalYear"] = " FY26 "
+        });
+        Assert.Equal(HttpStatusCode.Redirect, edit.StatusCode);
+
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        int phaseId, typeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var i = await db.Initiatives.SingleAsync(x => x.Id == id);
+            Assert.Equal(20_000m, i.ApprovedBudget);
+            Assert.Equal("FY26", i.BudgetFiscalYear);
+            var audits = await db.AuditEvents.Where(a => a.Entity == "Initiative" && a.EntityId == id.ToString() && a.Action == "Update").Select(a => a.DiffJson).ToListAsync();
+            Assert.Contains(audits, d => d is not null && d.Contains("\"ApprovedBudget\":20000") && d.Contains("\"BudgetFiscalYear\":\"FY26\""));
+            phaseId = (await db.Phases.FirstAsync(p => p.InitiativeId == id)).Id;
+            typeId = (await db.ResourceTypes.FirstAsync(t => t.Name == "Software Engineer")).Id;
+        }
+        await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
+            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+        });
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync(details));
+        Assert.Contains("Budget $20,000 (FY26)", html);
+        Assert.Contains("id=\"approved-budget\">$20,000", html);
+        Assert.Contains("−$4,000 over budget", html);
+        Assert.Contains("id=\"budget-eac\">$24,000", html);
+        Assert.Contains("Over budget", html);
+
+        var portfolio = WebUtility.HtmlDecode(await client.GetStringAsync("/Portfolio"));
+        Assert.Contains("id=\"portfolio-budget\"", portfolio);
+        Assert.Contains("over budget", portfolio);
+        Assert.Contains("120% used", portfolio);
+
+        var csv = await client.GetStringAsync("/Portfolio/Export?format=csv");
+        Assert.Contains("Approved budget,Budget fiscal year,Budget remaining,Budget used %,Over budget", csv);
+        Assert.Matches(new Regex($"Budget {tag},.*,20000(\\.0+)?,FY26,-4000(\\.0+)?,120(\\.0+)?,Yes,"), csv);
+
+        var initiativeCsv = await client.GetStringAsync($"/Initiatives/{id}/Export?format=csv");
+        Assert.Contains("Approved budget,20000", initiativeCsv);
+        Assert.Contains("Budget compared against,Forecast with contingency", initiativeCsv);
+        Assert.Contains("Budget remaining,-4000", initiativeCsv);
+    }
+
     private async Task<int> CreateActivatedInitiativeAsync(HttpClient client, string name)
     {
         var id = await CreateInitiativeAsync(client, name);

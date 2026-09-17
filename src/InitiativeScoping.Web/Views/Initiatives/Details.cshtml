@@ -33,6 +33,7 @@
             &middot; Sizing: @(i.SizingMethod == SizingMethod.Direct ? "Direct hours" : $"{i.SizingMethod} {i.SizeKey}")
             @if (i.VarianceThresholdPct is not null) { <span> &middot; Variance threshold @i.VarianceThresholdPct%</span> }
             @if (i.ContingencyPct > 0) { <span> &middot; Contingency @i.ContingencyPct.ToString("0.##")%</span> }
+            @if (i.ApprovedBudget is not null) { <span> &middot; Budget @i.ApprovedBudget.Value.ToString("C0")@(string.IsNullOrEmpty(i.BudgetFiscalYear) ? "" : $" ({i.BudgetFiscalYear})")</span> }
             <partial name="_Confidence" model="i.EstimateConfidence" />
         </div>
         <div class="mt-2"><partial name="_Lifecycle" model="i.Status" /></div>
@@ -247,6 +248,25 @@ else
     {
         <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">With contingency</div><div class="fs-3" id="forecast-with-contingency">@Model.Forecast.TotalCostWithContingency.ToString("C0")</div><div class="small text-muted">+@Model.Forecast.ContingencyCost.ToString("C0") reserve (@Model.Forecast.ContingencyPct.ToString("0.##")%)</div></div></div></div>
     }
+    @if (Model.Budget.HasBudget)
+    {
+        var budget = Model.Budget;
+        var remaining = budget.Remaining!.Value;
+        <div class="col-md-3"><div class="card @(budget.OverBudget ? "border-danger" : budget.NearBudget ? "border-warning" : "")" id="budget-card"><div class="card-body">
+            <div class="text-muted small">Approved budget@(string.IsNullOrEmpty(budget.FiscalYear) ? "" : $" · {budget.FiscalYear}")</div>
+            <div class="fs-3" id="approved-budget">@budget.Budget!.Value.ToString("C0")</div>
+            <div class="small">
+                <span class="@(budget.OverBudget ? "text-danger fw-semibold" : "text-muted")" id="budget-remaining" title="Budget minus @(budget.UsesEac ? "estimate at completion" : "forecast incl. contingency")">@(remaining < 0 ? "−" : "")@Math.Abs(remaining).ToString("C0") @(remaining < 0 ? "over budget" : "remaining")</span>
+                @if (budget.UtilizationPct is not null) { <span class="text-muted"> &middot; @budget.UtilizationPct.Value.ToString("0.#")% of budget</span> }
+            </div>
+            @if (budget.OverBudget) { <span class="badge text-bg-danger">Over budget</span> } else if (budget.NearBudget) { <span class="badge text-bg-warning">Near budget</span> }
+        </div></div></div>
+        <div class="col-md-3"><div class="card"><div class="card-body">
+            <div class="text-muted small">@(budget.UsesEac ? "Estimate at completion" : "Expected at completion")</div>
+            <div class="fs-3" id="budget-eac">@budget.Expected.ToString("C0")</div>
+            <div class="small text-muted">@(budget.UsesEac ? $"Spent {budget.Actual:C0} + remaining plan" : "Live forecast")@(Model.Forecast.ContingencyPct > 0 ? " incl. contingency" : "")</div>
+        </div></div></div>
+    }
     @foreach (var row in Model.ByClass)
     {
         <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">@row.Label</div><div class="fs-3">@row.Cost.ToString("C0")</div><div class="small text-muted">@row.Hours.ToString("N1") h</div></div></div></div>
@@ -287,6 +307,11 @@ else
         @if (baselineDelta is not null)
         {
             <span class="@(baselineDelta > 0 ? "text-danger" : baselineDelta < 0 ? "text-success" : "")" title="Live forecast vs. current baseline v@(current!.Version)">@(baselineDelta >= 0 ? "+" : "")@baselineDelta.Value.ToString("C0") vs. baseline</span>
+        }
+        @if (Model.Budget.HasBudget)
+        {
+            var remaining = Model.Budget.Remaining!.Value;
+            <span class="@(remaining < 0 ? "text-danger" : "")" title="Approved budget @Model.Budget.Budget!.Value.ToString("C0") minus @(Model.Budget.UsesEac ? "estimate at completion" : "forecast incl. contingency")"><span class="text-body fw-semibold">@(remaining < 0 ? "−" : "")@Math.Abs(remaining).ToString("C0")</span> @(remaining < 0 ? "over budget" : "budget remaining")</span>
         }
         @if (!Model.Forecast.IsComplete) { <span class="text-warning">Unpriced lines</span> }
     </div>

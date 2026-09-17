@@ -61,6 +61,19 @@
     </div></div></div>
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Baseline cost</div><div class="fs-3" title="@p.BaselineCost.ToString("C0")">@Money.Compact(p.BaselineCost)</div><div class="small text-muted">@p.BaselineHours.ToString("N0") h</div></div></div></div>
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Actual cost to date</div><div class="fs-3" title="@p.ActualCost.ToString("C0")">@Money.Compact(p.ActualCost)</div><div class="small text-muted">@p.ActualHours.ToString("N0") h</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100 @(p.OverBudget > 0 ? "border-danger" : "")" id="portfolio-budget"><div class="card-body"><div class="text-muted small">Approved budget</div>
+        @if (p.Budgeted == 0)
+        {
+            <div class="fs-3 text-muted">—</div><div class="small text-muted">No budgets recorded</div>
+        }
+        else
+        {
+            <div class="fs-3" title="@p.ApprovedBudget.ToString("C0")">@Money.Compact(p.ApprovedBudget)</div>
+            <div class="small @(p.BudgetRemaining < 0 ? "text-danger" : "text-muted")" title="@Signed(p.BudgetRemaining, "C0") across @p.Budgeted budgeted initiative(s)">@(p.BudgetRemaining < 0 ? "−" : "")@Money.Compact(Math.Abs(p.BudgetRemaining)) @(p.BudgetRemaining < 0 ? "over" : "remaining")
+                @if (p.OverBudget > 0) { <span class="badge bg-danger ms-1">@p.OverBudget over budget</span> }
+            </div>
+        }
+    </div></div></div>
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100 @(p.OverThreshold > 0 ? "border-danger" : "")"><div class="card-body"><div class="text-muted small">Variance vs. baseline</div>
         <div class="fs-3 @VarianceClass(p.CostVariancePct, false)" title="@Signed(p.CostVariance, "C0")">@(p.CostVariance > 0 ? "+" : "")@Money.Compact(p.CostVariance)</div>
         <div class="small">@(p.CostVariancePct is null ? "n/a" : Signed(p.CostVariancePct.Value, "N1") + "%")
@@ -99,14 +112,14 @@ else
     <table data-sortable data-columns data-paginate="25" class="table table-sm align-middle">
         <thead>
         <tr>
-            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast</th><th class="text-end d-none d-xl-table-cell">Contingency</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th style="min-width: 110px">Burn</th><th>Flags</th>
+            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast</th><th class="text-end d-none d-xl-table-cell">Contingency</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th class="text-end">Budget</th><th class="text-end">Remaining</th><th style="min-width: 110px">Burn</th><th>Flags</th>
         </tr>
         </thead>
         <tbody>
         @foreach (var r in p.Rows)
         {
             var i = r.Initiative;
-            <tr class="@(r.ExceedsThreshold ? "table-danger" : "")">
+            <tr class="@(r.ExceedsThreshold || r.OverBudget ? "table-danger" : "")">
                 <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@i.Id">@i.Name</a></td>
                 <td class="d-none d-md-table-cell">@i.BusinessUnit?.Name</td>
                 <td class="d-none d-md-table-cell"><partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="i.Status" /></td>
@@ -126,6 +139,14 @@ else
                     @if (r.HasBaseline) { @r.EacCost.ToString("C0") <div class="small @VarianceClass(r.Variance.EacCostVariancePct, r.Variance.EacExceedsThreshold)">@(r.Variance.EacCostVariancePct is null ? "" : Signed(r.Variance.EacCostVariancePct.Value, "N1") + "%")</div> }
                     else { <span class="text-muted">—</span> }
                 </td>
+                <td class="text-end" data-sort="@(r.ApprovedBudget is null ? "" : Inv(r.ApprovedBudget.Value))">
+                    @if (r.ApprovedBudget is not null) { @r.ApprovedBudget.Value.ToString("C0") @if (!string.IsNullOrEmpty(r.Budget.FiscalYear)) { <div class="small text-muted">@r.Budget.FiscalYear</div> } }
+                    else { <span class="text-muted">—</span> }
+                </td>
+                <td class="text-end @(r.OverBudget ? "text-danger fw-semibold" : "")" title="Budget minus @(r.Budget.UsesEac ? "EAC" : "forecast incl. contingency")" data-sort="@(r.BudgetRemaining is null ? "" : Inv(r.BudgetRemaining.Value))">
+                    @if (r.BudgetRemaining is not null) { @Signed(r.BudgetRemaining.Value, "C0") @if (r.Budget.UtilizationPct is not null) { <div class="small @(r.OverBudget ? "" : "text-muted")">@r.Budget.UtilizationPct.Value.ToString("N0")% used</div> } }
+                    else { <span class="text-muted">—</span> }
+                </td>
                 <td data-sort="@Inv(r.BurnPct)">
                     <div class="progress" style="height: 8px" role="progressbar" aria-label="Burn" aria-valuenow="@r.BurnPct.ToString(System.Globalization.CultureInfo.InvariantCulture)" aria-valuemin="0" aria-valuemax="100" title="@r.BurnPct% of @(r.HasBaseline ? "baseline" : "forecast") spent">
                         <div class="progress-bar @(r.ExceedsThreshold ? "bg-danger" : r.BurnPct >= 90 ? "bg-warning" : "bg-success")" style="width: @Math.Min(r.BurnPct, 100).ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div>
@@ -134,6 +155,8 @@ else
                 </td>
                 <td>
                     @if (r.ExceedsThreshold) { <span class="badge bg-danger" title="Cost variance exceeds @r.Variance.ThresholdPct%">Over threshold</span> }
+                    @if (r.OverBudget) { <span class="badge bg-danger" title="Expected cost exceeds the approved budget by @Math.Abs(r.BudgetRemaining!.Value).ToString("C0")">Over budget</span> }
+                    else if (r.Budget.NearBudget) { <span class="badge bg-warning text-dark" title="@r.Budget.UtilizationPct% of the approved budget">Near budget</span> }
                     @if (r.HasUnpricedForecast) { <span class="badge bg-warning text-dark" title="One or more allocations have no matching rate">Unpriced forecast</span> }
                     @if (r.HasUnpricedActuals) { <span class="badge bg-warning text-dark" title="@r.Variance.UnpricedEntries actual rows without a rate">Unpriced actuals</span> }
                     @if (i.OpenRebaseline is not null) { <span class="badge bg-info text-dark">Re-baseline @i.OpenRebaseline.Status.ToString().ToLower()</span> }
@@ -154,6 +177,8 @@ else
             <td class="text-end @VarianceClass(p.CostVariancePct, false)">@Signed(p.CostVariance, "C0")</td>
             <td class="text-end @VarianceClass(p.CostVariancePct, false)">@(p.CostVariancePct is null ? "—" : Signed(p.CostVariancePct.Value, "N1") + "%")</td>
             <td class="text-end">@p.EacCost.ToString("C0")</td>
+            <td class="text-end">@(p.Budgeted > 0 ? p.ApprovedBudget.ToString("C0") : "—")</td>
+            <td class="text-end @(p.BudgetRemaining < 0 ? "text-danger" : "")">@(p.Budgeted > 0 ? Signed(p.BudgetRemaining, "C0") : "—")</td>
             <td colspan="2"></td>
         </tr>
         </tfoot>

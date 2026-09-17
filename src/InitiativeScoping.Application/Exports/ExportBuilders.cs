@@ -13,6 +13,7 @@ public static class PortfolioExport
              "Contingency %", "Contingency cost", "Forecast cost with contingency", "Estimate confidence",
              "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Cost variance", "Cost variance %",
              "ETC cost", "EAC cost", "Projected variance", "Projected variance %",
+             "Approved budget", "Budget fiscal year", "Budget remaining", "Budget used %", "Over budget",
              "Threshold %", "Over threshold", "Unpriced forecast", "Unpriced actuals", "Planning mode", "Target end"],
             portfolio.Rows.Select(r => (IReadOnlyList<object?>)
             [
@@ -21,6 +22,7 @@ public static class PortfolioExport
                 r.ContingencyPct, r.ContingencyCost, r.ForecastCostWithContingency, r.Confidence?.ToString(),
                 r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.CostVariance, r.CostVariancePct,
                 r.Variance.EtcCost, r.Variance.EacCost, r.Variance.EacCostVariance, r.Variance.EacCostVariancePct,
+                r.ApprovedBudget, r.Budget.FiscalYear, r.BudgetRemaining, r.Budget.UtilizationPct, r.Budget.HasBudget ? r.OverBudget : null,
                 r.Variance.ThresholdPct, r.ExceedsThreshold, r.HasUnpricedForecast, r.HasUnpricedActuals,
                 r.Initiative.PlanningMode.ToString(), r.Initiative.TargetEnd
             ]).ToList());
@@ -82,6 +84,7 @@ public static class InitiativeExport
     {
         var phases = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
         var baseline = variance.Baseline;
+        var budget = BudgetCalculator.Calculate(initiative, forecast, variance);
 
         var summary = new ExportTable("Summary", ["Field", "Value"],
         [
@@ -116,6 +119,12 @@ public static class InitiativeExport
             ["EAC cost", variance.EacCost],
             ["Projected variance", variance.EacCostVariance],
             ["Projected variance %", variance.EacCostVariancePct],
+            ["Approved budget", budget.Budget],
+            ["Budget fiscal year", budget.FiscalYear],
+            ["Budget compared against", budget.HasBudget ? (budget.UsesEac ? "EAC" : "Forecast with contingency") : null],
+            ["Budget remaining", budget.Remaining],
+            ["Budget used %", budget.UtilizationPct],
+            ["Over budget", budget.HasBudget ? budget.OverBudget : null],
             ["Threshold %", variance.ThresholdPct],
             ["Over threshold", variance.ExceedsThreshold],
             ["Unpriced actual rows", variance.UnpricedEntries]

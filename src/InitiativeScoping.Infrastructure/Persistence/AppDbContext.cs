@@ -160,6 +160,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.Property(x => x.VarianceThresholdPct).HasPrecision(5, 2);
             e.Property(x => x.ContingencyPct).HasPrecision(5, 2);
+            e.Property(x => x.ApprovedBudget).HasPrecision(18, 2);
+            e.Property(x => x.BudgetFiscalYear).HasMaxLength(50);
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.ScenarioOfId);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);

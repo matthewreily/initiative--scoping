@@ -62,6 +62,10 @@ public class InitiativeEditModel
     public decimal ContingencyPct { get; set; }
     [Display(Name = "Estimate confidence")]
     public EstimateConfidence? EstimateConfidence { get; set; }
+    [Range(0, 999_999_999_999.99), Display(Name = "Approved budget")]
+    public decimal? ApprovedBudget { get; set; }
+    [StringLength(50), Display(Name = "Budget fiscal year")]
+    public string? BudgetFiscalYear { get; set; }
 }
 
 public class PhaseEditModel
@@ -256,6 +260,7 @@ public class InitiativeDetailsModel
     public required VarianceResult Variance { get; init; }
     public required MonthlyPhasing Phasing { get; init; }
     public int UnmappedForMappedProjects { get; init; }
+    public BudgetPosition Budget => BudgetCalculator.Calculate(Initiative, Forecast, Variance);
 }
 
 public class InitiativeExplainModel
