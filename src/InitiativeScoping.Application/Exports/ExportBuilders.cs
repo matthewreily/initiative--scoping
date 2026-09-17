@@ -175,3 +175,21 @@ public static class InitiativeExport
             ["Group", "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Hours variance", "Cost variance", "Cost variance %", "ETC hours", "ETC cost", "EAC hours", "EAC cost", "Projected variance", "Projected variance %"],
             rows.Select(r => (IReadOnlyList<object?>)[r.Label, r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.HoursVariance, r.CostVariance, r.CostVariancePct, r.EtcHours, r.EtcCost, r.EacHours, r.EacCost, r.EacCostVariance, r.EacCostVariancePct]).ToList());
 }
+
+public static class CapacityExport
+{
+    public static IReadOnlyList<ExportTable> Build(CapacityHeatmap heatmap)
+    {
+        var cells = new ExportTable("Capacity",
+            ["Resource type", "Month", "Demand hours", "Demand FTE", "Headcount", "Supply hours", "Utilization", "Over-allocated"],
+            heatmap.Rows.SelectMany(r => r.Cells.Select(c => (IReadOnlyList<object?>)
+                [r.ResourceTypeName, c.Month, c.DemandHours, c.DemandFte, c.Headcount, c.SupplyHours, c.Utilization, c.IsOverAllocated])).ToList());
+
+        var contributions = new ExportTable("Capacity by initiative",
+            ["Resource type", "Month", "Id", "Initiative", "Hours"],
+            heatmap.Rows.SelectMany(r => r.Cells.SelectMany(c => c.Contributions.Select(x => (IReadOnlyList<object?>)
+                [r.ResourceTypeName, c.Month, x.Initiative.Id, x.Initiative.Name, x.Hours]))).ToList());
+
+        return [cells, contributions];
+    }
+}

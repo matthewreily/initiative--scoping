@@ -103,6 +103,44 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
     }
 
     [Fact]
+    public async Task Capacity_heatmap_shows_demand_by_resource_type_and_month_and_exports()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var id = await CreateActivatedInitiativeAsync(client, $"Capacity {tag}");
+
+        // 2 x 100h over 1 Mar–30 Apr 2026 (61 days): Mar 101.64h, Apr 98.36h.
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync("/Capacity"));
+        Assert.Contains("id=\"capacity-heatmap\"", html);
+        Assert.Contains("Software Engineer", html);
+        Assert.Contains("Mar 26", html);
+        Assert.Contains("Apr 26", html);
+        Assert.Contains($"• Capacity {tag}: 102 h", html);
+        Assert.Contains("id=\"capacity-over-count\"", html);
+
+        var csv = await client.GetStringAsync("/Capacity/Export?format=csv");
+        Assert.StartsWith("# Capacity", csv);
+        Assert.Contains("Resource type,Month,Demand hours,Demand FTE,Headcount,Supply hours,Utilization,Over-allocated", csv);
+        Assert.Contains("# Capacity by initiative", csv);
+        Assert.Contains($",2026-03-01,{id},Capacity {tag},101.64", csv);
+        Assert.Contains($",2026-04-01,{id},Capacity {tag},98.36", csv);
+
+        var xlsx = await client.GetAsync("/Capacity/Export?format=xlsx");
+        Assert.Equal(HttpStatusCode.OK, xlsx.StatusCode);
+        Assert.Equal(["Capacity", "Capacity by initiative"], await SheetNamesAsync(xlsx));
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/Capacity/Export?format=pdf")).StatusCode);
+
+        // Closed initiatives drop out of the heatmap unless requested.
+        await PostFormAsync(client, $"/Initiatives/Details/{id}", $"/Initiatives/{id}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Complete) });
+        Assert.DoesNotContain($"Capacity {tag}", await client.GetStringAsync("/Capacity"));
+        Assert.Contains($"Capacity {tag}", WebUtility.HtmlDecode(await client.GetStringAsync("/Capacity?includeClosed=true")));
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await db.AuditEvents.AnyAsync(e => e.Entity == "Capacity" && e.Action == "Export"));
+    }
+
+    [Fact]
     public async Task Viewer_sees_portfolio_and_can_export_but_not_edit()
     {
         await using var viewerFactory = new ViewerOnlyFactory();

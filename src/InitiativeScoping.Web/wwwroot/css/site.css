@@ -197,3 +197,17 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 .column-picker .dropdown-menu { min-width: 12rem; }
 .setup-mark { flex: 0 0 1.25rem; height: 1.25rem; margin-top: .15rem; border: 2px solid var(--is-border); border-radius: 50%; font-size: .75rem; line-height: 1rem; text-align: center; }
 .setup-mark.done { background: var(--bs-success); border-color: var(--bs-success); color: #fff; }
+
+/* Capacity heatmap */
+.heatmap .heat-sticky { position: sticky; left: 0; background: var(--bs-body-bg); z-index: 1; min-width: 10rem; }
+.heatmap .heat-cell { min-width: 4.5rem; line-height: 1.15; padding: .35rem .25rem; }
+.heatmap .heat-value { display: block; font-variant-numeric: tabular-nums; }
+.heatmap .heat-fte { display: block; font-size: .7rem; opacity: .8; }
+.heat-swatch { display: inline-block; width: .9rem; height: .9rem; border-radius: .15rem; border: 1px solid rgba(0, 0, 0, .1); vertical-align: -.1rem; }
+.heat-0 { background: transparent; }
+.heat-1 { background: #e7f3ea; }
+.heat-2 { background: #c8e6cf; }
+.heat-3 { background: #ffe8a8; }
+.heat-4 { background: #ffc98a; }
+.heat-over { background: #f4a6a6; font-weight: 600; }
+.heat-none { background: repeating-linear-gradient(45deg, #f0f0f0 0 4px, #e2e2e2 4px 8px); }
