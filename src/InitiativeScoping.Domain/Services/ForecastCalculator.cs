@@ -5,9 +5,12 @@ namespace InitiativeScoping.Domain.Services;
 public sealed record ForecastLine(
     InitiativeAllocation Allocation,
     decimal Hours,
-    decimal? HourlyRate)
+    decimal? HourlyRate,
+    IReadOnlyList<RateSegment>? RateSegments = null)
 {
     public bool IsUnpriced => HourlyRate is null;
+    /// <summary>True when the phase spans more than one rate card, so <see cref="HourlyRate"/> is a day-weighted blend.</summary>
+    public bool IsBlendedRate => RateSegments is { Count: > 1 };
     public decimal Cost => Hours * (HourlyRate ?? 0m);
 }
 
@@ -39,19 +42,20 @@ public sealed record ForecastResult(IReadOnlyList<ForecastLine> Lines, IReadOnly
 public static class ForecastCalculator
 {
     /// <summary>
-    /// Hours = Quantity x EstimatedHours; rate resolved against the rate card in effect at the phase planned start,
-    /// keyed by the allocation's own resourcing business unit (and vendor, for vendor resources).
+    /// Hours = Quantity x EstimatedHours; rate is the day-weighted blend of the rate cards in effect across the phase's
+    /// planned window (a single card for most phases), keyed by resource type, seniority, location, class and vendor.
     /// </summary>
     public static ForecastResult Calculate(Initiative initiative, IReadOnlyCollection<RateCard> rateCards)
     {
         var phases = initiative.Phases.Where(p => p.Id != 0).ToDictionary(p => p.Id);
         var lines = initiative.Allocations.Select(a =>
         {
-            var asOf = (a.Phase ?? phases.GetValueOrDefault(a.PhaseId))?.PlannedStart ?? initiative.TargetStart;
-            var rate = RateResolver.Resolve(rateCards,
-                new RateKey(a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId),
-                asOf);
-            return new ForecastLine(a, a.Quantity * a.EstimatedHours, rate);
+            var phase = a.Phase ?? phases.GetValueOrDefault(a.PhaseId);
+            var start = phase?.PlannedStart ?? initiative.TargetStart;
+            var end = phase?.PlannedEnd ?? start;
+            var key = new RateKey(a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId);
+            var segments = RateResolver.Segments(rateCards, key, start, end);
+            return new ForecastLine(a, a.Quantity * a.EstimatedHours, RateResolver.Blend(segments), segments);
         }).ToList();
 
         var nonLabor = initiative.NonLaborCosts.Select(c => PriceNonLabor(c, initiative)).ToList();

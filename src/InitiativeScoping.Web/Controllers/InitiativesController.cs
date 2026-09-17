@@ -1207,7 +1207,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return query.FirstOrDefaultAsync(i => i.Id == id, ct);
     }
 
-    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) => db.PublishedRateCardsAsync(ct);
+    private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) => db.PricingRateCardsAsync(ct);
 
     private async Task PopulateEditLists(CancellationToken ct)
     {
@@ -1426,9 +1426,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var seniorities = await db.SeniorityLevels.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Name).Select(s => new NamedId(s.Id, s.Name)).ToListAsync(ct);
         var seniorityOrder = seniorities.Select((s, i) => (s.Id, i)).ToDictionary(x => x.Id, x => x.i);
         var cardOptions = cards
-            .Where(c => c.Status == RateCardStatus.Published)
+            .Where(RateResolver.IsPricing)
             .OrderBy(c => c.EffectiveStart).ThenBy(c => c.Id)
-            .Select(c => new RateCardOptions(c.Id, c.EffectiveStart, c.Entries
+            .Select(c => new RateCardOptions(c.Id, c.EffectiveStart, c.EffectiveEnd, c.Entries
                 .Where(e => typeNames.ContainsKey(e.ResourceTypeId))
                 .OrderBy(e => typeNames[e.ResourceTypeId]).ThenBy(e => seniorityOrder.GetValueOrDefault(e.SeniorityId, int.MaxValue)).ThenBy(e => e.Location).ThenBy(e => e.ResourcingClass).ThenBy(e => e.VendorId)
                 .Select(e => new RateOption(e.ResourceTypeId, typeNames[e.ResourceTypeId], e.SeniorityId, e.Location, e.ResourcingClass, e.VendorId, e.HourlyRate))

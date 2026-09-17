@@ -7,7 +7,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
     <div>
         <h2 class="h4 mb-1">@card.Name <partial name="_StatusBadge" model="card.Status" /></h2>
-        <div class="text-muted small">Effective from @card.EffectiveStart.ToString("yyyy-MM-dd") &middot; @card.Entries.Count entr@(card.Entries.Count == 1 ? "y" : "ies") shown</div>
+        <div class="text-muted small">Effective @card.EffectiveStart.ToString("yyyy-MM-dd") &ndash; @(card.EffectiveEnd?.ToString("yyyy-MM-dd") ?? "open") &middot; @card.Entries.Count entr@(card.Entries.Count == 1 ? "y" : "ies") shown</div>
     </div>
     <div class="btn-group">
         <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@card.Id">Edit card</a>
@@ -20,7 +20,9 @@
         }
         else if (card.Status == RateCardStatus.Published)
         {
-            <form asp-action="Retire" asp-route-id="@card.Id" method="post" class="d-inline" onsubmit="return confirm('Retire @card.Name? New forecasts will no longer use it.');">
+            <form asp-action="Retire" asp-route-id="@card.Id" method="post" class="d-inline-flex align-items-center gap-1" onsubmit="return confirm('Retire @card.Name? It keeps pricing work dated up to the effective end; later dates fall to the next card.');">
+                <label class="visually-hidden" for="retire-end">Effective end</label>
+                <input type="date" id="retire-end" name="effectiveEnd" class="form-control form-control-sm" value="@(card.EffectiveEnd?.ToString("yyyy-MM-dd") ?? DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"))" min="@card.EffectiveStart.ToString("yyyy-MM-dd")" title="Last day this card prices work" />
                 <button type="submit" class="btn btn-warning btn-sm">Retire</button>
             </form>
         }
@@ -29,11 +31,11 @@
 
 @if (card.Status == RateCardStatus.Published)
 {
-    <div class="alert alert-info py-2 small">This card is published. Rate changes affect future forecast calculations only; committed baselines keep their snapshotted rates.</div>
+    <div class="alert alert-info py-2 small">This card is published and prices work dated @card.EffectiveStart.ToString("yyyy-MM-dd") &ndash; @(card.EffectiveEnd?.ToString("yyyy-MM-dd") ?? "onwards (until a later card starts)"). Rate changes affect live forecasts for those dates; committed baselines keep their snapshotted rates.</div>
 }
 else if (card.Status == RateCardStatus.Retired)
 {
-    <div class="alert alert-secondary py-2 small">This card is retired and read-only.</div>
+    <div class="alert alert-secondary py-2 small">This card is retired and read-only. It still prices work dated @card.EffectiveStart.ToString("yyyy-MM-dd") &ndash; @(card.EffectiveEnd?.ToString("yyyy-MM-dd") ?? "(no end recorded: not used for pricing)").</div>
 }
 
 <div class="row g-4">

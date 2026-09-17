@@ -4,6 +4,7 @@
     {
         id = c.CardId,
         effectiveStart = c.EffectiveStart.ToString("yyyy-MM-dd"),
+        effectiveEnd = c.EffectiveEnd?.ToString("yyyy-MM-dd"),
         options = c.Options.Select(o => new { type = o.ResourceTypeId, seniority = o.SeniorityId, location = o.Location, cls = (int)o.ResourcingClass, vendor = o.VendorId, rate = o.Rate })
     });
     var phaseStarts = Model.Data.PhaseStarts.ToDictionary(p => p.Key, p => p.Value.ToString("yyyy-MM-dd"));
@@ -24,8 +25,8 @@
         function pricedFor(phaseId) {
             const start = phaseStarts[phaseId];
             if (!start) { return []; }
-            // Same tie-break as RateResolver.EffectiveCard: latest effective start, then highest card id.
-            const card = cards.filter(c => c.effectiveStart <= start)
+            // Same rule as RateResolver.EffectiveCard: window covers the phase start; latest effective start, then highest card id.
+            const card = cards.filter(c => c.effectiveStart <= start && (!c.effectiveEnd || start <= c.effectiveEnd))
                 .sort((a, b) => a.effectiveStart === b.effectiveStart ? b.id - a.id : (b.effectiveStart < a.effectiveStart ? -1 : 1))[0];
             return card ? card.options : [];
         }

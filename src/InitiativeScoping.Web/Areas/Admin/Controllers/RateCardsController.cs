@@ -11,9 +11,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InitiativeScoping.Web.Areas.Admin.Controllers;
 
-public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminControllerBase
+public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider clock) : AdminControllerBase
 {
     private const long MaxImportBytes = 5 * 1024 * 1024;
+
+    private void ValidateWindow(RateCardEditModel model)
+    {
+        if (model.EffectiveEnd is { } end && end < model.EffectiveStart)
+        {
+            ModelState.AddModelError(nameof(model.EffectiveEnd), "Effective end must be on or after the effective start.");
+        }
+    }
 
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -29,15 +37,16 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
     [HttpPost]
     public async Task<IActionResult> Create(RateCardEditModel model, CancellationToken ct)
     {
+        ValidateWindow(model);
         if (!ModelState.IsValid)
         {
             return View("Edit", model);
         }
 
-        var card = new RateCard { Name = model.Name.Trim(), EffectiveStart = model.EffectiveStart };
+        var card = new RateCard { Name = model.Name.Trim(), EffectiveStart = model.EffectiveStart, EffectiveEnd = model.EffectiveEnd };
         db.RateCards.Add(card);
         await db.SaveChangesAsync(ct);
-        audit.Record(nameof(RateCard), card.Id, AuditActions.Create, new { card.Name, card.EffectiveStart });
+        audit.Record(nameof(RateCard), card.Id, AuditActions.Create, new { card.Name, card.EffectiveStart, card.EffectiveEnd });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Rate card '{card.Name}' created. Add entries, then publish.", "Details", new { id = card.Id });
     }
@@ -50,7 +59,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return NotFound();
         }
 
-        return View(new RateCardEditModel { Id = card.Id, Name = card.Name, EffectiveStart = card.EffectiveStart });
+        return View(new RateCardEditModel { Id = card.Id, Name = card.Name, EffectiveStart = card.EffectiveStart, EffectiveEnd = card.EffectiveEnd });
     }
 
     [HttpPost]
@@ -62,16 +71,23 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return NotFound();
         }
 
+        ValidateWindow(model);
+        if (card.Status == RateCardStatus.Retired && model.EffectiveEnd is null)
+        {
+            ModelState.AddModelError(nameof(model.EffectiveEnd), "A retired rate card must keep an effective end so history stays priced.");
+        }
+
         if (!ModelState.IsValid)
         {
             model.Id = id;
             return View(model);
         }
 
-        var before = new { card.Name, card.EffectiveStart };
+        var before = new { card.Name, card.EffectiveStart, card.EffectiveEnd };
         card.Name = model.Name.Trim();
         card.EffectiveStart = model.EffectiveStart;
-        audit.Record(nameof(RateCard), card.Id, AuditActions.Update, new { Before = before, After = new { card.Name, card.EffectiveStart } });
+        card.EffectiveEnd = model.EffectiveEnd;
+        audit.Record(nameof(RateCard), card.Id, AuditActions.Update, new { Before = before, After = new { card.Name, card.EffectiveStart, card.EffectiveEnd } });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Rate card '{card.Name}' updated.", "Details", new { id });
     }
@@ -398,13 +414,17 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
         }
 
         card.Status = RateCardStatus.Published;
-        audit.Record(nameof(RateCard), card.Id, AuditActions.Publish, new { card.Name, card.EffectiveStart, EntryCount = card.Entries.Count });
+        audit.Record(nameof(RateCard), card.Id, AuditActions.Publish, new { card.Name, card.EffectiveStart, card.EffectiveEnd, EntryCount = card.Entries.Count });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Rate card '{card.Name}' published.", "Details", new { id });
     }
 
     [HttpPost]
-    public async Task<IActionResult> Retire(int id, CancellationToken ct)
+    /// <summary>
+    /// Retiring closes the card's effective window (at <paramref name="effectiveEnd"/>, its existing end, or today) rather than
+    /// removing it from pricing, so work dated inside the window keeps its historical rate.
+    /// </summary>
+    public async Task<IActionResult> Retire(int id, DateOnly? effectiveEnd, CancellationToken ct)
     {
         var card = await db.RateCards.FindAsync([id], ct);
         if (card is null)
@@ -417,10 +437,17 @@ public class RateCardsController(AppDbContext db, IAuditLog audit) : AdminContro
             return RedirectWithError("Only published rate cards can be retired.", "Details", new { id });
         }
 
+        var end = effectiveEnd ?? card.EffectiveEnd ?? DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+        if (end < card.EffectiveStart)
+        {
+            end = card.EffectiveStart;
+        }
+
+        card.EffectiveEnd = end;
         card.Status = RateCardStatus.Retired;
-        audit.Record(nameof(RateCard), card.Id, AuditActions.Retire, new { card.Name });
+        audit.Record(nameof(RateCard), card.Id, AuditActions.Retire, new { card.Name, card.EffectiveStart, card.EffectiveEnd });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Rate card '{card.Name}' retired. Existing baselines keep their snapshotted rates.", "Details", new { id });
+        return RedirectWithSuccess($"Rate card '{card.Name}' retired; it still prices work dated up to {end:yyyy-MM-dd}.", "Details", new { id });
     }
 
     [HttpPost]

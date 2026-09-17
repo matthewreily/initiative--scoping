@@ -37,7 +37,7 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
         }
 
         var scenarios = await ScenarioQuery().Where(s => s.ScenarioOfId == parent.Id).ToListAsync(ct);
-        var cards = await db.PublishedRateCardsAsync(ct);
+        var cards = await db.PricingRateCardsAsync(ct);
         return View(new ScenarioCompareModel
         {
             Parent = parent,
@@ -115,7 +115,7 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
             return RedirectWithError($"Scenario '{scenario.Name}' has actuals, source mappings or baselines attached; remove them before promoting.", id);
         }
 
-        var cards = await db.PublishedRateCardsAsync(ct);
+        var cards = await db.PricingRateCardsAsync(ct);
         var before = ForecastCalculator.Calculate(parent, cards);
         var after = ForecastCalculator.Calculate(scenario, cards);
 

@@ -135,5 +135,7 @@ public class ActualsImporter(AppDbContext db, ICurrentUser currentUser, IAuditLo
     }
 
     private Task<List<RateCard>> LoadRateCardsAsync(CancellationToken ct) =>
-        db.RateCards.Include(c => c.Entries).Where(c => c.Status == RateCardStatus.Published).AsNoTracking().ToListAsync(ct);
+        db.RateCards.Include(c => c.Entries)
+            .Where(c => c.Status == RateCardStatus.Published || c.Status == RateCardStatus.Retired && c.EffectiveEnd != null)
+            .AsNoTracking().ToListAsync(ct);
 }

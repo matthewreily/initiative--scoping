@@ -22,7 +22,7 @@ public static class PortfolioQueries
             .ToListAsync(ct);
         var adjustments = await db.ActualAdjustments.Where(a => ids.Contains(a.InitiativeId)).AsNoTracking().ToListAsync(ct);
         var typeNames = await db.ResourceTypeNamesAsync(ct);
-        var cards = await db.PublishedRateCardsAsync(ct);
+        var cards = await db.PricingRateCardsAsync(ct);
 
         return PortfolioCalculator.Calculate(initiatives, cards, entries, adjustments, typeNames, defaultThresholdPct);
     }
@@ -68,6 +68,9 @@ public static class PortfolioQueries
     public static Task<Dictionary<int, string>> ResourceTypeNamesAsync(this AppDbContext db, CancellationToken ct) =>
         db.ResourceTypes.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
-    public static Task<List<RateCard>> PublishedRateCardsAsync(this AppDbContext db, CancellationToken ct) =>
-        db.RateCards.Include(c => c.Entries).Where(c => c.Status == RateCardStatus.Published).AsNoTracking().AsSplitQuery().ToListAsync(ct);
+    /// <summary>Cards that price work: published, plus retired cards that kept their effective window (see <see cref="RateResolver.IsPricing"/>).</summary>
+    public static Task<List<RateCard>> PricingRateCardsAsync(this AppDbContext db, CancellationToken ct) =>
+        db.RateCards.Include(c => c.Entries)
+            .Where(c => c.Status == RateCardStatus.Published || c.Status == RateCardStatus.Retired && c.EffectiveEnd != null)
+            .AsNoTracking().AsSplitQuery().ToListAsync(ct);
 }

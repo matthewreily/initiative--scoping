@@ -94,6 +94,8 @@ public class RateCardEditModel
     public string Name { get; set; } = string.Empty;
     [Required, DataType(DataType.Date), Display(Name = "Effective start")]
     public DateOnly EffectiveStart { get; set; } = new(DateTime.UtcNow.Year, 1, 1);
+    [DataType(DataType.Date), Display(Name = "Effective end (optional)")]
+    public DateOnly? EffectiveEnd { get; set; }
 }
 
 public class RateCardEntryEditModel
