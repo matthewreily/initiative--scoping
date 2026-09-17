@@ -42,6 +42,7 @@
                 th.classList.add(direction > 0 ? 'sorted-asc' : 'sorted-desc');
             }
         });
+        table.dispatchEvent(new CustomEvent('table:sorted'));
     }
 
     const sortKey = table => 'is.sort:' + location.pathname + '#' + (table.id || Array.from(document.querySelectorAll('table[data-sortable]')).indexOf(table));
@@ -212,5 +213,200 @@ document.addEventListener('keydown', e => {
             revealingAnchor = !!anchorPane && buttons.includes(wanted);
             bootstrap.Tab.getOrCreateInstance(wanted).show();
         }
+    });
+})();
+
+
+// Column visibility: <table data-columns> gets a "Columns" menu (placed before the table's
+// .table-responsive wrapper) to hide/show columns; the choice is remembered per page and table.
+(function () {
+    const storageKey = table => 'is.columns:' + location.pathname + '#' + (table.id || Array.from(document.querySelectorAll('table[data-columns]')).indexOf(table));
+    const label = th => th.dataset.sortId || th.textContent.trim();
+
+    document.querySelectorAll('table[data-columns]').forEach(table => {
+        const head = table.tHead;
+        if (!head) return;
+        const headers = Array.from(head.rows[0].cells).filter(th => label(th) !== '' && !th.hasAttribute('data-nohide'));
+        if (headers.length < 2) return;
+        let hidden = [];
+        try { hidden = JSON.parse(localStorage.getItem(storageKey(table)) || '[]'); } catch { /* storage unavailable */ }
+
+        const apply = () => {
+            Array.from(head.rows[0].cells).forEach((th, index) => {
+                const hide = hidden.includes(label(th));
+                th.classList.toggle('col-hidden', hide);
+                Array.from(table.tBodies).concat(table.tFoot ? [table.tFoot] : []).forEach(section => {
+                    Array.from(section.rows).forEach(row => { if (row.cells[index] && row.cells.length === head.rows[0].cells.length) row.cells[index].classList.toggle('col-hidden', hide); });
+                });
+            });
+        };
+
+        const menu = document.createElement('div');
+        menu.className = 'dropdown d-inline-block column-picker';
+        menu.innerHTML = '<button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Columns</button>';
+        const list = document.createElement('div');
+        list.className = 'dropdown-menu dropdown-menu-end p-2';
+        headers.forEach(th => {
+            const id = 'col-' + Math.random().toString(36).slice(2, 8);
+            const item = document.createElement('div');
+            item.className = 'form-check form-check-sm mb-1';
+            item.innerHTML = `<input class="form-check-input" type="checkbox" id="${id}"><label class="form-check-label small" for="${id}"></label>`;
+            const box = item.querySelector('input');
+            item.querySelector('label').textContent = label(th);
+            box.checked = !hidden.includes(label(th));
+            box.addEventListener('change', () => {
+                hidden = box.checked ? hidden.filter(h => h !== label(th)) : hidden.concat(label(th));
+                try { localStorage.setItem(storageKey(table), JSON.stringify(hidden)); } catch { /* storage unavailable */ }
+                apply();
+            });
+            list.appendChild(item);
+        });
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'btn btn-link btn-sm p-0 mt-1';
+        reset.textContent = 'Show all';
+        reset.addEventListener('click', () => {
+            hidden = [];
+            try { localStorage.removeItem(storageKey(table)); } catch { /* storage unavailable */ }
+            list.querySelectorAll('input').forEach(i => { i.checked = true; });
+            apply();
+        });
+        list.appendChild(reset);
+        menu.appendChild(list);
+
+        const anchor = table.closest('.table-responsive') || table;
+        const toolbar = document.createElement('div');
+        toolbar.className = 'd-flex justify-content-end mb-2 table-toolbar';
+        toolbar.appendChild(menu);
+        anchor.parentNode.insertBefore(toolbar, anchor);
+        apply();
+    });
+})();
+
+// Client-side pagination: <table data-paginate="25"> shows that many body rows at a time with
+// controls under the table; page size is remembered per page. Re-applies after sorting.
+(function () {
+    document.querySelectorAll('table[data-paginate]').forEach(table => {
+        const body = table.tBodies[0];
+        if (!body) return;
+        const key = 'is.pagesize:' + location.pathname;
+        const sizes = [25, 50, 100, 0];
+        let size = parseInt(table.dataset.paginate, 10) || 25;
+        try { size = parseInt(localStorage.getItem(key), 10) || size; } catch { /* storage unavailable */ }
+        if (localStorage.getItem(key) === '0') size = 0;
+        let page = 1;
+
+        const nav = document.createElement('div');
+        nav.className = 'd-flex flex-wrap align-items-center justify-content-between gap-2 small table-pager';
+        const anchor = table.closest('.table-responsive') || table;
+        anchor.parentNode.insertBefore(nav, anchor.nextSibling);
+
+        const render = () => {
+            const rows = Array.from(body.rows).filter(r => !r.hasAttribute('data-nosort'));
+            const total = rows.length;
+            const pages = size === 0 ? 1 : Math.max(1, Math.ceil(total / size));
+            page = Math.min(Math.max(1, page), pages);
+            rows.forEach((row, i) => { row.classList.toggle('page-hidden', size !== 0 && (i < (page - 1) * size || i >= page * size)); });
+            const first = total === 0 ? 0 : (size === 0 ? 1 : (page - 1) * size + 1);
+            const last = size === 0 ? total : Math.min(total, page * size);
+            nav.innerHTML = '';
+            const info = document.createElement('span');
+            info.className = 'text-muted';
+            info.textContent = `Showing ${first}–${last} of ${total}`;
+            nav.appendChild(info);
+            const right = document.createElement('div');
+            right.className = 'd-flex align-items-center gap-2';
+            const select = document.createElement('select');
+            select.className = 'form-select form-select-sm w-auto';
+            select.setAttribute('aria-label', 'Rows per page');
+            sizes.forEach(n => {
+                const o = document.createElement('option');
+                o.value = n; o.textContent = n === 0 ? 'All rows' : n + ' per page'; o.selected = n === size;
+                select.appendChild(o);
+            });
+            select.addEventListener('change', () => {
+                size = parseInt(select.value, 10); page = 1;
+                try { localStorage.setItem(key, String(size)); } catch { /* storage unavailable */ }
+                render();
+            });
+            right.appendChild(select);
+            if (pages > 1) {
+                const ul = document.createElement('ul');
+                ul.className = 'pagination pagination-sm mb-0';
+                const add = (text, target, disabled, active, aria) => {
+                    const li = document.createElement('li');
+                    li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+                    const b = document.createElement('button');
+                    b.type = 'button'; b.className = 'page-link'; b.textContent = text; b.disabled = disabled;
+                    if (aria) b.setAttribute('aria-label', aria);
+                    if (active) b.setAttribute('aria-current', 'page');
+                    b.addEventListener('click', () => { page = target; render(); });
+                    li.appendChild(b); ul.appendChild(li);
+                };
+                add('‹', page - 1, page === 1, false, 'Previous page');
+                for (let p = 1; p <= pages; p++) {
+                    if (pages > 9 && Math.abs(p - page) > 3 && p !== 1 && p !== pages) {
+                        if (Math.abs(p - page) === 4) add('…', p, true, false, null);
+                        continue;
+                    }
+                    add(String(p), p, false, p === page, null);
+                }
+                add('›', page + 1, page === pages, false, 'Next page');
+                right.appendChild(ul);
+            }
+            nav.appendChild(right);
+        };
+        table.addEventListener('table:sorted', () => { page = 1; render(); });
+        render();
+    });
+})();
+
+// Keyboard shortcuts: any element with data-shortcut="g i" is activated by that key sequence;
+// "?" opens the help overlay listing them. Ignored while typing in a field.
+(function () {
+    const targets = () => Array.from(document.querySelectorAll('[data-shortcut]'));
+    if (targets().length === 0) return;
+    let buffer = '';
+    let timer = null;
+
+    const typing = e => {
+        const t = e.target;
+        return t && (t.matches('input, textarea, select, [contenteditable]') || t.isContentEditable);
+    };
+
+    function help() {
+        let modal = document.getElementById('shortcut-help');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'shortcut-help';
+            modal.className = 'modal fade';
+            modal.tabIndex = -1;
+            modal.setAttribute('aria-labelledby', 'shortcut-help-title');
+            modal.setAttribute('aria-hidden', 'true');
+            const rows = targets().map(el => `<tr><td><kbd>${el.dataset.shortcut.split(' ').join('</kbd> <kbd>')}</kbd></td><td>${(el.dataset.shortcutLabel || el.textContent).trim()}</td></tr>`).join('');
+            modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content">
+                <div class="modal-header"><h2 class="modal-title h6" id="shortcut-help-title">Keyboard shortcuts</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body p-2"><table class="table table-sm mb-0"><tbody>
+                    ${document.getElementById('global-search') ? '<tr><td><kbd>/</kbd></td><td>Search</td></tr>' : ''}
+                    ${rows}
+                    <tr><td><kbd>?</kbd></td><td>This help</td></tr>
+                </tbody></table></div></div></div>`;
+            document.body.appendChild(modal);
+        }
+        bootstrap.Modal.getOrCreateInstance(modal).toggle();
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
+        if (e.key === '?') { e.preventDefault(); help(); return; }
+        if (e.key.length !== 1) return;
+        buffer = (buffer + e.key).slice(-4);
+        clearTimeout(timer);
+        timer = setTimeout(() => { buffer = ''; }, 1200);
+        const hit = targets().find(el => el.dataset.shortcut.replace(/\s+/g, '') === buffer || el.dataset.shortcut.replace(/\s+/g, '') === buffer.slice(-1));
+        if (!hit) return;
+        buffer = '';
+        e.preventDefault();
+        if (hit.matches('a[href]')) location.assign(hit.href); else hit.click();
     });
 })();

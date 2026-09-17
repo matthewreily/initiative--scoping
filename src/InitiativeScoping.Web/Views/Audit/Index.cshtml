@@ -33,7 +33,7 @@
 </form>
 <p class="small text-muted">@Model.Total event(s) &middot; page @Model.Page of @Model.PageCount</p>
 <div class="table-responsive">
-<table data-sortable class="table table-sm align-middle">
+<table data-sortable data-columns class="table table-sm align-middle">
     <thead><tr><th>When (UTC)</th><th>Entity</th><th>Id</th><th>Action</th><th>User</th><th>Details</th></tr></thead>
     <tbody>
     @foreach (var e in Model.Events)
