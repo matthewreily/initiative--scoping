@@ -58,6 +58,10 @@ public class InitiativeEditModel
     public DateOnly? TargetEnd { get; set; }
     [Range(0, 1000), Display(Name = "Variance threshold %")]
     public decimal? VarianceThresholdPct { get; set; }
+    [Range(0, 100), Display(Name = "Contingency %")]
+    public decimal ContingencyPct { get; set; }
+    [Display(Name = "Estimate confidence")]
+    public EstimateConfidence? EstimateConfidence { get; set; }
 }
 
 public class PhaseEditModel

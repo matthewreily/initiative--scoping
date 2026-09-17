@@ -32,6 +32,8 @@
             }
             &middot; Sizing: @(i.SizingMethod == SizingMethod.Direct ? "Direct hours" : $"{i.SizingMethod} {i.SizeKey}")
             @if (i.VarianceThresholdPct is not null) { <span> &middot; Variance threshold @i.VarianceThresholdPct%</span> }
+            @if (i.ContingencyPct > 0) { <span> &middot; Contingency @i.ContingencyPct.ToString("0.##")%</span> }
+            <partial name="_Confidence" model="i.EstimateConfidence" />
         </div>
         <div class="mt-2"><partial name="_Lifecycle" model="i.Status" /></div>
     </div>
@@ -170,6 +172,10 @@ else
     <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3">@Model.Forecast.TotalCost.ToString("C0")</div>
         @if (Model.Forecast.NonLaborLines.Count > 0) { <div class="small text-muted" id="forecast-cost-split">Labor @Model.Forecast.LaborCost.ToString("C0") &middot; Non-labor @Model.Forecast.NonLaborCost.ToString("C0")</div> }
         @if (!Model.Forecast.IsComplete) { <span class="badge bg-warning text-dark">Incomplete – unpriced lines</span> }</div></div></div>
+    @if (Model.Forecast.ContingencyPct > 0)
+    {
+        <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">With contingency</div><div class="fs-3" id="forecast-with-contingency">@Model.Forecast.TotalCostWithContingency.ToString("C0")</div><div class="small text-muted">+@Model.Forecast.ContingencyCost.ToString("C0") reserve (@Model.Forecast.ContingencyPct.ToString("0.##")%)</div></div></div></div>
+    }
     @foreach (var row in Model.ByClass)
     {
         <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">@row.Label</div><div class="fs-3">@row.Cost.ToString("C0")</div><div class="small text-muted">@row.Hours.ToString("N1") h</div></div></div></div>
@@ -205,6 +211,7 @@ else
     <div class="details-summary small text-muted" aria-label="Summary">
         <span><span class="text-body fw-semibold">@Model.Forecast.TotalHours.ToString("N1")</span> h</span>
         <span><span class="text-body fw-semibold">@Model.Forecast.TotalCost.ToString("C0")</span> forecast</span>
+        @if (Model.Forecast.ContingencyPct > 0) { <span title="Forecast plus @Model.Forecast.ContingencyPct.ToString("0.##")% contingency"><span class="text-body fw-semibold">@Model.Forecast.TotalCostWithContingency.ToString("C0")</span> with contingency</span> }
         @if (baselineDelta is not null)
         {
             <span class="@(baselineDelta > 0 ? "text-danger" : baselineDelta < 0 ? "text-success" : "")" title="Live forecast vs. current baseline v@(current!.Version)">@(baselineDelta >= 0 ? "+" : "")@baselineDelta.Value.ToString("C0") vs. baseline</span>
@@ -830,7 +837,7 @@ else
         <h2 class="h5">Baselines <a class="small fw-normal ms-2" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">details</a></h2>
         <div class="table-responsive">
         <table class="table table-sm" id="baseline-history">
-            <thead><tr><th>Version</th><th>Captured</th><th>By</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th>Reason</th></tr></thead>
+            <thead><tr><th>Version</th><th>Captured</th><th>By</th><th class="text-end">Hours</th><th class="text-end">Cost</th><th class="text-end">Contingency</th><th>Reason</th></tr></thead>
             <tbody>
             @foreach (var b in i.Baselines.OrderByDescending(b => b.Version))
             {
@@ -840,12 +847,13 @@ else
                     <td>@Users.Display(b.SnapshotBy)</td>
                     <td class="text-end">@b.TotalHours.ToString("N1")</td>
                     <td class="text-end">@b.TotalCost.ToString("C0")</td>
+                    <td class="text-end">@(b.ContingencyPct > 0 ? $"{b.ContingencyCost:C0} ({b.ContingencyPct:0.##}%)" : "–")</td>
                     <td class="small text-muted">@b.Reason</td>
                 </tr>
             }
             @if (i.Baselines.Count == 0)
             {
-                <tr><td colspan="6" class="text-muted">No baselines yet &mdash; baseline v1 is captured when the initiative is activated.</td></tr>
+                <tr><td colspan="7" class="text-muted">No baselines yet &mdash; baseline v1 is captured when the initiative is activated.</td></tr>
             }
             </tbody>
         </table>

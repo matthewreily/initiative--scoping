@@ -22,14 +22,17 @@ public sealed record NonLaborForecastLine(
     public bool HasWindow => Start is not null;
 }
 
-public sealed record ForecastResult(IReadOnlyList<ForecastLine> Lines, IReadOnlyList<NonLaborForecastLine> NonLaborLines)
+public sealed record ForecastResult(IReadOnlyList<ForecastLine> Lines, IReadOnlyList<NonLaborForecastLine> NonLaborLines, decimal ContingencyPct = 0m)
 {
     public ForecastResult(IReadOnlyList<ForecastLine> lines) : this(lines, []) { }
 
     public decimal TotalHours => Lines.Sum(l => l.Hours);
     public decimal LaborCost => Lines.Sum(l => l.Cost);
     public decimal NonLaborCost => NonLaborLines.Sum(l => l.Cost);
+    /// <summary>Priced labor + non-labor, before contingency.</summary>
     public decimal TotalCost => LaborCost + NonLaborCost;
+    public decimal ContingencyCost => ContingencyCalculator.Reserve(TotalCost, ContingencyPct);
+    public decimal TotalCostWithContingency => TotalCost + ContingencyCost;
     public bool IsComplete => Lines.All(l => !l.IsUnpriced);
 }
 
@@ -53,7 +56,7 @@ public static class ForecastCalculator
 
         var nonLabor = initiative.NonLaborCosts.Select(c => PriceNonLabor(c, initiative)).ToList();
 
-        return new ForecastResult(lines, nonLabor);
+        return new ForecastResult(lines, nonLabor, initiative.ContingencyPct);
     }
 
     public static NonLaborForecastLine PriceNonLabor(InitiativeNonLaborCost line, Initiative initiative)

@@ -65,7 +65,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.StartsWith("# Initiatives", text);
         var initiativesSection = text[..text.IndexOf("\n# ", StringComparison.Ordinal)];
         var row = Assert.Single(initiativesSection.Split('\n'), l => l.StartsWith($"{id},Export {tag},"));
-        Assert.StartsWith($"{id},Export {tag},Boarding,Active,2026-03-01,1,200,24000,24000,0,0,200,24000,5,500,-23500,-97.9,", row);
+        Assert.StartsWith($"{id},Export {tag},Boarding,Active,2026-03-01,1,200,24000,24000,0,0,0,0,24000,,200,24000,5,500,-23500,-97.9,", row);
         Assert.EndsWith(",10,No,No,No,EffortDriven,", row.TrimEnd('\r'));
         Assert.Contains("ETC cost,EAC cost,Projected variance,Projected variance %", text);
         Assert.Contains("# By status", text);
@@ -161,6 +161,81 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         using var reader = new StreamReader(archive.GetEntry("xl/workbook.xml")!.Open());
         return Regex.Matches(await reader.ReadToEndAsync(), "<(?:x:)?sheet [^>]*name=\"([^\"]+)\"")
             .Select(m => m.Groups[1].Value).OrderBy(n => n).ToList();
+    }
+
+    [Fact]
+    public async Task Contingency_and_confidence_flow_through_details_baseline_portfolio_and_exports()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var id = await CreateInitiativeAsync(client, $"Contingency {tag}");
+        string name; int buId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var i = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Initiatives.SingleAsync(x => x.Id == id);
+            name = i.Name; buId = i.BusinessUnitId;
+        }
+
+        var tooHigh = await PostFormAsync(client, $"/Initiatives/Edit/{id}", $"/Initiatives/Edit/{id}", new()
+        {
+            ["Id"] = id.ToString(), ["Name"] = name, ["BusinessUnitId"] = buId.ToString(), ["SizingMethod"] = nameof(SizingMethod.Direct),
+            ["PlanningMode"] = nameof(PlanningMode.EffortDriven), ["TargetStart"] = "2026-03-01", ["ContingencyPct"] = "150"
+        });
+        Assert.Equal(HttpStatusCode.OK, tooHigh.StatusCode);
+
+        var edit = await PostFormAsync(client, $"/Initiatives/Edit/{id}", $"/Initiatives/Edit/{id}", new()
+        {
+            ["Id"] = id.ToString(), ["Name"] = name, ["BusinessUnitId"] = buId.ToString(), ["SizingMethod"] = nameof(SizingMethod.Direct),
+            ["PlanningMode"] = nameof(PlanningMode.EffortDriven), ["TargetStart"] = "2026-03-01",
+            ["ContingencyPct"] = "10", ["EstimateConfidence"] = nameof(EstimateConfidence.Low)
+        });
+        Assert.Equal(HttpStatusCode.Redirect, edit.StatusCode);
+
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        int phaseId, typeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            phaseId = (await db.Phases.FirstAsync(p => p.InitiativeId == id)).Id;
+            typeId = (await db.ResourceTypes.FirstAsync(t => t.Name == "Software Engineer")).Id;
+        }
+        await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
+            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+        });
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync(details));
+        Assert.Contains("Contingency 10%", html);
+        Assert.Contains("Low confidence", html);
+        Assert.Contains("id=\"forecast-with-contingency\">$26,400", html);
+        Assert.Contains("+$2,400 reserve (10%)", html);
+
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new())).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var baseline = await scope.ServiceProvider.GetRequiredService<AppDbContext>().ForecastBaselines.SingleAsync(b => b.InitiativeId == id);
+            Assert.Equal(24_000m, baseline.TotalCost);
+            Assert.Equal(10m, baseline.ContingencyPct);
+            Assert.Equal(2_400m, baseline.ContingencyCost);
+            Assert.Equal(EstimateConfidence.Low, baseline.EstimateConfidence);
+        }
+        Assert.Contains("$2,400 (10%)", WebUtility.HtmlDecode(await client.GetStringAsync(details)));
+
+        var portfolio = WebUtility.HtmlDecode(await client.GetStringAsync("/Portfolio"));
+        Assert.Contains("id=\"portfolio-contingency\"", portfolio);
+        Assert.Contains("10% · $26,400 total", portfolio);
+        Assert.Contains("low-confidence", portfolio);
+
+        var csv = await client.GetStringAsync("/Portfolio/Export?format=csv");
+        Assert.Contains("Contingency %,Contingency cost,Forecast cost with contingency,Estimate confidence", csv);
+        Assert.Contains($"Contingency {tag}", csv);
+        Assert.Matches(new Regex($"Contingency {tag},.*,10(\\.0+)?,2400(\\.0+)?,26400(\\.0+)?,Low,"), csv);
+
+        var initiativeCsv = await client.GetStringAsync($"/Initiatives/{id}/Export?format=csv");
+        Assert.Contains("Contingency cost,2400", initiativeCsv);
+        Assert.Contains("Estimate confidence,Low", initiativeCsv);
     }
 
     private async Task<int> CreateActivatedInitiativeAsync(HttpClient client, string name)

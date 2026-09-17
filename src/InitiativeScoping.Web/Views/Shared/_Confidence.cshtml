@@ -1,0 +1,6 @@
+@model EstimateConfidence?
+@if (Model is { } c)
+{
+    var cls = c switch { EstimateConfidence.High => "text-bg-success", EstimateConfidence.Medium => "text-bg-warning", _ => "text-bg-danger" };
+    <span class="badge @cls confidence-badge" title="Estimate confidence: @c">@c confidence</span>
+}

@@ -53,6 +53,14 @@ public enum PlanningMode
     FixedDuration = 2
 }
 
+/// <summary>How much the estimator trusts the plan; informational, surfaced on Portfolio so readers can weigh the forecast.</summary>
+public enum EstimateConfidence
+{
+    Low = 1,
+    Medium = 2,
+    High = 3
+}
+
 /// <summary>What a cost line pays for. Labor is priced from rate cards; the rest are non-labor lines.</summary>
 public enum CostCategory
 {
