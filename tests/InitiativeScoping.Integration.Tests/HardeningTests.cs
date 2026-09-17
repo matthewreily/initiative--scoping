@@ -98,7 +98,9 @@ public class HardeningTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10), $"Portfolio took {stopwatch.Elapsed}");
 
         var csv = await client.GetStringAsync("/Portfolio/Export?format=csv");
-        Assert.Equal(count, Regex.Matches(csv, $",Scale {tag} \\d{{3}},").Count);
+        var initiativesSection = csv[..csv.IndexOf("\n# ", StringComparison.Ordinal)];
+        Assert.Equal(count, Regex.Matches(initiativesSection, $",Scale {tag} \\d{{3}},").Count);
+        Assert.Contains("# Initiative by month", csv);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

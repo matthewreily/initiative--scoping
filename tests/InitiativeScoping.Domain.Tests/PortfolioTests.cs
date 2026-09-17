@@ -113,7 +113,7 @@ public class PortfolioCalculatorTests
 
         var tables = PortfolioExport.Build(result);
 
-        Assert.Equal(["Initiatives", "By sponsor business unit", "By status", "By resourcing business unit", "By vendor"], tables.Select(t => t.Name));
+        Assert.Equal(["Initiatives", "By sponsor business unit", "By status", "By resourcing business unit", "By vendor", "By month", "Initiative by month"], tables.Select(t => t.Name));
         var row = Assert.Single(tables[0].Rows);
         Assert.Equal(tables[0].Headers.Count, row.Count);
         Assert.Equal("I1", row[1]);
