@@ -370,7 +370,7 @@ else
                     <td class="text-end text-nowrap">
                         @if (Model.ScopeWritable)
                         {
-                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditPhase" asp-route-id="@p.Id">Edit</a>
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditPhase" asp-route-id="@p.Id" data-panel="Edit phase">Edit</a>
                             <form asp-action="DeletePhase" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Delete phase @p.Name?');">
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
                             </form>
@@ -428,7 +428,7 @@ else
                     <td class="text-end text-nowrap">
                         @if (Model.ScopeWritable)
                         {
-                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditAllocation" asp-route-id="@a.Id">Edit</a>
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditAllocation" asp-route-id="@a.Id" data-panel="Edit allocation">Edit</a>
                             <form asp-action="DeleteAllocation" asp-route-id="@a.Id" method="post" class="d-inline">
                                 <button type="submit" class="btn btn-outline-danger btn-sm" aria-label="Remove allocation">&times;</button>
                             </form>
@@ -654,7 +654,7 @@ else
                     <td class="text-end text-nowrap">
                         @if (Model.ScopeWritable)
                         {
-                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditNonLaborCost" asp-route-id="@c.Id">Edit</a>
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditNonLaborCost" asp-route-id="@c.Id" data-panel="Edit non-labor cost">Edit</a>
                             <form asp-action="DeleteNonLaborCost" asp-route-id="@c.Id" method="post" class="d-inline">
                                 <button type="submit" class="btn btn-outline-danger btn-sm" aria-label="Remove non-labor cost">&times;</button>
                             </form>
