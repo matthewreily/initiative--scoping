@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>@ViewData["Title"] - Initiative Scoping</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="print-body">
+    <div class="print-toolbar d-print-none border-bottom bg-body-tertiary">
+        <div class="container-lg d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+            <div class="small text-muted">@ViewData["PrintHint"]</div>
+            <div class="d-flex gap-2">
+                @RenderSection("Toolbar", required: false)
+                <button type="button" class="btn btn-primary btn-sm" onclick="window.print()" id="print-button">Print / Save as PDF</button>
+            </div>
+        </div>
+    </div>
+    <main id="main" class="container-lg py-3 print-page">
+        @RenderBody()
+    </main>
+</body>
+</html>
