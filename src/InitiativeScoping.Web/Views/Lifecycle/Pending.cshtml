@@ -5,6 +5,41 @@
 <h1 class="h3">Approvals</h1>
 <p class="text-muted">Requests from initiative Owners that need an Administrator decision.</p>
 
+<h2 class="h5 mt-4">Change requests</h2>
+@if (Model.Changes.Count == 0)
+{
+    <p class="text-muted">No change requests awaiting approval.</p>
+}
+else
+{
+    <div class="table-responsive">
+    <table data-sortable class="table table-sm align-middle">
+        <thead><tr><th>Initiative</th><th>Change</th><th>Type</th><th>Requested</th><th class="text-end">Est. cost impact</th><th class="text-end">Est. hours</th><th>Reason</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Changes)
+        {
+            <tr>
+                <td><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@r.InitiativeId" asp-fragment="pane-changes">@r.Initiative?.Name</a></td>
+                <td><span class="fw-semibold">@r.Code</span> @r.Title</td>
+                <td>@r.Type</td>
+                <td class="small">@r.RequestedAt.ToString("yyyy-MM-dd") by @Users.Display(r.RequestedBy)</td>
+                <td class="text-end">@(r.EstimatedCostImpact is null ? "—" : r.EstimatedCostImpact.Value.ToString("+#,##0;-#,##0;0"))</td>
+                <td class="text-end">@(r.EstimatedHoursImpact is null ? "—" : r.EstimatedHoursImpact.Value.ToString("+#,##0.#;-#,##0.#;0"))</td>
+                <td class="small">@r.Reason</td>
+                <td class="text-end">
+                    <form asp-controller="ChangeRequests" asp-action="Decide" asp-route-id="@r.InitiativeId" asp-route-requestId="@r.Id" method="post" class="d-flex gap-2 justify-content-end">
+                        <input name="note" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 12rem" />
+                        <button type="submit" name="approve" value="true" class="btn btn-success btn-sm">Approve</button>
+                        <button type="submit" name="approve" value="false" class="btn btn-outline-danger btn-sm">Reject</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    </div>
+}
+
 <h2 class="h5 mt-4">Activation requests</h2>
 @if (Model.Activations.Count == 0)
 {

@@ -1,0 +1,135 @@
+@using InitiativeScoping.Domain.Enums
+@model InitiativeDetailsModel
+@{
+    var i = Model.Initiative;
+    var changes = i.ChangeRequests.OrderByDescending(c => c.Number).ToList();
+    var nextVersion = (i.CurrentBaseline?.Version ?? 0) + 1;
+    string StatusClass(ChangeRequestStatus s) => s switch
+    {
+        ChangeRequestStatus.Pending => "text-bg-warning",
+        ChangeRequestStatus.Approved => "text-bg-info",
+        ChangeRequestStatus.Implemented => "text-bg-success",
+        ChangeRequestStatus.Rejected => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+    string Signed(decimal? v, string fmt) => v is null ? "—" : v.Value.ToString(fmt);
+}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <h2 class="h5">Change requests</h2>
+        <p class="small text-muted">Formal changes to an Active plan. Approval by an Administrator unlocks scope (opens or joins a re-baseline); the change is marked <em>Implemented</em> when the Owner finalizes the next baseline, recording the realised impact next to the estimate.</p>
+        @if (changes.Count == 0)
+        {
+            <div class="empty-state small text-muted" id="changes-empty">No change requests yet.@if (Model.CanManage && i.Status == InitiativeStatus.Active) { <text> Raise one below to change scope, schedule, cost or resourcing on this Active initiative.</text> }</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+            <table class="table table-sm align-middle" id="change-requests">
+                <thead><tr><th>#</th><th>Change</th><th>Type</th><th>Status</th><th>Requested</th><th class="text-end">Cost impact<br /><span class="fw-normal small text-muted">est. / actual</span></th><th class="text-end">Hours impact<br /><span class="fw-normal small text-muted">est. / actual</span></th><th>Baseline</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var c in changes)
+                {
+                    <tr id="cr-@c.Id">
+                        <td class="fw-semibold text-nowrap">@c.Code</td>
+                        <td>
+                            <div>@c.Title</div>
+                            <div class="small text-muted">@c.Description</div>
+                            <div class="small"><span class="text-muted">Reason:</span> @c.Reason</div>
+                            @if (c.ProposedTargetEnd is not null)
+                            {
+                                <div class="small"><span class="text-muted">Target end:</span> @(c.TargetEndBefore?.ToString("yyyy-MM-dd") ?? "—") &rarr; @c.ProposedTargetEnd?.ToString("yyyy-MM-dd")@if (c.TargetEndAfter is not null && c.TargetEndAfter != c.ProposedTargetEnd) { <text> (baselined @c.TargetEndAfter?.ToString("yyyy-MM-dd"))</text> }</div>
+                            }
+                            @if (c.DecidedBy is not null)
+                            {
+                                <div class="small text-muted">@(c.Status == ChangeRequestStatus.Withdrawn ? "Withdrawn" : c.Status == ChangeRequestStatus.Rejected ? "Rejected" : "Approved") by @Users.Display(c.DecidedBy) on @c.DecidedAt?.ToString("yyyy-MM-dd")@(string.IsNullOrEmpty(c.DecisionNote) ? "" : $": \u201c{c.DecisionNote}\u201d")</div>
+                            }
+                        </td>
+                        <td>@c.Type</td>
+                        <td><span class="badge @StatusClass(c.Status)">@c.Status</span></td>
+                        <td class="small">@c.RequestedAt.ToString("yyyy-MM-dd")<br />@Users.Display(c.RequestedBy)</td>
+                        <td class="text-end text-nowrap">@Signed(c.EstimatedCostImpact, "+#,##0;-#,##0;0") / <span title="Forecast @c.ForecastCostBefore.ToString("C0") when raised@(c.ForecastCostAfter is null ? "" : $", {c.ForecastCostAfter.Value:C0} at implementation")">@Signed(c.ActualCostImpact, "+#,##0;-#,##0;0")</span></td>
+                        <td class="text-end text-nowrap">@Signed(c.EstimatedHoursImpact, "+#,##0.#;-#,##0.#;0") / @Signed(c.ActualHoursImpact, "+#,##0.#;-#,##0.#;0")</td>
+                        <td class="small text-nowrap">
+                            @(c.BaselineVersionBefore is null ? "—" : $"v{c.BaselineVersionBefore}")
+                            @if (c.ResultingBaseline is not null)
+                            {
+                                <text>&rarr; <a asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id" asp-route-version="@c.ResultingBaseline.Version">v@(c.ResultingBaseline.Version)</a></text>
+                            }
+                            else if (c.Status == ChangeRequestStatus.Approved)
+                            {
+                                <text>&rarr; <span class="text-muted">v@(nextVersion) pending</span></text>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (c.Status == ChangeRequestStatus.Pending)
+                            {
+                                <div class="d-flex flex-column gap-1 align-items-end">
+                                @if (Model.CanApproveRebaseline)
+                                {
+                                    <form asp-controller="ChangeRequests" asp-action="Decide" asp-route-id="@i.Id" asp-route-requestId="@c.Id" method="post" class="d-flex gap-1 inline-form">
+                                        <input name="note" aria-label="Decision note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 10rem" />
+                                        <button type="submit" name="approve" value="true" class="btn btn-success btn-sm">Approve</button>
+                                        <button type="submit" name="approve" value="false" class="btn btn-outline-danger btn-sm">Reject</button>
+                                    </form>
+                                }
+                                @if (Model.CanManage)
+                                {
+                                    <form asp-controller="ChangeRequests" asp-action="Withdraw" asp-route-id="@i.Id" asp-route-requestId="@c.Id" method="post">
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Withdraw</button>
+                                    </form>
+                                }
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+
+        @if (Model.CanManage && i.Status == InitiativeStatus.Active && !i.IsScenario)
+        {
+            <h3 class="h6 mt-4">Raise a change request</h3>
+            <form asp-controller="ChangeRequests" asp-action="Raise" asp-route-id="@i.Id" method="post" class="row g-2" id="change-request-form">
+                <div class="col-md-3">
+                    <label class="form-label" for="cr-type">Type</label>
+                    <select id="cr-type" name="Type" class="form-select form-select-sm" asp-items="Html.GetEnumSelectList<ChangeRequestType>()"></select>
+                </div>
+                <div class="col-md-9">
+                    <label class="form-label" for="cr-title">Title</label>
+                    <input id="cr-title" name="Title" class="form-control form-control-sm" maxlength="200" required />
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="cr-description">What changes</label>
+                    <textarea id="cr-description" name="Description" class="form-control form-control-sm" rows="2" maxlength="4000" required placeholder="Describe the change to scope, schedule, cost or resourcing"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="cr-reason">Reason / justification</label>
+                    <textarea id="cr-reason" name="Reason" class="form-control form-control-sm" rows="2" maxlength="2000" required></textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="cr-cost">Estimated cost impact</label>
+                    <input id="cr-cost" name="EstimatedCostImpact" type="number" step="0.01" class="form-control form-control-sm" placeholder="+ increase / − decrease" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="cr-hours">Estimated hours impact</label>
+                    <input id="cr-hours" name="EstimatedHoursImpact" type="number" step="0.5" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="cr-end">Proposed target end <span class="text-muted">(schedule changes)</span></label>
+                    <input id="cr-end" name="ProposedTargetEnd" type="date" class="form-control form-control-sm" />
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary btn-sm">Raise change request</button>
+                    <span class="small text-muted ms-2">Current forecast @Model.Forecast.TotalCost.ToString("C0") / @Model.Forecast.TotalHours.ToString("N1") h@(i.CurrentBaseline is null ? "" : $" against baseline v{i.CurrentBaseline.Version}") is recorded as the “before” snapshot.</span>
+                </div>
+            </form>
+        }
+        else if (Model.CanManage && i.Status != InitiativeStatus.Active)
+        {
+            <p class="small text-muted mt-3">Change requests are raised on Active initiatives; a Draft can be edited directly.</p>
+        }
+    </div>
+</div>

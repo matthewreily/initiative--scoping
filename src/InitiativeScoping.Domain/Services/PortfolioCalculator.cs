@@ -34,6 +34,18 @@ public sealed record PortfolioRow(
     public decimal EacCost => Variance.EacCost;
     public bool ExceedsThreshold => Variance.ExceedsThreshold;
     public bool HasUnpricedForecast => !Forecast.IsComplete;
+    public int PendingChangeRequests => Initiative.ChangeRequests.Count(c => c.Status == ChangeRequestStatus.Pending);
+    public int ApprovedChangeRequests => Initiative.ChangeRequests.Count(c => c.Status == ChangeRequestStatus.Approved);
+    public int ImplementedChangeRequests => Initiative.ChangeRequests.Count(c => c.Status == ChangeRequestStatus.Implemented);
+    /// <summary>Sum of requester estimates on change requests still awaiting a decision; null when none carry an estimate.</summary>
+    public decimal? PendingChangeCostImpact
+    {
+        get
+        {
+            var estimates = Initiative.ChangeRequests.Where(c => c.Status == ChangeRequestStatus.Pending && c.EstimatedCostImpact is not null).Select(c => c.EstimatedCostImpact!.Value).ToList();
+            return estimates.Count == 0 ? null : estimates.Sum();
+        }
+    }
     public bool HasUnpricedActuals => Variance.UnpricedEntries > 0;
 
     /// <summary>Spent as a share of baseline (or of the live forecast for un-baselined initiatives), capped at 100 for rendering.</summary>

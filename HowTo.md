@@ -76,6 +76,16 @@ The comparison shows the live plan first and every scenario beside it – schedu
 2. Administrator: **Approvals** (nav bar) → **Approve** (scope unlocks) or **Reject**.
 3. Owner edits phases/allocations, then **Finalize** to snapshot **v2**. All versions remain in `Baselines` with deltas; variance is always measured against the *current* version. Baseline lines store the phase, business unit, resource type, seniority and vendor **names as of the snapshot**, so renaming a catalog entry later does not relabel historical baselines.
 
+### Change requests
+
+Formal scope / schedule / cost / resource changes on an **Active** initiative go through the **Changes** tab instead of an ad-hoc re-baseline:
+
+1. Owner: **Raise change request** — type, title, what changes, reason, optional estimated cost / hours impact and (for schedule changes) the proposed target end. The live forecast, current baseline version and target end are recorded as the *before* snapshot; requests are numbered **CR-1, CR-2, …** per initiative. A pending request can be **withdrawn** by the Owner.
+2. Administrator: **Approve** or **Reject** (with an optional note) from the Changes tab or the **Approvals** queue. Approving a change on an Active initiative opens an *approved* re-baseline (or joins the one already open), so scope unlocks immediately.
+3. Owner applies the change to phases / allocations / non-labor, then **Finalize baseline vN+1**. Every approved change linked to that re-baseline becomes **Implemented**, capturing the *after* forecast, the resulting baseline version and the realised cost / hours impact (shown as *estimated / actual*).
+
+Raising, deciding, withdrawing and implementing are audited (`ChangeRequest`, `ChangeRequestDecision`, `ChangeRequestImplemented`). Portfolio rows flag pending / approved changes (with the summed estimated pending cost impact) and the Portfolio and initiative exports include a **Change requests** table.
+
 ### Notes
 
 The **Notes** tab on an initiative holds free-text notes (context, decisions, assumptions) with author and UTC timestamp; the `Baselines` page has a separate **Notes on baseline vN** panel under each selected version for sign-offs and caveats, and those notes also appear on the initiative's Notes tab with a *baseline vN* badge (the History tab shows a per-version note count). Users and Administrators add notes (max 4,000 characters); authors delete their own, Administrators delete any; Viewers read only. Adding and deleting are recorded in the audit log.

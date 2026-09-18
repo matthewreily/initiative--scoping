@@ -41,6 +41,7 @@ public class Initiative
     public List<RebaselineRequest> RebaselineRequests { get; set; } = [];
     public List<ActivationRequest> ActivationRequests { get; set; } = [];
     public List<InitiativeNote> Notes { get; set; } = [];
+    public List<ChangeRequest> ChangeRequests { get; set; } = [];
     public List<InitiativeSourceMapping> SourceMappings { get; set; } = [];
 
     public bool IsScenario => ScenarioOfId is not null;
@@ -50,6 +51,10 @@ public class Initiative
     /// <summary>An approved re-baseline that has not yet been finalised into a new baseline version.</summary>
     public RebaselineRequest? OpenRebaseline =>
         RebaselineRequests.FirstOrDefault(r => r.Status is RebaselineStatus.Pending or RebaselineStatus.Approved);
+
+    /// <summary>Change requests awaiting an Admin decision.</summary>
+    public IEnumerable<ChangeRequest> PendingChangeRequests =>
+        ChangeRequests.Where(c => c.Status == ChangeRequestStatus.Pending);
 
     /// <summary>An activation request awaiting an Admin decision.</summary>
     public ActivationRequest? PendingActivation =>
@@ -111,6 +116,52 @@ public class RebaselineRequest
     public string? DecisionNote { get; set; }
     public int? ResultingBaselineId { get; set; }
     public ForecastBaseline? ResultingBaseline { get; set; }
+}
+
+/// <summary>
+/// A formal request to change an Active initiative's scope, schedule, cost or resourcing.
+/// Approval by an Admin opens (or joins) a re-baseline; finalising that re-baseline marks the change Implemented
+/// and records the resulting baseline so the before/after impact is explainable.
+/// </summary>
+public class ChangeRequest
+{
+    public int Id { get; set; }
+    public int InitiativeId { get; set; }
+    public Initiative? Initiative { get; set; }
+    /// <summary>Sequence within the initiative, shown as CR-1, CR-2, …</summary>
+    public int Number { get; set; }
+    public ChangeRequestType Type { get; set; }
+    public ChangeRequestStatus Status { get; set; } = ChangeRequestStatus.Pending;
+    public required string Title { get; set; }
+    public required string Description { get; set; }
+    public required string Reason { get; set; }
+    /// <summary>Requester's estimate of the cost impact (positive = increase). Null when unknown.</summary>
+    public decimal? EstimatedCostImpact { get; set; }
+    public decimal? EstimatedHoursImpact { get; set; }
+    /// <summary>Requested new target end, when the change moves the schedule.</summary>
+    public DateOnly? ProposedTargetEnd { get; set; }
+    // Snapshot of the plan when the request was raised.
+    public int? BaselineVersionBefore { get; set; }
+    public decimal ForecastHoursBefore { get; set; }
+    public decimal ForecastCostBefore { get; set; }
+    public DateOnly? TargetEndBefore { get; set; }
+    // Captured when the linked re-baseline is finalised.
+    public decimal? ForecastHoursAfter { get; set; }
+    public decimal? ForecastCostAfter { get; set; }
+    public DateOnly? TargetEndAfter { get; set; }
+    public required string RequestedBy { get; set; }
+    public DateTimeOffset RequestedAt { get; set; }
+    public string? DecidedBy { get; set; }
+    public DateTimeOffset? DecidedAt { get; set; }
+    public string? DecisionNote { get; set; }
+    public int? RebaselineRequestId { get; set; }
+    public RebaselineRequest? RebaselineRequest { get; set; }
+    public int? ResultingBaselineId { get; set; }
+    public ForecastBaseline? ResultingBaseline { get; set; }
+
+    public string Code => $"CR-{Number}";
+    public decimal? ActualCostImpact => ForecastCostAfter is null ? null : ForecastCostAfter - ForecastCostBefore;
+    public decimal? ActualHoursImpact => ForecastHoursAfter is null ? null : ForecastHoursAfter - ForecastHoursBefore;
 }
 
 public class InitiativeMember
