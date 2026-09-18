@@ -1,0 +1,86 @@
+@using InitiativeScoping.Domain.Services
+@model ScenarioCompareModel
+@{
+    Layout = "_LayoutPrint";
+    var p = Model.Parent;
+    var cols = Model.Comparison.Columns;
+    ViewData["Title"] = $"{p.Name} – Scenario comparison";
+    ViewData["PrintHint"] = cols.Count > 3
+        ? "Landscape fits more scenarios side by side. Use your browser's Print dialog and choose “Save as PDF” to export."
+        : "Use your browser's Print dialog and choose “Save as PDF” to export.";
+
+    decimal PhaseHours(ScenarioColumn c, int phaseId) => c.Forecast.Lines.Where(l => l.Allocation.PhaseId == phaseId).Sum(l => l.Hours);
+    decimal PhaseCost(ScenarioColumn c, int phaseId) =>
+        c.Forecast.Lines.Where(l => l.Allocation.PhaseId == phaseId).Sum(l => l.Cost)
+        + c.Forecast.NonLaborLines.Where(l => l.Line.PhaseId == phaseId).Sum(l => l.Cost);
+}
+@section Toolbar {
+    <a class="btn btn-outline-secondary btn-sm" asp-controller="Scenarios" asp-action="Compare" asp-route-id="@p.Id">Back to scenarios</a>
+}
+
+<header class="d-flex justify-content-between align-items-start gap-3 border-bottom pb-2 mb-3">
+    <div>
+        <div class="text-muted small text-uppercase">Scenario comparison</div>
+        <h1 class="h3 mb-1">@p.Name <partial name="~/Views/Initiatives/_StatusBadge.cshtml" model="p.Status" /></h1>
+        <div class="small text-muted">
+            @p.BusinessUnit?.Name@(string.IsNullOrWhiteSpace(p.SponsoringTeam) ? "" : $" · {p.SponsoringTeam}")
+            · Live plan and @(cols.Count - 1) scenario@(cols.Count == 2 ? "" : "s"); deltas are against the live plan.
+        </div>
+    </div>
+    <div class="text-end small text-muted text-nowrap">
+        <div>Generated @Model.GeneratedAt.ToString("yyyy-MM-dd HH:mm") UTC</div>
+        <div>Forecast at published rates</div>
+    </div>
+</header>
+
+@if (cols.Count == 1)
+{
+    <p class="text-muted small">No scenarios yet — the live plan is shown for reference.</p>
+}
+
+<section id="scenario-print-compare" class="mb-3">
+    <partial name="_CompareTable" model="Model" />
+</section>
+
+<section id="scenario-print-phases">
+    <h2 class="h6 text-uppercase text-muted">Phase schedule</h2>
+    <div class="row g-3">
+        @foreach (var c in cols)
+        {
+            var phases = c.Initiative.Phases.OrderBy(ph => ph.PlannedStart).ThenBy(ph => ph.Name).ToList();
+            <div class="col-md-6">
+                <div class="fw-semibold small">@c.Initiative.Name <span class="text-muted fw-normal">· @(c.IsParent ? "Live plan" : "Scenario")</span></div>
+                @if (phases.Count == 0)
+                {
+                    <div class="text-muted small">No phases.</div>
+                }
+                else
+                {
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Phase</th>
+                                <th class="text-nowrap">Start</th>
+                                <th class="text-nowrap">End</th>
+                                <th class="text-end">Hours</th>
+                                <th class="text-end">Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ph in phases)
+                            {
+                                <tr>
+                                    <td>@ph.Name</td>
+                                    <td class="text-nowrap">@ph.PlannedStart.ToString("yyyy-MM-dd")</td>
+                                    <td class="text-nowrap">@ph.PlannedEnd.ToString("yyyy-MM-dd")</td>
+                                    <td class="text-end">@PhaseHours(c, ph.Id).ToString("N1")</td>
+                                    <td class="text-end">@PhaseCost(c, ph.Id).ToString("C0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        }
+    </div>
+</section>

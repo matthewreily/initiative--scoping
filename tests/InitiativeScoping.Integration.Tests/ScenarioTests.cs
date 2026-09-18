@@ -105,7 +105,27 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         Assert.Contains("-$12,000", compare);
         Assert.Contains("-100.0", compare);
         Assert.Contains($"/Initiatives/{id}/Scenarios/{scenarioId}/Promote", compare);
+        Assert.Contains($"/Initiatives/{id}/Scenarios/Print", compare);
         Assert.Contains($"Scenarios (1)", WebUtility.HtmlDecode(await client.GetStringAsync(details)));
+
+        // Printable comparison: same figures, no app chrome, links or actions, plus each plan's phase schedule.
+        foreach (var printUrl in new[] { $"/Initiatives/{id}/Scenarios/Print", $"/Initiatives/{scenarioId}/Scenarios/Print" })
+        {
+            var print = WebUtility.HtmlDecode(await client.GetStringAsync(printUrl));
+            Assert.Contains("Scenario comparison", print);
+            Assert.Contains($"Live {tag}", print);
+            Assert.Contains($"Lean {tag}", print);
+            Assert.Contains("$24,000", print);
+            Assert.Contains("-$12,000", print);
+            Assert.Contains("id=\"print-button\"", print);
+            Assert.Contains("id=\"scenario-print-phases\"", print);
+            Assert.DoesNotContain("/Promote", print);
+            Assert.DoesNotContain("New scenario from live plan", print);
+            Assert.DoesNotContain("class=\"navbar", print);
+            Assert.DoesNotContain("/Initiatives/Details/", print);
+        }
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/Initiatives/999999/Scenarios/Print")).StatusCode);
 
         // Unrelated initiative cannot be promoted onto this one.
         var otherId = await CreatePlannedInitiativeAsync(client, $"Other {tag}");

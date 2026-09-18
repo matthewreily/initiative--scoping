@@ -2,25 +2,7 @@
 @{
     var p = Model.Parent;
     ViewData["Title"] = $"{p.Name} – Scenarios";
-    var cmp = Model.Comparison;
-    var cols = cmp.Columns;
-    var parent = cmp.Parent;
-
-    string Delta(decimal value, decimal baseValue, string format, bool lowerIsBetter = true)
-    {
-        var d = value - baseValue;
-        if (d == 0) { return ""; }
-        var cls = (d < 0) == lowerIsBetter ? "text-success" : "text-danger";
-        return $"<div class=\"small {cls}\">{(d > 0 ? "+" : "")}{d.ToString(format)}</div>";
-    }
-
-    string DeltaDays(DateOnly? value, DateOnly? baseValue)
-    {
-        if (value is null || baseValue is null) { return ""; }
-        var d = value.Value.DayNumber - baseValue.Value.DayNumber;
-        if (d == 0) { return ""; }
-        return $"<div class=\"small {(d < 0 ? "text-success" : "text-danger")}\">{(d > 0 ? "+" : "")}{d} d</div>";
-    }
+    var cols = Model.Comparison.Columns;
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb">
     <li class="breadcrumb-item"><a asp-controller="Initiatives" asp-action="Index">Initiatives</a></li>
@@ -38,13 +20,16 @@
             }
         </div>
     </div>
-    @if (Model.CanEdit)
-    {
-        <form asp-controller="Scenarios" asp-action="Create" asp-route-id="@p.Id" method="post" class="d-flex gap-2 inline-form">
-            <input asp-for="NewScenario.Name" name="Name" class="form-control form-control-sm" style="width: 18rem" aria-label="Scenario name" required maxlength="300" />
-            <button type="submit" class="btn btn-primary btn-sm text-nowrap">New scenario from live plan</button>
-        </form>
-    }
+    <div class="d-flex flex-wrap gap-2 align-items-start">
+        <a class="btn btn-outline-secondary btn-sm text-nowrap" asp-controller="Scenarios" asp-action="Print" asp-route-id="@p.Id" id="scenarios-print-link">Print / PDF</a>
+        @if (Model.CanEdit)
+        {
+            <form asp-controller="Scenarios" asp-action="Create" asp-route-id="@p.Id" method="post" class="d-flex gap-2 inline-form">
+                <input asp-for="NewScenario.Name" name="Name" class="form-control form-control-sm" style="width: 18rem" aria-label="Scenario name" required maxlength="300" />
+                <button type="submit" class="btn btn-primary btn-sm text-nowrap">New scenario from live plan</button>
+            </form>
+        }
+    </div>
 </div>
 
 @if (cols.Count == 1)
@@ -54,131 +39,4 @@
     </div>
 }
 
-<div class="table-responsive">
-<table class="table table-sm align-middle scenario-compare">
-    <thead>
-        <tr>
-            <th style="min-width: 12rem"></th>
-            @foreach (var c in cols)
-            {
-                <th class="text-end @(c.IsParent ? "table-active" : "")" style="min-width: 11rem">
-                    <a asp-controller="Initiatives" asp-action="Details" asp-route-id="@c.Initiative.Id">@c.Initiative.Name</a>
-                    <div class="small fw-normal text-muted">@(c.IsParent ? "Live plan" : $"Scenario · created {c.Initiative.CreatedAt:yyyy-MM-dd}")</div>
-                </th>
-            }
-        </tr>
-    </thead>
-    <tbody>
-        <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Schedule</span></th></tr>
-        <tr>
-            <th scope="row">Planning mode</th>
-            @foreach (var c in cols) { <td class="text-end">@(c.Initiative.PlanningMode == PlanningMode.FixedDuration ? "Fixed duration" : "Effort driven")</td> }
-        </tr>
-        <tr>
-            <th scope="row">Sizing</th>
-            @foreach (var c in cols) { <td class="text-end">@(c.Initiative.SizingMethod == SizingMethod.Direct ? "Direct hours" : $"{c.Initiative.SizingMethod} {c.Initiative.SizeKey}")</td> }
-        </tr>
-        <tr>
-            <th scope="row">Phases</th>
-            @foreach (var c in cols) { <td class="text-end">@c.Initiative.Phases.Count</td> }
-        </tr>
-        <tr>
-            <th scope="row">Plan start</th>
-            @foreach (var c in cols) { <td class="text-end">@(c.PlanStart?.ToString("yyyy-MM-dd") ?? "—")@Html.Raw(c.IsParent ? "" : DeltaDays(c.PlanStart, parent.PlanStart))</td> }
-        </tr>
-        <tr>
-            <th scope="row">Plan end</th>
-            @foreach (var c in cols) { <td class="text-end">@(c.PlanEnd?.ToString("yyyy-MM-dd") ?? "—")@Html.Raw(c.IsParent ? "" : DeltaDays(c.PlanEnd, parent.PlanEnd))</td> }
-        </tr>
-
-        <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Effort</span></th></tr>
-        <tr>
-            <th scope="row">Total hours</th>
-            @foreach (var c in cols) { <td class="text-end fw-semibold">@c.Hours.ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.Hours, parent.Hours, "N1"))</td> }
-        </tr>
-        <tr>
-            <th scope="row">People (allocation quantity)</th>
-            @foreach (var c in cols) { <td class="text-end">@c.HeadCount@Html.Raw(c.IsParent ? "" : Delta(c.HeadCount, parent.HeadCount, "N0"))</td> }
-        </tr>
-        <tr>
-            <th scope="row">Internal FTE hours</th>
-            @foreach (var c in cols) { <td class="text-end">@c.InternalHours.ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.InternalHours, parent.InternalHours, "N1"))</td> }
-        </tr>
-        <tr>
-            <th scope="row">Vendor hours</th>
-            @foreach (var c in cols) { <td class="text-end">@c.VendorHours.ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.VendorHours, parent.VendorHours, "N1"))</td> }
-        </tr>
-        @foreach (var typeId in cmp.ResourceTypeIds)
-        {
-            <tr>
-                <th scope="row" class="fw-normal ps-4">@Model.ResourceTypeNames.GetValueOrDefault(typeId, "?") hours</th>
-                @foreach (var c in cols) { <td class="text-end">@c.HoursByResourceType(typeId).ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.HoursByResourceType(typeId), parent.HoursByResourceType(typeId), "N1"))</td> }
-            </tr>
-        }
-
-        <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Cost</span></th></tr>
-        <tr>
-            <th scope="row">Labor</th>
-            @foreach (var c in cols) { <td class="text-end">@c.LaborCost.ToString("C0")@Html.Raw(c.IsParent ? "" : Delta(c.LaborCost, parent.LaborCost, "C0"))</td> }
-        </tr>
-        <tr>
-            <th scope="row" class="fw-normal ps-4">of which vendor</th>
-            @foreach (var c in cols) { <td class="text-end">@c.VendorCost.ToString("C0")@Html.Raw(c.IsParent ? "" : Delta(c.VendorCost, parent.VendorCost, "C0"))</td> }
-        </tr>
-        <tr>
-            <th scope="row">Non-labor</th>
-            @foreach (var c in cols) { <td class="text-end">@c.NonLaborCost.ToString("C0")@Html.Raw(c.IsParent ? "" : Delta(c.NonLaborCost, parent.NonLaborCost, "C0"))</td> }
-        </tr>
-        <tr class="fw-semibold">
-            <th scope="row">Forecast cost</th>
-            @foreach (var c in cols) { <td class="text-end">@c.TotalCost.ToString("C0")@Html.Raw(c.IsParent ? "" : Delta(c.TotalCost, parent.TotalCost, "C0"))</td> }
-        </tr>
-        <tr>
-            <th scope="row">Contingency</th>
-            @foreach (var c in cols) { <td class="text-end">@c.ContingencyCost.ToString("C0") <span class="text-muted small">(@c.Initiative.ContingencyPct.ToString("0.##")%)</span></td> }
-        </tr>
-        <tr class="fw-semibold">
-            <th scope="row">With contingency</th>
-            @foreach (var c in cols) { <td class="text-end">@c.TotalCostWithContingency.ToString("C0")@Html.Raw(c.IsParent ? "" : Delta(c.TotalCostWithContingency, parent.TotalCostWithContingency, "C0"))</td> }
-        </tr>
-        <tr>
-            <th scope="row">Confidence</th>
-            @foreach (var c in cols) { <td class="text-end">@if (c.Initiative.EstimateConfidence is null) { <span class="text-muted">—</span> } else { <partial name="_Confidence" model="c.Initiative.EstimateConfidence" /> }</td> }
-        </tr>
-        <tr>
-            <th scope="row">Unpriced lines</th>
-            @foreach (var c in cols) { <td class="text-end @(c.UnpricedLines > 0 ? "text-danger" : "")">@c.UnpricedLines</td> }
-        </tr>
-    </tbody>
-    @if (cols.Count > 1)
-    {
-        <tfoot>
-            <tr>
-                <th></th>
-                @foreach (var c in cols)
-                {
-                    <td class="text-end">
-                        @if (c.IsParent)
-                        {
-                            <a class="btn btn-outline-secondary btn-sm" asp-controller="Initiatives" asp-action="Details" asp-route-id="@c.Initiative.Id">Open live plan</a>
-                        }
-                        else
-                        {
-                            <div class="d-flex flex-wrap justify-content-end gap-1">
-                                <a class="btn btn-outline-secondary btn-sm" asp-controller="Initiatives" asp-action="Details" asp-route-id="@c.Initiative.Id">Edit</a>
-                                @if (Model.CanPromote)
-                                {
-                                    <form asp-controller="Scenarios" asp-action="Promote" asp-route-id="@p.Id" asp-route-scenarioId="@c.Initiative.Id" method="post" class="d-inline"
-                                          onsubmit="return confirm('Replace the live plan of \'@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(p.Name))\' with this scenario? The scenario is removed afterwards.');">
-                                        <button type="submit" class="btn btn-success btn-sm text-nowrap" title="@(c.UnpricedLines > 0 ? "Some lines have no published rate" : null)">Promote</button>
-                                    </form>
-                                }
-                            </div>
-                        }
-                    </td>
-                }
-            </tr>
-        </tfoot>
-    }
-</table>
-</div>
+<partial name="_CompareTable" model="Model" />

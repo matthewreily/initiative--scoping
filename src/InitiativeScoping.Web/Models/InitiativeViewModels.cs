@@ -499,6 +499,9 @@ public class ScenarioCompareModel
     public required NewScenarioModel NewScenario { get; init; }
     public bool CanEdit { get; init; }
     public bool CanPromote { get; init; }
+    /// <summary>Print layout: no links, forms or action buttons in the comparison table.</summary>
+    public bool Printable { get; init; }
+    public DateTimeOffset GeneratedAt { get; init; }
 }
 
 public class InitiativeOnePagerModel
