@@ -75,8 +75,8 @@ else
 {
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Resource types</div><div class="fs-3">@h.Rows.Count</div></div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Planned hours</div><div class="fs-3">@h.DemandHours.ToString("N0")</div><div class="small text-muted">@h.Months.Count months</div></div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Over-allocated cells</div><div class="fs-3 @(h.OverAllocatedCells > 0 ? "text-danger" : "")" id="capacity-over-count">@h.OverAllocatedCells</div><div class="small text-muted">demand above roster supply</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Planned hours<help for="capacity-demand" /></div><div class="fs-3">@h.DemandHours.ToString("N0")</div><div class="small text-muted">@h.Months.Count months</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Over-allocated cells<help for="over-allocated" /></div><div class="fs-3 @(h.OverAllocatedCells > 0 ? "text-danger" : "")" id="capacity-over-count">@h.OverAllocatedCells</div><div class="small text-muted">demand above roster supply</div></div></div></div>
         <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Legend</div>
             <div class="d-flex flex-wrap gap-1 small mt-1">
                 <span class="heat-swatch heat-1"></span>&lt;30% <span class="heat-swatch heat-2"></span>&lt;60% <span class="heat-swatch heat-3"></span>&lt;85% <span class="heat-swatch heat-4"></span>≤100% <span class="heat-swatch heat-over"></span>&gt;100% <span class="heat-swatch heat-none"></span>no roster
@@ -89,7 +89,7 @@ else
             <thead>
                 <tr>
                     <th scope="col" class="heat-sticky">Resource type</th>
-                    <th scope="col" class="text-end">People</th>
+                    <th scope="col" class="text-end">People<help for="capacity-supply" /></th>
                     @foreach (var m in h.Months)
                     {
                         <th scope="col" class="text-center text-nowrap">@m.ToString("MMM yy")</th>

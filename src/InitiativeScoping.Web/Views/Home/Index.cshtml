@@ -1,9 +1,10 @@
 @model HomeViewModel
 @{
     ViewData["Title"] = "Home";
+    ViewData["Tour"] = "welcome";
 }
 
-<h1 class="mb-1">Initiative Scoping &amp; Cost Tracking</h1>
+<h1 class="mb-1" data-tour="welcome:1" data-tour-title="Welcome" data-tour-text="Initiative Scoping turns a plan (phases, allocations, rate cards) into a priced forecast, freezes it as a baseline at activation, then tracks actuals, variance and budget against it. A quick tour of the main areas follows.">Initiative Scoping &amp; Cost Tracking</h1>
 <p class="text-muted">Signed in as @Model.UserDisplayName</p>
 
 <div class="row g-3 mt-2">

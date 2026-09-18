@@ -284,3 +284,24 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 .theme-toggle .theme-icon { font-size: 1.1rem; line-height: 1; }
 .theme-toggle .theme-icon-dark, [data-bs-theme=dark] .theme-toggle .theme-icon-light { display: none; }
 [data-bs-theme=dark] .theme-toggle .theme-icon-dark { display: inline; }
+
+/* Metric help hints (<help for="…">) */
+.help-hint {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1rem; height: 1rem; margin-left: .25rem; padding: 0; vertical-align: text-bottom;
+  border: 1px solid var(--is-text-muted); border-radius: 50%; background: transparent;
+  color: var(--is-text-muted); font: 600 .65rem/1 var(--bs-font-sans-serif); cursor: help;
+}
+.help-hint::before { content: "?"; }
+.help-hint:hover, .help-hint:focus-visible { color: var(--bs-link-color); border-color: var(--bs-link-color); }
+th .help-hint { font-weight: 600; }
+.tooltip-inner { text-align: left; max-width: 280px; }
+
+/* Guided tour */
+.tour-overlay { position: fixed; inset: 0; z-index: 1080; }
+.tour-spot {
+  position: fixed; border-radius: var(--is-radius); pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .55), 0 0 0 2px var(--bs-primary);
+  transition: top .15s, left .15s, width .15s, height .15s;
+}
+.tour-card { position: fixed; width: 320px; max-width: calc(100vw - 24px); }

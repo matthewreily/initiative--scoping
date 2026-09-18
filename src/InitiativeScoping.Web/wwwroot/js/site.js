@@ -411,6 +411,8 @@ document.addEventListener('keydown', e => {
         bootstrap.Modal.getOrCreateInstance(modal).toggle();
     }
 
+    document.querySelectorAll('[data-shortcut-help]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); help(); }));
+
     document.addEventListener('keydown', e => {
         if (e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
         if (e.key === '?') { e.preventDefault(); help(); return; }
@@ -450,4 +452,144 @@ document.addEventListener('keydown', e => {
     });
     media.addEventListener('change', apply);
     apply();
+})();
+
+// Metric help: <help for="…"> renders a "?" button with a Bootstrap tooltip. Clicking it must not
+// bubble to sortable headers or collapsible cards.
+(function () {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => bootstrap.Tooltip.getOrCreateInstance(el));
+    document.querySelectorAll('.help-hint').forEach(el => el.addEventListener('keydown', e => e.stopPropagation()));
+    document.addEventListener('click', e => {
+        const hint = e.target.closest('.help-hint');
+        if (!hint) return;
+        e.stopPropagation();
+        e.preventDefault();
+        hint.focus();
+    }, true);
+})();
+
+// Guided tour: elements tagged data-tour="<name>:<order>" with data-tour-title / data-tour-text form the
+// steps of tour <name>. The tour named by <body data-tour> starts automatically the first time it is seen
+// in this browser; "Take the tour" (data-tour-start) replays it.
+(function () {
+    const seenKey = name => 'is-tour-seen:' + name;
+    const replayKey = 'is-tour-replay';
+    const seen = name => { try { return localStorage.getItem(seenKey(name)) === '1'; } catch { return true; } };
+    const markSeen = name => { try { localStorage.setItem(seenKey(name), '1'); } catch { /* storage unavailable */ } };
+
+    const steps = name => Array.from(document.querySelectorAll(`[data-tour^="${name}:"]`))
+        .filter(el => el.offsetParent !== null)
+        .sort((a, b) => Number(a.dataset.tour.split(':')[1]) - Number(b.dataset.tour.split(':')[1]));
+
+    let overlay = null;
+
+    function start(name) {
+        const list = steps(name);
+        if (list.length === 0 || overlay) return;
+        let index = 0;
+        let previousFocus = document.activeElement;
+
+        overlay = document.createElement('div');
+        overlay.className = 'tour-overlay';
+        overlay.innerHTML = `<div class="tour-spot" aria-hidden="true"></div>
+            <div class="tour-card card shadow" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-text">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <h2 class="h6 mb-1" id="tour-title"></h2>
+                        <span class="small text-muted text-nowrap" id="tour-count"></span>
+                    </div>
+                    <p class="small mb-3" id="tour-text"></p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button type="button" class="btn btn-link btn-sm p-0" data-tour-action="skip">Skip tour</button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-tour-action="back">Back</button>
+                            <button type="button" class="btn btn-primary btn-sm" data-tour-action="next">Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        const spot = overlay.querySelector('.tour-spot');
+        const card = overlay.querySelector('.tour-card');
+        const title = overlay.querySelector('#tour-title');
+        const text = overlay.querySelector('#tour-text');
+        const count = overlay.querySelector('#tour-count');
+        const back = overlay.querySelector('[data-tour-action="back"]');
+        const next = overlay.querySelector('[data-tour-action="next"]');
+
+        function place() {
+            const el = list[index];
+            const r = el.getBoundingClientRect();
+            const pad = 6;
+            spot.style.top = (r.top - pad) + 'px';
+            spot.style.left = (r.left - pad) + 'px';
+            spot.style.width = (r.width + pad * 2) + 'px';
+            spot.style.height = (r.height + pad * 2) + 'px';
+            const cw = card.offsetWidth, ch = card.offsetHeight, gap = 12;
+            let top = r.bottom + gap;
+            if (top + ch > window.innerHeight - gap) top = Math.max(gap, r.top - ch - gap);
+            let left = Math.min(Math.max(gap, r.left), window.innerWidth - cw - gap);
+            card.style.top = top + 'px';
+            card.style.left = left + 'px';
+        }
+
+        function show() {
+            const el = list[index];
+            el.scrollIntoView({ block: 'center', inline: 'nearest' });
+            title.textContent = el.dataset.tourTitle || '';
+            text.textContent = el.dataset.tourText || '';
+            count.textContent = `${index + 1} of ${list.length}`;
+            back.disabled = index === 0;
+            next.textContent = index === list.length - 1 ? 'Done' : 'Next';
+            place();
+            next.focus();
+        }
+
+        function finish() {
+            markSeen(name);
+            window.removeEventListener('resize', place);
+            window.removeEventListener('scroll', place, true);
+            document.removeEventListener('keydown', keys);
+            overlay.remove();
+            overlay = null;
+            if (previousFocus && previousFocus.focus) previousFocus.focus();
+        }
+
+        function keys(e) {
+            if (e.key === 'Escape') { e.preventDefault(); finish(); }
+            else if (e.key === 'ArrowRight') { e.preventDefault(); next.click(); }
+            else if (e.key === 'ArrowLeft' && index > 0) { e.preventDefault(); back.click(); }
+        }
+
+        overlay.addEventListener('click', e => {
+            const action = e.target.closest('[data-tour-action]')?.dataset.tourAction;
+            if (action === 'skip') finish();
+            else if (action === 'back') { if (index > 0) { index--; show(); } }
+            else if (action === 'next') { if (index < list.length - 1) { index++; show(); } else finish(); }
+        });
+        window.addEventListener('resize', place);
+        window.addEventListener('scroll', place, true);
+        document.addEventListener('keydown', keys);
+        show();
+    }
+
+    const pageTour = document.body.dataset.tour;
+    const homeHref = document.body.dataset.tourHome || '/';
+    // Steps only exist in the current document, so a tour whose steps live on another page is replayed
+    // there: remember the request, navigate, and start on arrival.
+    document.querySelectorAll('[data-tour-start]').forEach(el => el.addEventListener('click', e => {
+        e.preventDefault();
+        const name = el.dataset.tourStart || pageTour || 'welcome';
+        if (name === 'welcome' && pageTour !== 'welcome') {
+            try { sessionStorage.setItem(replayKey, name); } catch { /* storage unavailable */ }
+            location.assign(homeHref);
+            return;
+        }
+        start(name);
+    }));
+    let replay = null;
+    try { replay = sessionStorage.getItem(replayKey); sessionStorage.removeItem(replayKey); } catch { /* storage unavailable */ }
+    if (replay === pageTour || (pageTour && !seen(pageTour) && !window.matchMedia('(max-width: 575.98px)').matches)) {
+        window.setTimeout(() => start(pageTour), 300);
+    }
 })();

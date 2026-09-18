@@ -25,6 +25,8 @@ public class HomeController(AppDbContext db, ICurrentUser currentUser) : Control
         return View(model);
     }
 
+    public IActionResult Help() => View(InitiativeScoping.Web.Services.HelpText.Terms);
+
     private async Task<IReadOnlyList<SetupStep>> SetupStepsAsync(CancellationToken ct) =>
     [
         new("Business units", "Teams that sponsor and staff initiatives.", await db.BusinessUnits.AnyAsync(ct), "Admin", "BusinessUnits", "Index"),
