@@ -94,6 +94,10 @@ public class WorkCalendarSettings
     public decimal HoursPerDay { get; set; } = 8;
     /// <summary>Calendar month (1–12) in which the fiscal year starts; 1 = fiscal year equals calendar year.</summary>
     public int FiscalYearStartMonth { get; set; } = 1;
+    /// <summary>Capex % prefilled on new internal-FTE labor allocations.</summary>
+    public decimal InternalCapexPercent { get; set; } = 70;
+    /// <summary>Capex % prefilled on new vendor labor allocations.</summary>
+    public decimal VendorCapexPercent { get; set; } = 100;
 }
 
 /// <summary>Admin-managed non-labor cost item (software license, hardware SKU, ...) initiatives can pick to prefill a cost line.</summary>

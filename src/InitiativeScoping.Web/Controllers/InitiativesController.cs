@@ -321,7 +321,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 PlannedStart = nextPhaseStart,
                 PlannedEnd = nextPhaseEnd
             },
-            NewAllocation = new AllocationEditModel { InitiativeId = id, BusinessUnitId = initiative.BusinessUnitId },
+            NewAllocation = new AllocationEditModel { InitiativeId = id, BusinessUnitId = initiative.BusinessUnitId, CapexPercent = calendar.DefaultCapexPercent(ResourcingClass.InternalFte) },
             NewNonLaborCost = new NonLaborCostEditModel { InitiativeId = id },
             CatalogOptions = await CatalogOptionsAsync(ct),
             CostPreviewWindows = CostPreviewWindows(initiative),
@@ -1050,6 +1050,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 {
                     Phase = phase, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, SeniorityId = sized.SeniorityId,
                     Location = location, ResourcingClass = model.ResourcingClass, VendorId = vendorId, Quantity = 1,
+                    CapexPercent = calendar.DefaultCapexPercent(model.ResourcingClass),
                     AllocationPercent = percent,
                     EstimatedHours = DurationCalculator.Hours(percent, workingDays, calendar.HoursPerDay)
                 });
@@ -1064,6 +1065,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
         else
         {
+            var capexPercent = (await workCalendar.GetAsync(ct)).DefaultCapexPercent(model.ResourcingClass);
             var phasesByName = initiative.Phases.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
             var nextSequence = (initiative.Phases.Count == 0 ? 0 : initiative.Phases.Max(p => p.Sequence)) + 1;
             var nextStart = initiative.Phases.Count == 0 ? initiative.TargetStart : initiative.Phases.Max(p => p.PlannedEnd).AddDays(1);
@@ -1087,7 +1089,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 initiative.Allocations.Add(new InitiativeAllocation
                 {
                     Phase = phasesByName[sized.PhaseName], BusinessUnitId = model.BusinessUnitId, ResourceTypeId = sized.ResourceTypeId, SeniorityId = sized.SeniorityId,
-                    Location = location, ResourcingClass = model.ResourcingClass, VendorId = vendorId, Quantity = 1, EstimatedHours = sized.Hours
+                    Location = location, ResourcingClass = model.ResourcingClass, VendorId = vendorId, Quantity = 1, EstimatedHours = sized.Hours,
+                    CapexPercent = capexPercent
                 });
             }
 
@@ -1513,6 +1516,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .OrderBy(p => p.DisplayName)
             .Select(p => new PersonOption(p.Id, p.DisplayName, p.ResourceTypeId, p.SeniorityId, p.BusinessUnitId, p.ResourcingClass, p.VendorId))
             .ToListAsync(ct);
+        var calendar = await workCalendar.GetAsync(ct);
         return new RateOptionsData(
             businessUnits,
             initiative.BusinessUnitId,
@@ -1522,7 +1526,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             locations,
             vendors,
             seniorities,
-            people);
+            people,
+            calendar.InternalCapexPercent,
+            calendar.VendorCapexPercent);
     }
 
     /// <summary>Named people must be active, in a participating BU and match the allocation's type / seniority / BU / class / vendor; each person fills one of the <see cref="AllocationEditModel.Quantity"/> seats.</summary>

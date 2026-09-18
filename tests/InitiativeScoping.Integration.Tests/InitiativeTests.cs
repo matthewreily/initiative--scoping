@@ -513,6 +513,7 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         Assert.Equal(["Discovery", "Build", "Launch"], initiative.Phases.OrderBy(p => p.Sequence).Select(p => p.Name));
         Assert.Equal(6, initiative.Allocations.Count);
         Assert.Equal(480m, initiative.Allocations.Sum(a => a.Quantity * a.EstimatedHours));
+        Assert.All(initiative.Allocations, a => Assert.Equal(70m, a.CapexPercent));
         Assert.Equal(SizingMethod.TShirt, initiative.SizingMethod);
         Assert.Equal("L", initiative.SizeKey);
 

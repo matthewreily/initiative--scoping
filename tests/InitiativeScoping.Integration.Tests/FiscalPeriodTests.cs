@@ -113,6 +113,69 @@ public class FiscalPeriodTests
         Assert.Contains($"{id},Fiscal {tag},2027,1,FY2027 Q1,", portfolioCsv);
     }
 
+    [Fact]
+    public async Task Labor_capex_defaults_are_admin_configurable_and_prefill_new_allocations_by_class()
+    {
+        await using var factory = new WebAppFactory();
+        var client = factory.CreateClient(NoRedirect);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+
+        // Out of the box: internal 70 / vendor 100, editable on the Work calendar page.
+        var admin = await client.GetStringAsync("/Admin/WorkCalendar");
+        Assert.Contains("Internal labor Capex %", admin);
+        Assert.Contains("id=\"InternalCapexPercent\" name=\"InternalCapexPercent\" value=\"70\"", admin);
+        Assert.Contains("id=\"VendorCapexPercent\" name=\"VendorCapexPercent\" value=\"100\"", admin);
+
+        var id = await CreateInitiativeAsync(client, factory, $"Capex default {tag}");
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-05-01", ["PlannedEnd"] = "2026-08-31" });
+        var page = await client.GetStringAsync(details);
+        Assert.Matches("id=\"capitalization\"[^>]*value=\"70\"", page);
+        Assert.Contains("internal: 70,", page);
+        Assert.Contains("vendor: 100", page);
+
+        // Apply a template as vendor labor: every generated line starts at the vendor default.
+        int vendorId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var vendor = new Domain.Entities.Vendor { Name = $"Vendor {tag}" };
+            db.Vendors.Add(vendor);
+            await db.SaveChangesAsync();
+            vendorId = vendor.Id;
+        }
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/ApplySize/{id}", new()
+        {
+            ["Method"] = nameof(SizingMethod.TShirt), ["SizeKey"] = "L", ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.Vendor),
+            ["VendorId"] = vendorId.ToString(), ["Replace"] = "true"
+        })).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var lines = await db.InitiativeAllocations.Where(a => a.InitiativeId == id).ToListAsync();
+            Assert.NotEmpty(lines);
+            Assert.All(lines, a => Assert.Equal(100m, a.CapexPercent));
+        }
+
+        // Changing the defaults affects new lines only; the existing vendor lines keep 100.
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, "/Admin/WorkCalendar", "/Admin/WorkCalendar/Settings",
+            new() { ["HoursPerDay"] = "8", ["FiscalYearStartMonth"] = "1", ["InternalCapexPercent"] = "55.5", ["VendorCapexPercent"] = "80" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostFormAsync(client, "/Admin/WorkCalendar", "/Admin/WorkCalendar/Settings",
+            new() { ["HoursPerDay"] = "8", ["FiscalYearStartMonth"] = "1", ["InternalCapexPercent"] = "101", ["VendorCapexPercent"] = "80" })).StatusCode);
+        page = await client.GetStringAsync(details);
+        Assert.Matches("id=\"capitalization\"[^>]*value=\"55.5\"", page);
+        Assert.Contains("internal: 55.5,", page);
+        Assert.Contains("vendor: 80", page);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var settings = await db.WorkCalendarSettings.SingleAsync();
+            Assert.Equal(55.5m, settings.InternalCapexPercent);
+            Assert.Equal(80m, settings.VendorCapexPercent);
+            Assert.All(await db.InitiativeAllocations.Where(a => a.InitiativeId == id).ToListAsync(), a => Assert.Equal(100m, a.CapexPercent));
+        }
+    }
+
     private static async Task<int> CreateInitiativeAsync(HttpClient client, WebAppFactory factory, string name)
     {
         int buId;

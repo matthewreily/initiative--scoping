@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -221,6 +222,12 @@ public class WorkCalendarViewModel
     [Display(Name = "Fiscal year starts in")]
     [Range(1, 12)]
     public int FiscalYearStartMonth { get; set; } = 1;
+    [Display(Name = "Internal labor Capex %")]
+    [Range(0, 100)]
+    public decimal InternalCapexPercent { get; set; } = WorkCalendar.DefaultInternalCapexPercent;
+    [Display(Name = "Vendor labor Capex %")]
+    [Range(0, 100)]
+    public decimal VendorCapexPercent { get; set; } = WorkCalendar.DefaultVendorCapexPercent;
     public IReadOnlyList<Holiday> Holidays { get; set; } = [];
 }
 

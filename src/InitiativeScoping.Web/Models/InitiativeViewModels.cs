@@ -216,6 +216,7 @@ public sealed record RateOptionsScriptModel(
     public string BusinessUnitSelectId { get; init; } = "BusinessUnitId";
     public string PersonSelectId { get; init; } = "PersonIds";
     public string QuantityInputId { get; init; } = "Quantity";
+    public string CapexInputId { get; init; } = "CapexPercent";
 }
 
 /// <summary>Global priced combinations per published card, the initiative's participating BUs (for allocation ownership), plus the catalogs needed for the unpriced fallback.</summary>
@@ -228,7 +229,9 @@ public sealed record RateOptionsData(
     IReadOnlyList<string> AllLocations,
     IReadOnlyList<NamedId> Vendors,
     IReadOnlyList<NamedId> Seniorities,
-    IReadOnlyList<PersonOption> People)
+    IReadOnlyList<PersonOption> People,
+    decimal InternalCapexPercent,
+    decimal VendorCapexPercent)
 {
     public bool HasAnyPricing => Cards.Any(c => c.Options.Count > 0);
 }

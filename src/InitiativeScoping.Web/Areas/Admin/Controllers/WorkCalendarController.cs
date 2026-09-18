@@ -18,6 +18,8 @@ public class WorkCalendarController(AppDbContext db, IAuditLog audit) : AdminCon
         {
             HoursPerDay = settings?.HoursPerDay ?? WorkCalendar.DefaultHoursPerDay,
             FiscalYearStartMonth = settings?.FiscalYearStartMonth ?? 1,
+            InternalCapexPercent = settings?.InternalCapexPercent ?? WorkCalendar.DefaultInternalCapexPercent,
+            VendorCapexPercent = settings?.VendorCapexPercent ?? WorkCalendar.DefaultVendorCapexPercent,
             Holidays = holidays
         });
     }
@@ -32,7 +34,13 @@ public class WorkCalendarController(AppDbContext db, IAuditLog audit) : AdminCon
         }
 
         var settings = await db.WorkCalendarSettings.FirstOrDefaultAsync(ct);
-        var before = new { HoursPerDay = settings?.HoursPerDay ?? WorkCalendar.DefaultHoursPerDay, FiscalYearStartMonth = settings?.FiscalYearStartMonth ?? 1 };
+        var before = new
+        {
+            HoursPerDay = settings?.HoursPerDay ?? WorkCalendar.DefaultHoursPerDay,
+            FiscalYearStartMonth = settings?.FiscalYearStartMonth ?? 1,
+            InternalCapexPercent = settings?.InternalCapexPercent ?? WorkCalendar.DefaultInternalCapexPercent,
+            VendorCapexPercent = settings?.VendorCapexPercent ?? WorkCalendar.DefaultVendorCapexPercent
+        };
         if (settings is null)
         {
             settings = new WorkCalendarSettings();
@@ -41,11 +49,13 @@ public class WorkCalendarController(AppDbContext db, IAuditLog audit) : AdminCon
 
         settings.HoursPerDay = model.HoursPerDay;
         settings.FiscalYearStartMonth = model.FiscalYearStartMonth;
+        settings.InternalCapexPercent = model.InternalCapexPercent;
+        settings.VendorCapexPercent = model.VendorCapexPercent;
         await db.SaveChangesAsync(ct);
-        audit.Record(nameof(WorkCalendarSettings), settings.Id, AuditActions.Update, new { Before = before, After = new { settings.HoursPerDay, settings.FiscalYearStartMonth } });
+        audit.Record(nameof(WorkCalendarSettings), settings.Id, AuditActions.Update, new { Before = before, After = new { settings.HoursPerDay, settings.FiscalYearStartMonth, settings.InternalCapexPercent, settings.VendorCapexPercent } });
         await db.SaveChangesAsync(ct);
         var fyStart = CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(settings.FiscalYearStartMonth);
-        return RedirectWithSuccess($"Hours per working day set to {settings.HoursPerDay:0.##}; fiscal year starts in {fyStart}.");
+        return RedirectWithSuccess($"Hours per working day set to {settings.HoursPerDay:0.##}; fiscal year starts in {fyStart}; new labor lines default to {settings.InternalCapexPercent:0.##}% Capex (internal) / {settings.VendorCapexPercent:0.##}% Capex (vendor).");
     }
 
     public IActionResult CreateHoliday() => View("EditHoliday", new HolidayEditModel());

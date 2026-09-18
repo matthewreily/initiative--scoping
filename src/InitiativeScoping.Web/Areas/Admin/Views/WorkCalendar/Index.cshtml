@@ -7,7 +7,7 @@
         .ToList();
 }
 <h2 class="h4">Work Calendar</h2>
-<p class="text-muted">Fixed-duration initiatives compute allocation hours as quantity × allocation % × working days (Mon–Fri excluding holidays) × hours per day. The fiscal year start month drives the FY / quarter subtotals on cost phasing, Portfolio and exports; a fiscal year is named after the calendar year it ends in.</p>
+<p class="text-muted">Fixed-duration initiatives compute allocation hours as quantity × allocation % × working days (Mon–Fri excluding holidays) × hours per day. The fiscal year start month drives the FY / quarter subtotals on cost phasing, Portfolio and exports; a fiscal year is named after the calendar year it ends in. The labor Capex % defaults prefill new allocations by resourcing class (each line can still be changed; existing lines keep their value); non-labor lines take their default from the cost catalog item.</p>
 
 <form asp-action="Settings" method="post" class="row g-2 align-items-end mb-4">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -20,6 +20,16 @@
         <label asp-for="FiscalYearStartMonth" class="form-label"></label>
         <select asp-for="FiscalYearStartMonth" asp-items="months" class="form-select" style="max-width: 12rem"></select>
         <span asp-validation-for="FiscalYearStartMonth" class="text-danger"></span>
+    </div>
+    <div class="col-auto">
+        <label asp-for="InternalCapexPercent" class="form-label"></label>
+        <input asp-for="InternalCapexPercent" type="number" min="0" max="100" step="0.01" class="form-control" style="max-width: 8rem" title="Capex % new internal-FTE allocations start with" />
+        <span asp-validation-for="InternalCapexPercent" class="text-danger"></span>
+    </div>
+    <div class="col-auto">
+        <label asp-for="VendorCapexPercent" class="form-label"></label>
+        <input asp-for="VendorCapexPercent" type="number" min="0" max="100" step="0.01" class="form-control" style="max-width: 8rem" title="Capex % new vendor allocations start with" />
+        <span asp-validation-for="VendorCapexPercent" class="text-danger"></span>
     </div>
     <div class="col-auto">
         <button type="submit" class="btn btn-primary">Save</button>
