@@ -25,22 +25,23 @@ test.describe('Named people on allocations', () => {
     await addPhase(page, 'Build', isoDate(0), isoDate(30));
     await applySize(page, 'M');
 
-    // Edit the Senior Software Engineer allocation in the side panel: only Jane is offered, quantity locks to 1
+    // Edit the Senior Software Engineer allocation in the side panel: only Jane is offered; she fills one of the seats
     const row = page.locator('#allocations-table tbody tr').filter({ hasText: 'Software Engineer' }).first();
     await row.getByRole('link', { name: 'Edit' }).click();
     const panel = page.locator('#side-panel');
     await expect(panel.getByRole('heading', { name: 'Edit allocation' })).toBeVisible();
-    const person = panel.locator('#PersonId');
+    const person = panel.locator('#PersonIds');
     await expect(person.locator('option', { hasText: jane })).toHaveCount(1);
     await expect(person.locator('option', { hasText: jane })).toBeEnabled();
     await expect(person.locator('option', { hasText: quinn })).toBeDisabled();
     await person.selectOption({ label: jane });
-    await expect(panel.getByLabel('Quantity')).toHaveValue('1');
-    await expect(panel.getByLabel('Quantity')).toHaveJSProperty('readOnly', true);
+    await panel.getByLabel('Quantity').fill('2');
+    await expect(panel.getByLabel('Quantity')).toHaveJSProperty('readOnly', false);
     await panel.getByRole('button', { name: 'Save' }).click();
     await expect(panel).toBeHidden();
 
     await expect(page.locator('#allocations-table .allocation-person', { hasText: jane })).toBeVisible();
+    await expect(page.locator('#allocations-table')).toContainText('+ 1 unassigned');
     await page.getByRole('tab', { name: /Team/ }).click();
     await expect(page.locator('#pane-team')).toContainText(jane);
 

@@ -168,12 +168,12 @@ public static class InitiativeExport
             initiative.ChangeRequests.OrderBy(c => c.Number).Select(ChangeRequestExport.Row).ToList());
 
         var forecastLines = new ExportTable("Forecast",
-            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Capex / Opex", "Contract", "Cost center"],
+            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "People", "Unassigned seats", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Capex / Opex", "Contract", "Cost center"],
             forecast.Lines.Select(l => (IReadOnlyList<object?>)
             [
                 phases.GetValueOrDefault(l.Allocation.PhaseId), l.Allocation.BusinessUnit?.Name, resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
                 seniorityNames.GetValueOrDefault(l.Allocation.SeniorityId), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
-                l.Allocation.Person?.DisplayName, l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
+                l.Allocation.PersonNames, l.Allocation.UnassignedSeats, l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
                 l.Allocation.Capitalization.ToString(), l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
 

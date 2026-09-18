@@ -26,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Phase> Phases => Set<Phase>();
     public DbSet<PhaseDateHistory> PhaseDateHistories => Set<PhaseDateHistory>();
     public DbSet<InitiativeAllocation> InitiativeAllocations => Set<InitiativeAllocation>();
+    public DbSet<InitiativeAllocationPerson> InitiativeAllocationPeople => Set<InitiativeAllocationPerson>();
     public DbSet<InitiativeNonLaborCost> InitiativeNonLaborCosts => Set<InitiativeNonLaborCost>();
     public DbSet<ForecastBaseline> ForecastBaselines => Set<ForecastBaseline>();
     public DbSet<ForecastBaselineLine> ForecastBaselineLines => Set<ForecastBaselineLine>();
@@ -206,7 +207,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(x => x.Person).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.Ignore(x => x.PersonIds);
+            e.Ignore(x => x.NamedPeople);
+            e.Ignore(x => x.HasNamedPeople);
+            e.Ignore(x => x.UnassignedSeats);
+            e.Ignore(x => x.PersonNames);
+            e.HasMany(x => x.People).WithOne(x => x.Allocation).HasForeignKey(x => x.AllocationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<InitiativeAllocationPerson>(e =>
+        {
+            e.HasOne(x => x.Person).WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.AllocationId, x.PersonId }).IsUnique();
             e.HasIndex(x => x.PersonId);
         });
 

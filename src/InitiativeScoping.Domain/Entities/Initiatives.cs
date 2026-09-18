@@ -216,9 +216,8 @@ public class InitiativeAllocation
     public ResourcingClass ResourcingClass { get; set; }
     public int? VendorId { get; set; }
     public Vendor? Vendor { get; set; }
-    /// <summary>Named roster person filling this allocation; null when it is still a generic (type × seniority) slot.</summary>
-    public int? PersonId { get; set; }
-    public Person? Person { get; set; }
+    /// <summary>Named roster people filling seats of this allocation (at most <see cref="Quantity"/>); the rest are generic (type × seniority) seats.</summary>
+    public List<InitiativeAllocationPerson> People { get; set; } = [];
     public int Quantity { get; set; } = 1;
     /// <summary>Staffing level per person over the phase window (100 = full time); fixed-duration initiatives only.</summary>
     public decimal? AllocationPercent { get; set; }
@@ -226,6 +225,23 @@ public class InitiativeAllocation
     public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
     public string? ContractReference { get; set; }
     public string? CostCenter { get; set; }
+
+    public IEnumerable<int> PersonIds => People.Select(p => p.PersonId);
+    public IEnumerable<Person> NamedPeople => People.Where(p => p.Person is not null).Select(p => p.Person!);
+    public bool HasNamedPeople => People.Count > 0;
+    /// <summary>Seats not yet filled by a named person.</summary>
+    public int UnassignedSeats => Math.Max(0, Quantity - People.Count);
+    public string? PersonNames => People.Count == 0 ? null : string.Join(", ", People.Select(p => p.Person?.DisplayName ?? $"Person #{p.PersonId}"));
+}
+
+/// <summary>One named seat on an allocation.</summary>
+public class InitiativeAllocationPerson
+{
+    public int Id { get; set; }
+    public int AllocationId { get; set; }
+    public InitiativeAllocation? Allocation { get; set; }
+    public int PersonId { get; set; }
+    public Person? Person { get; set; }
 }
 
 /// <summary>

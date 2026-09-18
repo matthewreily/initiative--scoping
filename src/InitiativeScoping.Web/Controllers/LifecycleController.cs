@@ -476,7 +476,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
             .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
             .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
-            .Include(i => i.Allocations).ThenInclude(a => a.Person)
+            .Include(i => i.Allocations).ThenInclude(a => a.People).ThenInclude(p => p.Person)
             .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines)
             .Include(i => i.RebaselineRequests)

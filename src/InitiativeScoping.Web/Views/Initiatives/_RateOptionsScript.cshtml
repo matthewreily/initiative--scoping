@@ -22,7 +22,7 @@
         const cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cards));
         const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
         const VENDOR = '@vendorClass';
-        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)', person: '@(Model.Current.PersonId?.ToString() ?? string.Empty)' };
+        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)', people: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.PersonIds.Select(p => p.ToString()))) };
         const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
 
         function pricedFor(phaseId) {
@@ -100,26 +100,29 @@
             }
         }
 
-        // Offers only roster people whose type / seniority / BU / class (and vendor) match the chosen dimensions; a named person is one seat.
+        // Offers only roster people whose type / seniority / BU / class (and vendor) match the chosen dimensions; each named person fills one of the Quantity seats.
         function syncPeople(preferCurrent) {
             if (!person) { return; }
             const vendorId = isVendor() && vendor ? vendor.value : '';
             const eligible = people.filter(p => same(p.type, type.value) && same(p.seniority, seniority.value) && (!bu || same(p.bu, bu.value))
                 && same(p.cls, cls.value) && (!same(p.cls, VENDOR) || sameVendor(p.vendor, vendorId)));
-            const wanted = preferCurrent ? current.person : person.value;
-            let kept = '';
+            const wanted = preferCurrent ? current.people : Array.from(person.selectedOptions).map(o => o.value);
+            let kept = 0;
             for (const opt of person.options) {
-                const ok = opt.value === '' || eligible.some(p => same(p.id, opt.value)) || (preferCurrent && same(opt.value, current.person) && current.person !== '');
+                if (opt.value === '') { continue; }
+                const ok = eligible.some(p => same(p.id, opt.value)) || (preferCurrent && current.people.some(id => same(id, opt.value)));
                 opt.hidden = !ok;
                 opt.disabled = !ok;
-                if (ok && opt.value !== '' && same(opt.value, wanted)) { kept = opt.value; }
+                opt.selected = ok && wanted.some(id => same(id, opt.value));
+                if (opt.selected) { kept++; }
             }
-            person.value = kept;
             const anyEligible = Array.from(person.options).some(o => o.value !== '' && !o.disabled);
-            person.title = anyEligible ? 'Roster people matching this resource type, seniority, business unit and class' : 'No active roster person matches this combination';
+            person.title = anyEligible ? 'Roster people matching this resource type, seniority, business unit and class; one seat each, up to the quantity' : 'No active roster person matches this combination';
             if (quantity) {
-                if (kept !== '') { quantity.value = '1'; quantity.readOnly = true; quantity.title = 'One allocation per named person'; }
-                else { quantity.readOnly = false; quantity.title = ''; }
+                const qty = parseInt(quantity.value, 10) || 0;
+                if (kept > qty) { quantity.value = String(kept); }
+                quantity.min = String(Math.max(1, kept));
+                quantity.title = kept > 0 ? kept + ' named ' + (kept === 1 ? 'person fills' : 'people fill') + ' seats; quantity cannot go below that' : '';
             }
         }
 
@@ -131,6 +134,7 @@
         if (vendor) { vendor.addEventListener('change', () => sync(false)); }
         if (bu) { bu.addEventListener('change', () => syncPeople(false)); }
         if (person) { person.addEventListener('change', () => syncPeople(false)); }
+        if (quantity && person) { quantity.addEventListener('change', () => syncPeople(false)); }
         sync(true);
     })();
 </script>

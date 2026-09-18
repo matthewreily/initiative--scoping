@@ -12,6 +12,9 @@ public sealed record ForecastLine(
     /// <summary>True when the phase spans more than one rate card, so <see cref="HourlyRate"/> is a day-weighted blend.</summary>
     public bool IsBlendedRate => RateSegments is { Count: > 1 };
     public decimal Cost => Hours * (HourlyRate ?? 0m);
+    /// <summary>Share of one seat when the allocation's quantity is spread evenly over its named and unnamed seats.</summary>
+    public decimal HoursPerSeat => Hours / Math.Max(1, Math.Max(Allocation.Quantity, Allocation.People.Count));
+    public decimal CostPerSeat => Cost / Math.Max(1, Math.Max(Allocation.Quantity, Allocation.People.Count));
 }
 
 /// <summary>Priced non-labor line. <see cref="Periods"/> is 0 (and cost 0) when the window is empty or its phase is missing.</summary>

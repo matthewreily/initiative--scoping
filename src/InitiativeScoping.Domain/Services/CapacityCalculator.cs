@@ -76,7 +76,7 @@ public static class CapacityCalculator
         IReadOnlySet<DateOnly> holidays,
         decimal hoursPerDay)
     {
-        var demand = Aggregate(initiatives, a => a.ResourceTypeId);
+        var demand = Aggregate(initiatives, a => [(a.ResourceTypeId, a.Quantity * a.EstimatedHours)]);
         if (demand.Count == 0)
         {
             return CapacityHeatmap.Empty;
@@ -105,8 +105,8 @@ public static class CapacityCalculator
         IReadOnlySet<DateOnly> holidays,
         decimal hoursPerDay)
     {
-        // Named allocations key on the person id; unassigned ones on the negated resource type id.
-        var demand = Aggregate(initiatives, a => a.PersonId ?? -a.ResourceTypeId);
+        // Each named person is one seat keyed on the person id; unnamed seats key on the negated resource type id.
+        var demand = Aggregate(initiatives, a => a.PersonIds.Select(p => (p, a.EstimatedHours)).Append((-a.ResourceTypeId, a.UnassignedSeats * a.EstimatedHours)));
         if (demand.Count == 0)
         {
             return CapacityHeatmap.Empty;
@@ -147,7 +147,7 @@ public static class CapacityCalculator
 
     private static Dictionary<(int Key, DateOnly Month), Dictionary<int, (Initiative Initiative, decimal Hours)>> Aggregate(
         IReadOnlyList<Initiative> initiatives,
-        Func<InitiativeAllocation, int> keyOf)
+        Func<InitiativeAllocation, IEnumerable<(int Key, decimal Hours)>> seatsOf)
     {
         var demand = new Dictionary<(int Key, DateOnly Month), Dictionary<int, (Initiative Initiative, decimal Hours)>>();
         foreach (var initiative in initiatives)
@@ -160,23 +160,24 @@ public static class CapacityCalculator
                     continue;
                 }
 
-                var hours = a.Quantity * a.EstimatedHours;
-                if (hours <= 0)
+                foreach (var (key, hours) in seatsOf(a))
                 {
-                    continue;
-                }
-
-                var key = keyOf(a);
-                foreach (var (month, amount) in MonthlyPhasingCalculator.SpreadByDays(hours, phase.PlannedStart, phase.PlannedEnd))
-                {
-                    if (!demand.TryGetValue((key, month), out var byInitiative))
+                    if (hours <= 0)
                     {
-                        byInitiative = [];
-                        demand[(key, month)] = byInitiative;
+                        continue;
                     }
 
-                    var existing = byInitiative.TryGetValue(initiative.Id, out var c) ? c.Hours : 0m;
-                    byInitiative[initiative.Id] = (initiative, existing + amount);
+                    foreach (var (month, amount) in MonthlyPhasingCalculator.SpreadByDays(hours, phase.PlannedStart, phase.PlannedEnd))
+                    {
+                        if (!demand.TryGetValue((key, month), out var byInitiative))
+                        {
+                            byInitiative = [];
+                            demand[(key, month)] = byInitiative;
+                        }
+
+                        var existing = byInitiative.TryGetValue(initiative.Id, out var c) ? c.Hours : 0m;
+                        byInitiative[initiative.Id] = (initiative, existing + amount);
+                    }
                 }
             }
         }

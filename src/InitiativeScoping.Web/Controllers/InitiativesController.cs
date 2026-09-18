@@ -401,7 +401,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ByPhase = Rollup(forecast, l => phaseNames.GetValueOrDefault(l.Allocation.PhaseId, "?"), phases.Select(p => p.Name)),
             ByResourceType = Rollup(forecast, l => typeNames.GetValueOrDefault(l.Allocation.ResourceTypeId, "?")),
             ByClass = Rollup(forecast, l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : "Vendor"),
-            ByPerson = Rollup(new ForecastResult(forecast.Lines.Where(l => l.Allocation.Person is not null).ToList(), []), l => l.Allocation.Person!.DisplayName),
+            ByPerson = RollupByPerson(forecast),
             Variance = actuals.Variance,
             Phasing = MonthlyPhasingCalculator.Calculate(initiative, forecast, initiative.CurrentBaseline, actuals.Entries, actuals.Adjustments),
             Fiscal = (await workCalendar.GetAsync(ct)).Fiscal,
@@ -599,7 +599,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var allocation = new InitiativeAllocation
         {
             PhaseId = model.PhaseId, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = model.ResourceTypeId, SeniorityId = model.SeniorityId,
-            Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, VendorId = VendorFor(model), PersonId = model.PersonId, Quantity = model.Quantity,
+            Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, VendorId = VendorFor(model), People = SeatsFor(model), Quantity = model.Quantity,
             EstimatedHours = model.EstimatedHours, Capitalization = model.Capitalization, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
         };
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
@@ -613,7 +613,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     public async Task<IActionResult> EditAllocation(int id, CancellationToken ct)
     {
         var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
-            .Include(a => a.Initiative!).ThenInclude(i => i.Phases).Include(a => a.Initiative!).ThenInclude(i => i.ParticipatingBusinessUnits).FirstOrDefaultAsync(a => a.Id == id, ct);
+            .Include(a => a.People).Include(a => a.Initiative!).ThenInclude(i => i.Phases).Include(a => a.Initiative!).ThenInclude(i => i.ParticipatingBusinessUnits).FirstOrDefaultAsync(a => a.Id == id, ct);
         if (allocation is null)
         {
             return NotFound();
@@ -630,7 +630,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, BusinessUnitId = allocation.BusinessUnitId, ResourceTypeId = allocation.ResourceTypeId,
             SeniorityId = allocation.SeniorityId, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass, VendorId = allocation.VendorId,
-            PersonId = allocation.PersonId, Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
+            PersonIds = allocation.PersonIds.ToList(), Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
             Capitalization = allocation.Capitalization, ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
         });
     }
@@ -639,7 +639,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     public async Task<IActionResult> EditAllocation(int id, AllocationEditModel model, CancellationToken ct)
     {
         var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
-            .Include(a => a.Initiative!).ThenInclude(i => i.Phases).Include(a => a.Initiative!).ThenInclude(i => i.ParticipatingBusinessUnits).FirstOrDefaultAsync(a => a.Id == id, ct);
+            .Include(a => a.People).Include(a => a.Initiative!).ThenInclude(i => i.Phases).Include(a => a.Initiative!).ThenInclude(i => i.ParticipatingBusinessUnits).FirstOrDefaultAsync(a => a.Id == id, ct);
         if (allocation is null)
         {
             return NotFound();
@@ -675,7 +675,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         allocation.Location = model.Location.Trim();
         allocation.ResourcingClass = model.ResourcingClass;
         allocation.VendorId = VendorFor(model);
-        allocation.PersonId = model.PersonId;
+        allocation.People.RemoveAll(s => !model.PersonIds.Contains(s.PersonId));
+        allocation.People.AddRange(SeatsFor(model).Where(s => allocation.People.All(e => e.PersonId != s.PersonId)));
         allocation.Quantity = model.Quantity;
         allocation.EstimatedHours = model.EstimatedHours;
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
@@ -1254,7 +1255,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.Allocations).ThenInclude(a => a.BusinessUnit)
             .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
             .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
-            .Include(i => i.Allocations).ThenInclude(a => a.Person)
+            .Include(i => i.Allocations).ThenInclude(a => a.People).ThenInclude(p => p.Person)
             .Include(i => i.NonLaborCosts).ThenInclude(c => c.CostCatalogItem)
             .Include(i => i.Baselines).ThenInclude(b => b.Lines)
             .Include(i => i.Baselines).ThenInclude(b => b.NonLaborLines)
@@ -1506,7 +1507,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(l => l, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var assignedIds = await db.InitiativeAllocations.Where(a => a.InitiativeId == initiative.Id && a.PersonId != null).Select(a => a.PersonId!.Value).ToListAsync(ct);
+        var assignedIds = await db.InitiativeAllocationPeople.Where(s => s.Allocation!.InitiativeId == initiative.Id).Select(s => s.PersonId).ToListAsync(ct);
         var people = await db.People.AsNoTracking()
             .Where(p => (p.IsActive && participantIds.Contains(p.BusinessUnitId)) || assignedIds.Contains(p.Id))
             .OrderBy(p => p.DisplayName)
@@ -1524,42 +1525,49 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             people);
     }
 
-    /// <summary>A named person must be active, in a participating BU and match the allocation's type / seniority / BU / class / vendor; one person is one seat.</summary>
+    /// <summary>Named people must be active, in a participating BU and match the allocation's type / seniority / BU / class / vendor; each person fills one of the <see cref="AllocationEditModel.Quantity"/> seats.</summary>
     private async Task ValidateAllocationPersonAsync(AllocationEditModel model, Initiative initiative, InitiativeAllocation? existing, CancellationToken ct)
     {
-        if (model.PersonId is not { } personId)
+        model.PersonIds = model.PersonIds.Distinct().ToList();
+        if (model.PersonIds.Count == 0)
         {
             return;
         }
 
-        var person = await db.People.AsNoTracking().FirstOrDefaultAsync(p => p.Id == personId, ct);
-        if (person is null)
+        if (model.PersonIds.Count > model.Quantity)
         {
-            ModelState.AddModelError(nameof(model.PersonId), "Select a person from the roster or leave unassigned.");
+            ModelState.AddModelError(nameof(model.Quantity), $"{model.PersonIds.Count} people are named but the quantity is {model.Quantity}; raise the quantity or remove people.");
+        }
+
+        var people = await db.People.AsNoTracking().Where(p => model.PersonIds.Contains(p.Id)).ToListAsync(ct);
+        if (people.Count != model.PersonIds.Count)
+        {
+            ModelState.AddModelError(nameof(model.PersonIds), "Select people from the roster or leave the seats unassigned.");
             return;
         }
 
-        if (!person.IsActive && existing?.PersonId != personId)
+        foreach (var person in people)
         {
-            ModelState.AddModelError(nameof(model.PersonId), $"{person.DisplayName} is inactive on the roster.");
-        }
+            if (!person.IsActive && existing?.PersonIds.Contains(person.Id) != true)
+            {
+                ModelState.AddModelError(nameof(model.PersonIds), $"{person.DisplayName} is inactive on the roster.");
+            }
 
-        if (!initiative.ParticipatingBusinessUnitIds.Contains(person.BusinessUnitId) || person.BusinessUnitId != model.BusinessUnitId)
-        {
-            ModelState.AddModelError(nameof(model.PersonId), $"{person.DisplayName} belongs to a different business unit than this allocation.");
-        }
+            if (!initiative.ParticipatingBusinessUnitIds.Contains(person.BusinessUnitId) || person.BusinessUnitId != model.BusinessUnitId)
+            {
+                ModelState.AddModelError(nameof(model.PersonIds), $"{person.DisplayName} belongs to a different business unit than this allocation.");
+            }
 
-        if (person.ResourceTypeId != model.ResourceTypeId || person.SeniorityId != model.SeniorityId
-            || person.ResourcingClass != model.ResourcingClass || person.VendorId != VendorFor(model))
-        {
-            ModelState.AddModelError(nameof(model.PersonId), $"{person.DisplayName}'s roster resource type / seniority / class (and vendor) do not match this allocation. Change the allocation or the roster entry.");
-        }
-
-        if (model.Quantity != 1)
-        {
-            ModelState.AddModelError(nameof(model.Quantity), "Quantity must be 1 when a named person is assigned; add one allocation per person.");
+            if (person.ResourceTypeId != model.ResourceTypeId || person.SeniorityId != model.SeniorityId
+                || person.ResourcingClass != model.ResourcingClass || person.VendorId != VendorFor(model))
+            {
+                ModelState.AddModelError(nameof(model.PersonIds), $"{person.DisplayName}'s roster resource type / seniority / class (and vendor) do not match this allocation. Change the allocation or the roster entry.");
+            }
         }
     }
+
+    private static List<InitiativeAllocationPerson> SeatsFor(AllocationEditModel model) =>
+        model.PersonIds.Distinct().Select(id => new InitiativeAllocationPerson { PersonId = id }).ToList();
 
     private async Task ValidateAllocation(AllocationEditModel model, Initiative initiative, CancellationToken ct, InitiativeAllocation? existing = null)
     {
@@ -1735,7 +1743,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
-        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, a.PersonId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.Capitalization, a.ContractReference, a.CostCenter };
+        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, PersonIds = a.PersonIds.ToList(), a.Quantity, a.AllocationPercent, a.EstimatedHours, a.Capitalization, a.ContractReference, a.CostCenter };
 
     private static List<RollupRow> Rollup(ForecastResult forecast, Func<ForecastLine, string> key, IEnumerable<string>? order = null)
     {
@@ -1750,6 +1758,15 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var rank = order.Select((name, idx) => (name, idx)).ToDictionary(x => x.name, x => x.idx);
         return rows.OrderBy(r => rank.GetValueOrDefault(r.Label, int.MaxValue)).ToList();
     }
+
+    /// <summary>Hours / cost per named person, one seat each (a line's total divided by its quantity).</summary>
+    private static List<RollupRow> RollupByPerson(ForecastResult forecast) =>
+        forecast.Lines
+            .SelectMany(l => l.Allocation.NamedPeople.Select(p => (p.DisplayName, l)))
+            .GroupBy(x => x.DisplayName)
+            .Select(g => new RollupRow(g.Key, g.Sum(x => x.l.HoursPerSeat), g.Sum(x => x.l.CostPerSeat), g.Any(x => x.l.IsUnpriced)))
+            .OrderByDescending(r => r.Cost)
+            .ToList();
 
     private static List<GanttBar> BuildGantt(IReadOnlyList<Phase> phases)
     {
