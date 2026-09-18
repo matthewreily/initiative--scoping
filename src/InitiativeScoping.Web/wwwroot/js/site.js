@@ -424,7 +424,7 @@ document.addEventListener('keydown', e => {
         if (!hit) return;
         buffer = '';
         e.preventDefault();
-        if (hit.matches('a[href]')) location.assign(hit.href); else hit.click();
+        if (hit.matches('a[href]')) { window.showPageLoading?.(hit.href); location.assign(hit.href); } else hit.click();
     });
 })();
 
@@ -759,4 +759,85 @@ document.addEventListener('keydown', e => {
         const cell = e.target.closest('.heat-cell[tabindex]');
         if (cell) { e.preventDefault(); show(cell); }
     });
+})();
+
+
+// Loading skeletons: the Portfolio and Capacity pages aggregate every initiative, so when the user navigates
+// to one (nav link, filter form, keyboard shortcut) swap <main> for a placeholder layout of the destination
+// immediately instead of leaving the old page frozen until the response lands. A thin indeterminate bar at the
+// top of the viewport covers every other same-origin navigation. bfcache restores are rolled back.
+(function () {
+    const main = document.getElementById('main');
+    if (!main) return;
+    const pages = {
+        '/portfolio': { title: 'Portfolio', tiles: 6, tileCols: 'col-6 col-md-4 col-xl-2', chart: true, rows: 8, cols: 9 },
+        '/capacity': { title: 'Capacity', tiles: 4, tileCols: 'col-6 col-md-3', rows: 7, cols: 13 }
+    };
+    const pageFor = url => {
+        let u;
+        try { u = new URL(url, location.href); } catch { return null; }
+        if (u.origin !== location.origin) return null;
+        const path = u.pathname.replace(/\/index\/?$/i, '').replace(/\/$/, '').toLowerCase();
+        return pages[path] ?? null;
+    };
+
+    const bar = document.createElement('div');
+    bar.className = 'page-progress';
+    bar.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(bar);
+
+    let original = null, pending = null;
+    const block = cls => `<span class="skeleton ${cls}"></span>`;
+    function render(spec) {
+        const tiles = Array.from({ length: spec.tiles }, () =>
+            `<div class="${spec.tileCols}"><div class="card h-100"><div class="card-body">${block('skeleton-text w-50')}${block('skeleton-title w-75')}${block('skeleton-text w-25')}</div></div></div>`).join('');
+        const header = Array.from({ length: spec.cols }, () => `<th>${block('skeleton-text')}</th>`).join('');
+        const rows = Array.from({ length: spec.rows }, () =>
+            `<tr>${Array.from({ length: spec.cols }, (_, c) => `<td>${block('skeleton-text' + (c === 0 ? ' w-100' : ' w-75'))}</td>`).join('')}</tr>`).join('');
+        return `
+<div class="page-skeleton" role="status" aria-live="polite" aria-busy="true" data-skeleton>
+  <span class="visually-hidden">Loading ${spec.title}…</span>
+  <div class="d-flex justify-content-between align-items-center mb-3"><h1 class="h3 mb-0">${spec.title}</h1>${block('skeleton-button')}</div>
+  <div class="row g-2 mb-3">${block('col-md-3 skeleton skeleton-input')}${block('col-md-3 skeleton skeleton-input')}${block('col-md-2 skeleton skeleton-input')}</div>
+  <div class="row g-3 mb-4">${tiles}</div>
+  ${spec.chart ? `<div class="card mb-4"><div class="card-body">${block('skeleton skeleton-chart')}</div></div>` : ''}
+  <div class="table-responsive"><table class="table table-sm"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table></div>
+</div>`;
+    }
+
+    function start(url) {
+        bar.classList.add('is-active');
+        const spec = pageFor(url);
+        if (!spec || original !== null || pending !== null) return;
+        // Swap after the current event finishes: a form removed from the DOM during its submit event is never submitted.
+        pending = setTimeout(() => {
+            pending = null;
+            original = main.innerHTML;
+            main.innerHTML = render(spec);
+            main.scrollIntoView({ block: 'start' });
+        }, 0);
+    }
+    function reset() {
+        bar.classList.remove('is-active');
+        if (pending !== null) { clearTimeout(pending); pending = null; }
+        if (original !== null) { main.innerHTML = original; original = null; }
+    }
+    window.showPageLoading = start;
+
+    document.addEventListener('click', e => {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        const a = e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || a.hasAttribute('download') || a.getAttribute('href').startsWith('#')) return;
+        if (a.origin !== location.origin || (a.protocol !== 'http:' && a.protocol !== 'https:')) return;
+        if (/\/export(\/|$)/i.test(a.pathname)) return;
+        start(a.href);
+    });
+    document.addEventListener('submit', e => {
+        const form = e.target;
+        if (e.defaultPrevented || form.target === '_blank') return;
+        if (form.method.toLowerCase() === 'get' && pageFor(form.action || location.href)) start(form.action || location.href);
+        else bar.classList.add('is-active');
+    });
+    window.addEventListener('pageshow', e => { if (e.persisted) reset(); });
+    window.addEventListener('pagehide', () => { bar.classList.remove('is-active'); });
 })();
