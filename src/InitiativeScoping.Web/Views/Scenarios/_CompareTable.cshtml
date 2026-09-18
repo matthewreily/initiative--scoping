@@ -67,20 +67,19 @@
             <th scope="row">People (allocation quantity)</th>
             @foreach (var c in cols) { <td class="text-end">@c.HeadCount@Html.Raw(c.IsParent ? "" : Delta(c.HeadCount, parent.HeadCount, "N0"))</td> }
         </tr>
-        <tr>
-            <th scope="row">Internal FTE hours</th>
-            @foreach (var c in cols) { <td class="text-end">@c.InternalHours.ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.InternalHours, parent.InternalHours, "N1"))</td> }
-        </tr>
-        <tr>
-            <th scope="row">Vendor hours</th>
-            @foreach (var c in cols) { <td class="text-end">@c.VendorHours.ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.VendorHours, parent.VendorHours, "N1"))</td> }
-        </tr>
-        @foreach (var typeId in cmp.ResourceTypeIds)
+        @foreach (var (cls, label) in new[] { (ResourcingClass.InternalFte, "Internal FTE hours"), (ResourcingClass.Vendor, "Vendor hours") })
         {
-            <tr>
-                <th scope="row" class="fw-normal ps-4">@Model.ResourceTypeNames.GetValueOrDefault(typeId, "?") hours</th>
-                @foreach (var c in cols) { <td class="text-end">@c.HoursByResourceType(typeId).ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.HoursByResourceType(typeId), parent.HoursByResourceType(typeId), "N1"))</td> }
+            <tr class="compare-class-row">
+                <th scope="row">@label</th>
+                @foreach (var c in cols) { <td class="text-end fw-semibold">@c.HoursByClass(cls).ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.HoursByClass(cls), parent.HoursByClass(cls), "N1"))</td> }
             </tr>
+            foreach (var typeId in cmp.ResourceTypeIds.Where(t => cols.Any(c => c.HoursByResourceType(t, cls) != 0)))
+            {
+                <tr class="compare-type-row">
+                    <th scope="row" class="fw-normal ps-4">@Model.ResourceTypeNames.GetValueOrDefault(typeId, "?")</th>
+                    @foreach (var c in cols) { <td class="text-end">@c.HoursByResourceType(typeId, cls).ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.HoursByResourceType(typeId, cls), parent.HoursByResourceType(typeId, cls), "N1"))</td> }
+                </tr>
+            }
         }
 
         <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Cost</span></th></tr>
