@@ -1,0 +1,191 @@
+@using InitiativeScoping.Domain.Services
+@model InitiativeOnePagerModel
+@{
+    Layout = "_LayoutPrint";
+    var i = Model.Initiative;
+    var f = Model.Forecast;
+    var v = Model.Variance;
+    var b = Model.Budget;
+    var baseline = i.CurrentBaseline;
+    ViewData["Title"] = $"{i.Name} – One-pager";
+    ViewData["PrintHint"] = "Fits one A4/Letter page in portrait. Use your browser's Print dialog and choose “Save as PDF” to export.";
+    var owners = i.Members.Where(m => m.Role == InitiativeMemberRole.Owner).Select(m => Users.Display(m.UserId)).ToList();
+    var notes = i.Notes.Where(n => n.ForecastBaselineId is null).OrderByDescending(n => n.CreatedAt).Take(3).ToList();
+    string Delta(decimal value, decimal? pct) => $"{(value >= 0 ? "+" : "−")}{Math.Abs(value):C0}{(pct is null ? "" : $" ({(pct >= 0 ? "+" : "")}{pct:0.#}%)")}";
+}
+@section Toolbar {
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@i.Id">Back to initiative</a>
+}
+
+<header class="d-flex justify-content-between align-items-start gap-3 border-bottom pb-2 mb-3">
+    <div>
+        <div class="text-muted small text-uppercase">Initiative one-pager</div>
+        <h1 class="h3 mb-1">@i.Name <partial name="_StatusBadge" model="i.Status" /> <partial name="_Confidence" model="i.EstimateConfidence" /></h1>
+        <div class="small text-muted">
+            @i.BusinessUnit?.Name@(string.IsNullOrWhiteSpace(i.SponsoringTeam) ? "" : $" · {i.SponsoringTeam}")
+            @if (owners.Count > 0) { <text> · Owner@(owners.Count > 1 ? "s" : ""): @string.Join(", ", owners)</text> }
+        </div>
+    </div>
+    <div class="text-end small text-muted text-nowrap">
+        <div>Generated @Model.GeneratedAt.ToString("yyyy-MM-dd HH:mm") UTC</div>
+        <div>@(baseline is null ? "No baseline yet" : $"Baseline v{baseline.Version} · {baseline.SnapshotAt:yyyy-MM-dd}")</div>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(i.Description))
+{
+    <p class="mb-3 one-pager-description">@i.Description</p>
+}
+
+<div class="row g-2 mb-3 one-pager-tiles">
+    <div class="col-6 col-md-3"><div class="border rounded p-2 h-100">
+        <div class="text-muted small">Forecast (incl. contingency)</div>
+        <div class="fs-5 fw-semibold">@f.TotalCostWithContingency.ToString("C0")</div>
+        <div class="small text-muted">@f.TotalCost.ToString("C0") + @i.ContingencyPct.ToString("0.#")% contingency@(f.IsComplete ? "" : " · has unpriced lines")</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2 h-100">
+        <div class="text-muted small">Baseline</div>
+        <div class="fs-5 fw-semibold">@(baseline is null ? "—" : (baseline.TotalCost + baseline.ContingencyCost).ToString("C0"))</div>
+        <div class="small text-muted">@(baseline is null ? "Activate to capture v1" : $"v{baseline.Version} · {baseline.TotalHours:N0} h")</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2 h-100">
+        <div class="text-muted small">Actual to date</div>
+        <div class="fs-5 fw-semibold">@(v.HasActuals ? v.ActualCost.ToString("C0") : "—")</div>
+        <div class="small text-muted">@(v.HasActuals ? $"{v.ActualHours:N0} h · EAC {v.EacCost:C0}" : "No actuals recorded")</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2 h-100 @(b.OverBudget ? "border-danger" : "")">
+        <div class="text-muted small">Budget@(string.IsNullOrWhiteSpace(b.FiscalYear) ? "" : $" ({b.FiscalYear})")</div>
+        <div class="fs-5 fw-semibold">@(b.HasBudget ? b.Budget!.Value.ToString("C0") : "—")</div>
+        <div class="small @(b.OverBudget ? "text-danger fw-semibold" : "text-muted")">@(b.HasBudget ? $"{(b.Remaining >= 0 ? "Remaining" : "Over by")} {Math.Abs(b.Remaining!.Value):C0} vs. {(b.UsesEac ? "EAC" : "forecast")}" : "No approved budget")</div>
+    </div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <h2 class="h6 text-uppercase text-muted">Schedule</h2>
+        <table class="table table-sm mb-2">
+            <tbody>
+                <tr><th scope="row" class="fw-normal text-muted">Planning mode</th><td>@(i.PlanningMode == PlanningMode.FixedDuration ? "Fixed duration" : "Effort driven")@(i.SizingMethod == SizingMethod.Direct ? "" : $" · {i.SizingMethod} {i.SizeKey}")</td></tr>
+                <tr><th scope="row" class="fw-normal text-muted">Target</th><td>@i.TargetStart.ToString("yyyy-MM-dd") → @(i.TargetEnd?.ToString("yyyy-MM-dd") ?? "open")</td></tr>
+                <tr><th scope="row" class="fw-normal text-muted">Planned</th><td>@(Model.PlanStart is null ? "No phases" : $"{Model.PlanStart:yyyy-MM-dd} → {Model.PlanEnd:yyyy-MM-dd} · {Model.Phases.Count} phase{(Model.Phases.Count == 1 ? "" : "s")}")</td></tr>
+            </tbody>
+        </table>
+        @if (Model.Phases.Count > 0)
+        {
+            <table class="table table-sm mb-3" id="one-pager-phases">
+                <thead><tr><th>Phase</th><th>Start</th><th>End</th><th class="text-end">Hours</th><th class="text-end">Labor</th></tr></thead>
+                <tbody>
+                @foreach (var p in Model.Phases)
+                {
+                    var r = Model.ByPhase.FirstOrDefault(x => x.Label == p.Name);
+                    <tr>
+                        <td>@p.Name</td>
+                        <td class="text-nowrap">@p.PlannedStart.ToString("yyyy-MM-dd")</td>
+                        <td class="text-nowrap">@p.PlannedEnd.ToString("yyyy-MM-dd")</td>
+                        <td class="text-end">@((r?.Hours ?? 0m).ToString("N0"))</td>
+                        <td class="text-end">@((r?.Cost ?? 0m).ToString("C0"))@(r?.HasUnpriced == true ? "*" : "")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+
+        <h2 class="h6 text-uppercase text-muted">Cost breakdown</h2>
+        <table class="table table-sm mb-3" id="one-pager-breakdown">
+            <tbody>
+                <tr><th scope="row" class="fw-normal">Labor</th><td class="text-end">@f.TotalHours.ToString("N0") h</td><td class="text-end">@f.LaborCost.ToString("C0")</td></tr>
+                @foreach (var r in Model.ByClass)
+                {
+                    <tr class="text-muted"><td class="ps-4">@r.Label</td><td class="text-end">@r.Hours.ToString("N0") h</td><td class="text-end">@r.Cost.ToString("C0")</td></tr>
+                }
+                <tr><th scope="row" class="fw-normal">Non-labor</th><td class="text-end">@f.NonLaborLines.Count line@(f.NonLaborLines.Count == 1 ? "" : "s")</td><td class="text-end">@f.NonLaborCost.ToString("C0")</td></tr>
+                <tr><th scope="row" class="fw-normal">Contingency (@i.ContingencyPct.ToString("0.#")%)</th><td></td><td class="text-end">@f.ContingencyCost.ToString("C0")</td></tr>
+                <tr class="fw-semibold border-top"><th scope="row">Forecast</th><td></td><td class="text-end">@f.TotalCostWithContingency.ToString("C0")</td></tr>
+            </tbody>
+        </table>
+        @if (!f.IsComplete)
+        {
+            <p class="small text-danger mb-3">* Includes allocations with no matching rate-card row; the forecast is understated until they are priced.</p>
+        }
+    </div>
+
+    <div class="col-md-6">
+        <h2 class="h6 text-uppercase text-muted">Forecast vs. baseline &amp; actuals</h2>
+        @if (baseline is null)
+        {
+            <p class="small text-muted mb-3">No baseline yet – variance and EAC appear once the initiative is activated.</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-3" id="one-pager-variance">
+                <tbody>
+                    <tr><th scope="row" class="fw-normal text-muted">Baseline v@baseline.Version</th><td class="text-end">@v.BaselineCost.ToString("C0")</td><td></td></tr>
+                    <tr><th scope="row" class="fw-normal text-muted">Live forecast</th><td class="text-end">@f.TotalCost.ToString("C0")</td><td class="text-end small @(f.TotalCost - v.BaselineCost > 0 ? "text-danger" : "text-success")">@Delta(f.TotalCost - v.BaselineCost, v.BaselineCost == 0 ? null : Math.Round((f.TotalCost - v.BaselineCost) / v.BaselineCost * 100m, 1))</td></tr>
+                    @if (v.HasActuals)
+                    {
+                        <tr><th scope="row" class="fw-normal text-muted">Actual to date</th><td class="text-end">@v.ActualCost.ToString("C0")</td><td class="text-end small text-muted">@v.ActualHours.ToString("N0") h</td></tr>
+                        <tr><th scope="row" class="fw-normal text-muted">Estimate to complete</th><td class="text-end">@v.EtcCost.ToString("C0")</td><td class="text-end small text-muted">@v.EtcHours.ToString("N0") h</td></tr>
+                        <tr class="fw-semibold border-top"><th scope="row">EAC</th><td class="text-end">@v.EacCost.ToString("C0")</td><td class="text-end small @(v.EacExceedsThreshold ? "text-danger" : v.EacCostVariance > 0 ? "text-warning-emphasis" : "text-success")">@Delta(v.EacCostVariance, v.EacCostVariancePct)@(v.EacExceedsThreshold ? " ⚠" : "")</td></tr>
+                    }
+                </tbody>
+            </table>
+            @if (v.ThresholdPct is decimal t)
+            {
+                <p class="small text-muted mb-3">Variance threshold @t.ToString("0.#")%@(v.EacExceedsThreshold ? " – exceeded at EAC" : "").</p>
+            }
+        }
+
+        <h2 class="h6 text-uppercase text-muted">Cost by month</h2>
+        @if (Model.Phasing.IsEmpty)
+        {
+            <p class="small text-muted mb-3">Nothing to phase yet.</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-3" id="one-pager-months">
+                <thead><tr><th>Month</th><th class="text-end">Forecast</th>@if (Model.Phasing.BaselineCost != 0) { <th class="text-end">Baseline</th> }@if (Model.Phasing.ActualCost != 0) { <th class="text-end">Actual</th> }</tr></thead>
+                <tbody>
+                @foreach (var m in Model.Phasing.Months)
+                {
+                    <tr>
+                        <td>@m.Month.ToString("MMM yyyy")</td>
+                        <td class="text-end">@m.ForecastCost.ToString("C0")</td>
+                        @if (Model.Phasing.BaselineCost != 0) { <td class="text-end">@m.BaselineCost.ToString("C0")</td> }
+                        @if (Model.Phasing.ActualCost != 0) { <td class="text-end">@m.ActualCost.ToString("C0")</td> }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+
+        <h2 class="h6 text-uppercase text-muted">Team by resource type</h2>
+        <table class="table table-sm mb-3" id="one-pager-types">
+            <tbody>
+            @if (Model.ByResourceType.Count == 0)
+            {
+                <tr><td class="text-muted">No allocations yet</td></tr>
+            }
+            @foreach (var r in Model.ByResourceType)
+            {
+                <tr><td>@r.Label</td><td class="text-end">@r.Hours.ToString("N0") h</td><td class="text-end">@r.Cost.ToString("C0")</td></tr>
+            }
+            </tbody>
+        </table>
+
+        @if (notes.Count > 0)
+        {
+            <h2 class="h6 text-uppercase text-muted">Latest notes</h2>
+            <ul class="list-unstyled small mb-0" id="one-pager-notes">
+            @foreach (var n in notes)
+            {
+                <li class="mb-1"><span class="text-muted">@n.CreatedAt.ToString("yyyy-MM-dd") · @Users.Display(n.CreatedBy):</span> @n.Body</li>
+            }
+            </ul>
+        }
+    </div>
+</div>
+
+<footer class="border-top mt-3 pt-2 small text-muted d-flex justify-content-between">
+    <span>Initiative Scoping · initiative #@i.Id</span>
+    <span>Rates from published rate cards as of generation; baselines are frozen snapshots.</span>
+</footer>
