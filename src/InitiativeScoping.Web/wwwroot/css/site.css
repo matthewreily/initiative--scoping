@@ -244,3 +244,9 @@ th .help-hint { font-weight: 600; }
   transition: top .15s, left .15s, width .15s, height .15s;
 }
 .tour-card { position: fixed; width: 320px; max-width: calc(100vw - 24px); }
+
+/* Side panel for in-place editing (allocations, phases, non-labor) */
+.side-panel { --bs-offcanvas-width: min(720px, 100vw); }
+.side-panel .offcanvas-body .row > [class*="col-md-"] { flex: 0 0 auto; width: 50%; }
+.side-panel .offcanvas-body .row > .col-12 { width: 100%; }
+@media (max-width: 575.98px) { .side-panel .offcanvas-body .row > [class*="col-md-"] { width: 100%; } }

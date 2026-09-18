@@ -567,3 +567,89 @@ document.addEventListener('keydown', e => {
         window.setTimeout(() => start(pageTour), 300);
     }
 })();
+
+// Side panel: <a data-panel="Title" href="/edit/…"> loads that page into the offcanvas (#side-panel) instead of
+// navigating. The server sees the X-Panel header and renders the form without page chrome; inline scripts in the
+// fragment are re-run so rate / hours / cost previews work. Saving posts the form from the panel: a redirect means
+// success (reload to show the updated page and its toast), HTML means validation errors (re-render in the panel).
+(function () {
+    const panel = document.getElementById('side-panel');
+    if (!panel || !window.bootstrap?.Offcanvas) return;
+    const title = panel.querySelector('#side-panel-title');
+    const body = panel.querySelector('#side-panel-body');
+    const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(panel);
+    const headers = { 'X-Panel': '1' };
+    let opener = null;
+
+    function render(html) {
+        body.innerHTML = html;
+        // Scripts inserted through innerHTML are inert; re-create them so they execute against the panel's elements.
+        body.querySelectorAll('script').forEach(old => {
+            const s = document.createElement('script');
+            for (const a of old.attributes) s.setAttribute(a.name, a.value);
+            s.textContent = old.textContent;
+            old.replaceWith(s);
+        });
+        if (window.jQuery?.validator?.unobtrusive) {
+            body.querySelectorAll('form').forEach(f => { jQuery(f).removeData('validator').removeData('unobtrusiveValidation'); });
+            jQuery.validator.unobtrusive.parse(body);
+        }
+        body.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => bootstrap.Tooltip.getOrCreateInstance(el));
+        const first = body.querySelector('.is-invalid, .input-validation-error') || body.querySelector('input:not([type=hidden]):not([readonly]), select, textarea');
+        first?.focus();
+    }
+
+    function fail(message) {
+        render(`<div class="alert alert-danger">${message}</div>`);
+    }
+
+    async function load(url, label, trigger) {
+        opener = trigger;
+        title.textContent = label;
+        body.innerHTML = '<div class="text-muted small py-3" role="status">Loading…</div>';
+        offcanvas.show();
+        try {
+            const res = await fetch(url, { headers, credentials: 'same-origin', redirect: 'manual' });
+            if (res.type === 'opaqueredirect') { location.assign(url); return; }
+            if (!res.ok) { fail(`Could not load this form (HTTP ${res.status}). <a href="${url}">Open it as a page</a>.`); return; }
+            render(await res.text());
+        } catch {
+            fail(`Could not load this form. <a href="${url}">Open it as a page</a>.`);
+        }
+    }
+
+    document.addEventListener('click', e => {
+        const link = e.target.closest('a[data-panel]');
+        if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        load(link.href, link.dataset.panel || link.textContent.trim(), link);
+    });
+
+    panel.addEventListener('submit', async e => {
+        const form = e.target;
+        if (form.method.toLowerCase() !== 'post') return;
+        e.preventDefault();
+        if (window.jQuery?.validator && jQuery(form).data('validator') && !jQuery(form).valid()) return;
+        const button = e.submitter || form.querySelector('button[type=submit]');
+        button?.classList.add('is-loading');
+        button?.setAttribute('aria-busy', 'true');
+        if (button) button.disabled = true;
+        try {
+            const data = new FormData(form);
+            if (e.submitter?.name) data.append(e.submitter.name, e.submitter.value);
+            const res = await fetch(form.action, { method: 'POST', body: data, headers, credentials: 'same-origin', redirect: 'manual' });
+            if (res.type === 'opaqueredirect') { location.reload(); return; }
+            if (!res.ok) { fail(`Save failed (HTTP ${res.status}). Please try again.`); return; }
+            render(await res.text());
+        } catch {
+            fail('Save failed. Please check your connection and try again.');
+        }
+    });
+
+    panel.addEventListener('hidden.bs.offcanvas', () => {
+        body.innerHTML = '';
+        title.textContent = '';
+        if (opener && document.contains(opener)) opener.focus();
+        opener = null;
+    });
+})();

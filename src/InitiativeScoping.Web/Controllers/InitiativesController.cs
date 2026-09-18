@@ -1438,8 +1438,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ModelState.AddModelError(nameof(model.PlannedEnd), "Planned end must be on or after planned start.");
         }
 
-        var name = model.Name.Trim();
-        if (initiative.Phases.Any(p => p.Id != model.Id && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+        var name = model.Name?.Trim() ?? "";
+        if (name.Length > 0 && initiative.Phases.Any(p => p.Id != model.Id && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
             ModelState.AddModelError(nameof(model.Name), $"A phase named '{name}' already exists.");
         }

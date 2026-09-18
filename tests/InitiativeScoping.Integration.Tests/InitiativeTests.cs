@@ -6,6 +6,7 @@ using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using InitiativeScoping.Web;
 
 namespace InitiativeScoping.Integration.Tests;
 
@@ -343,6 +344,48 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         using var verify = factory.Services.CreateScope();
         var saved = await verify.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.SingleAsync(a => a.Id == allocationId);
         Assert.Equal(partnerId, saved.BusinessUnitId);
+    }
+
+    [Fact]
+    public async Task Edit_pages_render_as_bare_fragments_for_side_panel_requests_and_full_pages_otherwise()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "Panel test");
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        var (phaseId, _) = await FirstPhaseAndTypeAsync(id, "QA Analyst");
+
+        var detailsHtml = await client.GetStringAsync(details);
+        Assert.Matches($"<a [^>]*data-panel=\"Edit phase\"[^>]*href=\"/Initiatives/EditPhase/{phaseId}\"|<a [^>]*href=\"/Initiatives/EditPhase/{phaseId}\"[^>]*data-panel=\"Edit phase\"", detailsHtml);
+        Assert.Contains("id=\"side-panel\"", detailsHtml);
+
+        var fullPage = await client.GetStringAsync($"/Initiatives/EditPhase/{phaseId}");
+        Assert.Contains("class=\"navbar-brand\"", fullPage);
+        Assert.Contains("breadcrumb", fullPage);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/Initiatives/EditPhase/{phaseId}");
+        request.Headers.Add(SidePanel.Header, "1");
+        var fragment = await (await client.SendAsync(request)).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("class=\"navbar-brand\"", fragment);
+        Assert.DoesNotContain("breadcrumb", fragment);
+        Assert.Contains("data-bs-dismiss=\"offcanvas\"", fragment);
+        Assert.Contains("__RequestVerificationToken", fragment);
+
+        // Blank name in the panel (no client validation there) must redisplay the form, not crash.
+        var token = TokenRegex.Match(fragment).Groups[1].Value;
+        using var post = new HttpRequestMessage(HttpMethod.Post, $"/Initiatives/EditPhase/{phaseId}")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token, ["Name"] = "", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30"
+            })
+        };
+        post.Headers.Add(SidePanel.Header, "1");
+        var invalid = await client.SendAsync(post);
+        Assert.Equal(HttpStatusCode.OK, invalid.StatusCode);
+        var invalidHtml = await invalid.Content.ReadAsStringAsync();
+        Assert.Contains("required", invalidHtml);
+        Assert.DoesNotContain("class=\"navbar-brand\"", invalidHtml);
     }
 
     [Fact]
