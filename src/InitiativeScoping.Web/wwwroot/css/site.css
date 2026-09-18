@@ -244,3 +244,28 @@ th .help-hint { font-weight: 600; }
   transition: top .15s, left .15s, width .15s, height .15s;
 }
 .tour-card { position: fixed; width: 320px; max-width: calc(100vw - 24px); }
+
+/* Loading feedback: top progress bar on navigation, placeholder layout while Portfolio / Capacity load */
+.page-progress {
+  position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 1090; pointer-events: none;
+  background: var(--bs-primary); opacity: 0; transition: opacity .2s;
+}
+.page-progress.is-active { opacity: 1; animation: page-progress 6s cubic-bezier(.1, .7, .3, 1) forwards; }
+@keyframes page-progress { from { width: 0; } to { width: 92%; } }
+
+.skeleton {
+  display: block; height: .85rem; border-radius: var(--is-radius);
+  background: linear-gradient(90deg, var(--bs-secondary-bg) 25%, var(--bs-tertiary-bg) 50%, var(--bs-secondary-bg) 75%);
+  background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-text { margin: .3rem 0; }
+.skeleton-title { height: 1.6rem; margin: .4rem 0; }
+.skeleton-button { width: 5rem; height: 1.9rem; }
+.skeleton-input { height: 1.9rem; }
+.skeleton-chart { height: 200px; }
+.page-skeleton th .skeleton { height: .7rem; }
+@keyframes skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  .page-progress.is-active { animation: none; width: 92%; }
+}
