@@ -31,6 +31,7 @@ public class HomeController(AppDbContext db, ICurrentUser currentUser) : Control
     [
         new("Business units", "Teams that sponsor and staff initiatives.", await db.BusinessUnits.AnyAsync(ct), "Admin", "BusinessUnits", "Index"),
         new("Resource types", "Roles that can be allocated, grouped by discipline.", await db.ResourceTypes.AnyAsync(ct), "Admin", "ResourceTypes", "Index"),
+        new("Resourcing classes", "How resources are sourced (Internal, Vendor…) with labor Capex % defaults.", await db.ResourcingClasses.AnyAsync(c => c.IsActive, ct), "Admin", "ResourcingClasses", "Index"),
         new("Published rate card", "Hourly rates per resource type / seniority / class.", await db.RateCards.AnyAsync(r => r.Status == RateCardStatus.Published, ct), "Admin", "RateCards", "Index"),
         new("Allocation templates", "Default staffing per T-shirt size, used by Apply size.", await db.AllocationTemplates.AnyAsync(ct), "Admin", "Sizing", "Index"),
         new("Work calendar", "Hours per day and holidays for fixed-duration planning.", await db.WorkCalendarSettings.AnyAsync(ct), "Admin", "WorkCalendar", "Index"),

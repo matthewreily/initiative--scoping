@@ -4,14 +4,14 @@ using InitiativeScoping.Domain.Enums;
 namespace InitiativeScoping.Domain.Services;
 
 /// <summary>
-/// <paramref name="VendorId"/> is ignored for internal resources. For vendor resources a rate row naming the same vendor wins;
+/// <paramref name="VendorId"/> is null for non-vendor classes. For vendor resources a rate row naming the same vendor wins;
 /// a vendor-class row with no vendor is a generic "any vendor" rate that applies when no vendor-specific row exists.
 /// </summary>
 public readonly record struct RateKey(
     int ResourceTypeId,
     int SeniorityId,
     string Location,
-    ResourcingClass ResourcingClass,
+    int ResourcingClassId,
     int? VendorId = null);
 
 /// <summary>One stretch of days priced from a single rate card (rate null = unpriced there).</summary>
@@ -85,9 +85,9 @@ public static class RateResolver
         return result;
     }
 
-    /// <summary>True when the row prices the vendor: internal rows always, vendor rows when they name the vendor or name none.</summary>
-    public static bool VendorMatches(ResourcingClass cls, int? entryVendorId, int? vendorId) =>
-        cls != ResourcingClass.Vendor || entryVendorId is null || entryVendorId == vendorId;
+    /// <summary>True when the row prices the vendor: rows naming no vendor (all non-vendor rows, and generic vendor rows) always, vendor rows when they name the vendor.</summary>
+    public static bool VendorMatches(int? entryVendorId, int? vendorId) =>
+        entryVendorId is null || entryVendorId == vendorId;
 
     /// <summary>
     /// Published cards price from EffectiveStart until EffectiveEnd (or until a later card starts).
@@ -115,8 +115,8 @@ public static class RateResolver
             .Where(e =>
                 e.ResourceTypeId == key.ResourceTypeId &&
                 e.SeniorityId == key.SeniorityId &&
-                e.ResourcingClass == key.ResourcingClass &&
-                VendorMatches(e.ResourcingClass, e.VendorId, key.VendorId) &&
+                e.ResourcingClassId == key.ResourcingClassId &&
+                VendorMatches(e.VendorId, key.VendorId) &&
                 string.Equals(e.Location, key.Location, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(e => e.VendorId.HasValue)
             .FirstOrDefault()

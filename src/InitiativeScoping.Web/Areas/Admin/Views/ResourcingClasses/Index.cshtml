@@ -1,0 +1,49 @@
+@model IReadOnlyList<ResourcingClassListItem>
+@{
+    ViewData["Title"] = "Resourcing classes";
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="h4 mb-0">Resourcing classes</h2>
+    <a class="btn btn-primary btn-sm" asp-action="Create">New resourcing class</a>
+</div>
+<p class="text-muted small">How a resource is sourced (e.g. Internal, Vendor). Vendor-backed classes require a vendor on rate-card rows, allocations and people; each class sets the default labor Capex % for new allocations.</p>
+<form asp-action="BulkDelete" method="post" data-bulk>
+<div class="table-responsive">
+<table class="table table-sm align-middle" data-sortable>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Order</th><th>Name</th><th>Vendor-backed</th><th>Default Capex %</th><th>Status</th><th>Rate rows</th><th>Allocations</th><th>People</th><th>Baselines</th><th data-nosort></th></tr></thead>
+    <tbody>
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td><input type="checkbox" class="form-check-input" name="ids" value="@item.Class.Id" data-bulk-item aria-label="Select row" /></td>
+            <td>@item.Class.SortOrder</td>
+            <td>@item.Class.Name</td>
+            <td>@(item.Class.IsVendor ? "Yes" : "No")</td>
+            <td data-sort="@item.Class.DefaultCapexPercent">@item.Class.DefaultCapexPercent.ToString("0.##")%</td>
+            <td>@(item.Class.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
+            <td>@item.RateCardEntries</td>
+            <td>@item.Allocations</td>
+            <td>@item.People</td>
+            <td>@item.BaselineLines</td>
+            <td class="text-end">
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@item.Class.Id">Edit</a>
+                @if (!item.IsReferenced)
+                {
+                    <button type="submit" formaction="@Url.Action("Delete", new { id = item.Class.Id })" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete @item.Class.Name?');">Delete</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled title="Referenced; deactivate instead">Delete</button>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Count == 0)
+    {
+        <tr data-nosort><td colspan="11" class="text-muted">No resourcing classes yet.</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+<partial name="_BulkBar" model='new BulkBarOptions("resourcing classes")' />
+</form>

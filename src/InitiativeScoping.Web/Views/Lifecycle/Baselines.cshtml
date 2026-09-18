@@ -70,7 +70,7 @@ else
                     {
                         <tr class="@(l.Hours == 0 ? "text-muted" : "")">
                             <td>@l.Phase</td><td>@l.BusinessUnit</td><td>@l.ResourceType</td><td>@l.Seniority</td><td>@(l.Person ?? "—")</td><td>@l.Location</td>
-                            <td>@(l.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : l.Vendor is null ? "Vendor" : $"Vendor: {l.Vendor}")</td>
+                            <td>@(l.Vendor is null ? l.ResourcingClass : $"{l.ResourcingClass}: {l.Vendor}")</td>
                             <td class="text-end">@l.Hours.ToString("N1")</td>
                             <td class="text-end">@l.HourlyRate.ToString("C2")</td>
                             <td class="text-end">@l.Cost.ToString("C0")</td>

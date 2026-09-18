@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Discipline> Disciplines => Set<Discipline>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<SeniorityLevel> SeniorityLevels => Set<SeniorityLevel>();
+    public DbSet<ResourcingClass> ResourcingClasses => Set<ResourcingClass>();
     public DbSet<ResourceType> ResourceTypes => Set<ResourceType>();
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<RateCardEntry> RateCardEntries => Set<RateCardEntry>();
@@ -91,6 +92,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Name).IsUnique();
         });
 
+        b.Entity<ResourcingClass>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(ResourcingClass.MaxNameLength).UseCollation(ciCollation);
+            e.Property(x => x.DefaultCapexPercent).HasPrecision(5, 2);
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
         b.Entity<ResourceType>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(ResourceType.MaxNameLength).UseCollation(ciCollation);
@@ -109,10 +117,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Location).HasMaxLength(100).UseCollation(ciCollation);
             e.Property(x => x.HourlyRate).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.SeniorityId, x.Location, x.ResourcingClass, x.VendorId })
+            e.HasIndex(x => new { x.RateCardId, x.ResourceTypeId, x.SeniorityId, x.Location, x.ResourcingClassId, x.VendorId })
                 .IsUnique();
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ResourcingClass).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -126,8 +135,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<WorkCalendarSettings>(e =>
         {
             e.Property(x => x.HoursPerDay).HasPrecision(4, 2);
-            e.Property(x => x.InternalCapexPercent).HasPrecision(5, 2);
-            e.Property(x => x.VendorCapexPercent).HasPrecision(5, 2);
         });
 
         b.Entity<CostCatalogItem>(e =>
@@ -213,7 +220,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ResourcingClass).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.Ignore(x => x.IsVendor);
             e.Ignore(x => x.PersonIds);
             e.Ignore(x => x.NamedPeople);
             e.Ignore(x => x.HasNamedPeople);
@@ -329,6 +338,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.BusinessUnitName).HasMaxLength(200);
             e.Property(x => x.ResourceTypeName).HasMaxLength(200);
             e.Property(x => x.SeniorityName).HasMaxLength(200);
+            e.Property(x => x.ResourcingClassName).HasMaxLength(200);
             e.Property(x => x.VendorName).HasMaxLength(200);
             e.Property(x => x.PersonName).HasMaxLength(200);
             e.Property(x => x.Hours).HasPrecision(18, 2);
@@ -344,6 +354,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ResourcingClass).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 

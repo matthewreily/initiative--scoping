@@ -33,12 +33,12 @@ public class BulkActionsTests(WebAppFactory factory) : IClassFixture<WebAppFacto
             vendorId = vendor.Id;
         }
 
-        foreach (var (seniority, cls, vendor) in new[] { ("1", "InternalFte", (int?)null), ("2", "InternalFte", null), ("3", "Vendor", vendorId) })
+        foreach (var (seniority, cls, vendor) in new[] { ("1", ResourcingClass.InternalId, (int?)null), ("2", ResourcingClass.InternalId, null), ("3", ResourcingClass.VendorId, vendorId) })
         {
             List<KeyValuePair<string, string>> fields =
             [
                 new("ResourceTypeId", typeId.ToString()), new("BusinessUnitId", buId.ToString()), new("SeniorityId", seniority),
-                new("Location", "Onshore"), new("ResourcingClass", cls), new("HourlyRate", "100")
+                new("Location", "Onshore"), new("ResourcingClassId", cls.ToString()), new("HourlyRate", "100")
             ];
             if (vendor is not null)
             {
@@ -196,7 +196,7 @@ public class BulkActionsTests(WebAppFactory factory) : IClassFixture<WebAppFacto
             var add = await PostFormAsync(client, $"/Initiatives/Details/{target}", $"/Initiatives/AddAllocation/{target}",
             [
                 new("PhaseId", phase.ToString()), new("ResourceTypeId", typeId.ToString()), new("SeniorityId", "3"),
-                new("Location", "Onshore"), new("ResourcingClass", nameof(ResourcingClass.InternalFte)), new("Quantity", "1"), new("EstimatedHours", "10")
+                new("Location", "Onshore"), new("ResourcingClassId", ResourcingClass.InternalId.ToString()), new("Quantity", "1"), new("EstimatedHours", "10")
             ]);
             Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);
             var nl = await PostFormAsync(client, $"/Initiatives/Details/{target}", $"/Initiatives/AddNonLaborCost/{target}",
@@ -262,7 +262,7 @@ public class BulkActionsTests(WebAppFactory factory) : IClassFixture<WebAppFacto
         await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create",
         [
             new("DisplayName", $"Sam {tag}"), new("ExternalIds", $"SAM-{tag}"), new("ResourceTypeId", typeId.ToString()), new("BusinessUnitId", buId.ToString()),
-            new("SeniorityId", "3"), new("Location", "Onshore"), new("ResourcingClass", nameof(ResourcingClass.InternalFte)), new("IsActive", "true")
+            new("SeniorityId", "3"), new("Location", "Onshore"), new("ResourcingClassId", ResourcingClass.InternalId.ToString()), new("IsActive", "true")
         ]);
         var id = await CreateInitiativeAsync(client, $"Remap {tag}");
         int personId, otherEntryId;

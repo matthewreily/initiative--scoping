@@ -92,11 +92,12 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         return RedirectWithSuccess($"Rate card '{card.Name}' updated.", "Details", new { id });
     }
 
-    public async Task<IActionResult> Details(int id, string? resourceType, int? vendorId, ResourcingClass? resourcingClass, CancellationToken ct)
+    public async Task<IActionResult> Details(int id, string? resourceType, int? vendorId, int? resourcingClassId, CancellationToken ct)
     {
         var card = await db.RateCards
             .Include(c => c.Entries).ThenInclude(e => e.ResourceType)
             .Include(c => c.Entries).ThenInclude(e => e.Vendor)
+            .Include(c => c.Entries).ThenInclude(e => e.ResourcingClass)
             .Include(c => c.Entries).ThenInclude(e => e.Seniority)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
         if (card is null)
@@ -114,9 +115,9 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         card.Entries = card.Entries
             .Where(e => string.IsNullOrEmpty(resourceType) || e.ResourceType!.Name == resourceType)
             .Where(e => vendorId is null || e.VendorId == vendorId)
-            .Where(e => resourcingClass is null || e.ResourcingClass == resourcingClass)
+            .Where(e => resourcingClassId is null || e.ResourcingClassId == resourcingClassId)
             .OrderBy(e => e.ResourceType!.Name)
-            .ThenBy(e => e.ResourcingClass).ThenBy(e => e.Vendor?.Name).ThenBy(e => e.Location).ThenBy(e => e.Seniority!.SortOrder)
+            .ThenBy(e => e.ResourcingClass!.SortOrder).ThenBy(e => e.ResourcingClass!.Name).ThenBy(e => e.Vendor?.Name).ThenBy(e => e.Location).ThenBy(e => e.Seniority!.SortOrder)
             .ToList();
 
         return View(new RateCardDetailsModel
@@ -126,10 +127,13 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
             ResourceTypes = await ResourceTypeSelect(ct),
             Seniorities = await SenioritySelect(ct),
             Vendors = await VendorSelect(ct),
+            ResourcingClasses = await ResourcingClassSelect(ct),
+            VendorClassIds = await db.ResourcingClasses.Where(c => c.IsVendor).Select(c => c.Id).ToListAsync(ct),
             FilterResourceType = resourceType,
             FilterVendors = new SelectList(entryVendors, "Id", "Name", vendorId),
             FilterVendorId = vendorId,
-            FilterResourcingClass = resourcingClass
+            FilterResourcingClasses = new SelectList(await db.ResourcingClasses.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync(ct), "Id", "Name", resourcingClassId),
+            FilterResourcingClassId = resourcingClassId
         });
     }
 
@@ -148,7 +152,13 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         }
 
         var location = model.Location.Trim();
-        var vendorId = model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;
+        var resourcingClass = await db.ResourcingClasses.AsNoTracking().FirstOrDefaultAsync(c => c.Id == model.ResourcingClassId, ct);
+        if (resourcingClass is null)
+        {
+            return RedirectWithError("Select a resourcing class from the catalog.", "Details", new { id });
+        }
+
+        var vendorId = resourcingClass.IsVendor ? model.VendorId : null;
         if (vendorId is not null && !await db.Vendors.AnyAsync(v => v.Id == vendorId, ct))
         {
             return RedirectWithError("Select a vendor from the catalog.", "Details", new { id });
@@ -161,7 +171,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
 
         var duplicate = await db.RateCardEntries.AnyAsync(e =>
             e.RateCardId == id && e.ResourceTypeId == model.ResourceTypeId &&
-            e.SeniorityId == model.SeniorityId && e.ResourcingClass == model.ResourcingClass && e.VendorId == vendorId && e.Location == location, ct);
+            e.SeniorityId == model.SeniorityId && e.ResourcingClassId == model.ResourcingClassId && e.VendorId == vendorId && e.Location == location, ct);
         if (duplicate)
         {
             return RedirectWithError("An entry with the same resource type / seniority / location / class / vendor already exists.", "Details", new { id });
@@ -178,13 +188,13 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
             ResourceTypeId = model.ResourceTypeId,
             SeniorityId = model.SeniorityId,
             Location = location,
-            ResourcingClass = model.ResourcingClass,
+            ResourcingClassId = model.ResourcingClassId,
             VendorId = vendorId,
             HourlyRate = model.HourlyRate
         };
         db.RateCardEntries.Add(entry);
         await db.SaveChangesAsync(ct);
-        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Create, new { entry.RateCardId, entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
+        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Create, new { entry.RateCardId, entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClassId, entry.VendorId, entry.HourlyRate });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Entry added.", "Details", new { id });
     }
@@ -314,7 +324,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         foreach (var entry in entries)
         {
             db.RateCardEntries.Remove(entry);
-            audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
+            audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClassId, entry.VendorId, entry.HourlyRate });
         }
 
         await db.SaveChangesAsync(ct);
@@ -389,7 +399,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         }
 
         db.RateCardEntries.Remove(entry);
-        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClass, entry.VendorId, entry.HourlyRate });
+        audit.Record(nameof(RateCardEntry), entry.Id, AuditActions.Delete, new { entry.ResourceTypeId, entry.SeniorityId, entry.Location, entry.ResourcingClassId, entry.VendorId, entry.HourlyRate });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess("Entry removed.", "Details", new { id });
     }
@@ -475,6 +485,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         var card = await db.RateCards
             .Include(c => c.Entries).ThenInclude(e => e.ResourceType).ThenInclude(t => t!.Discipline)
             .Include(c => c.Entries).ThenInclude(e => e.Vendor)
+            .Include(c => c.Entries).ThenInclude(e => e.ResourcingClass)
             .Include(c => c.Entries).ThenInclude(e => e.Seniority)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
         if (card is null)
@@ -484,7 +495,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
 
         var rows = card.Entries
             .OrderBy(e => e.ResourceType!.Name).ThenBy(e => e.Seniority!.SortOrder)
-            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.Seniority!.Name, e.Location, e.ResourcingClass, e.HourlyRate, e.Vendor?.Name, e.ResourceType.Discipline?.Name));
+            .Select(e => new RateCardCsvRow(e.ResourceType!.Name, e.Seniority!.Name, e.Location, e.ResourcingClass!, e.HourlyRate, e.Vendor?.Name, e.ResourceType.Discipline?.Name));
 
         var sb = new StringBuilder();
         using (var writer = new StringWriter(sb))
@@ -496,17 +507,18 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", $"ratecard-{safeName}.csv");
     }
 
-    public IActionResult Template()
+    public async Task<IActionResult> Template(CancellationToken ct)
     {
+        var (internalClass, vendorClass) = await TemplateClassesAsync(db, ct);
         var sb = new StringBuilder();
         using (var writer = new StringWriter(sb))
         {
             RateCardCsv.Write(writer,
             [
-                new RateCardCsvRow("Software Engineer", "Senior", "Onshore", ResourcingClass.InternalFte, 120m),
-                new RateCardCsvRow("Software Engineer", "Senior", "Offshore", ResourcingClass.Vendor, 75m),
-                new RateCardCsvRow("Software Engineer", "Level 3 (5-8 Years)", "Offshore", ResourcingClass.Vendor, 82m, "Acme Consulting"),
-                new RateCardCsvRow("AI Engineer", "Senior", "Onshore", ResourcingClass.InternalFte, 140m, null, "Engineering")
+                new RateCardCsvRow("Software Engineer", "Senior", "Onshore", internalClass, 120m),
+                new RateCardCsvRow("Software Engineer", "Senior", "Offshore", vendorClass, 75m),
+                new RateCardCsvRow("Software Engineer", "Level 3 (5-8 Years)", "Offshore", vendorClass, 82m, "Acme Consulting"),
+                new RateCardCsvRow("AI Engineer", "Senior", "Onshore", internalClass, 140m, null, "Engineering")
             ]);
         }
 
@@ -536,7 +548,7 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
         RateCardCsvResult parsed;
         using (var reader = new StreamReader(model.File.OpenReadStream()))
         {
-            parsed = RateCardCsv.Parse(reader);
+            parsed = RateCardCsv.Parse(reader, await ResourcingClassCatalog.AllAsync(db, ct));
         }
 
         var vendors = ToLookup(await db.Vendors.Select(v => new { v.Name, v.Id }).ToListAsync(ct), x => x.Name, x => x.Id);
@@ -584,13 +596,13 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
             var seniorityId = seniorities[row.Seniority].Id;
             var existing = card.Entries.FirstOrDefault(e =>
                 e.ResourceTypeId == typeId && e.SeniorityId == seniorityId &&
-                e.ResourcingClass == row.ResourcingClass && e.VendorId == vendorId && string.Equals(e.Location, row.Location, StringComparison.OrdinalIgnoreCase));
+                e.ResourcingClassId == row.ResourcingClass.Id && e.VendorId == vendorId && string.Equals(e.Location, row.Location, StringComparison.OrdinalIgnoreCase));
             if (existing is null)
             {
                 card.Entries.Add(new RateCardEntry
                 {
                     ResourceTypeId = typeId, SeniorityId = seniorityId,
-                    Location = row.Location, ResourcingClass = row.ResourcingClass, VendorId = vendorId, HourlyRate = row.HourlyRate
+                    Location = row.Location, ResourcingClassId = row.ResourcingClass.Id, VendorId = vendorId, HourlyRate = row.HourlyRate
                 });
                 added++;
             }
@@ -627,4 +639,18 @@ public class RateCardsController(AppDbContext db, IAuditLog audit, TimeProvider 
 
     private async Task<SelectList> VendorSelect(CancellationToken ct) =>
         new(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");
+
+    /// <summary>First non-vendor and first vendor-backed class for CSV template rows (falls back to placeholder names when the catalog is empty).</summary>
+    internal static async Task<(ResourcingClass Internal, ResourcingClass Vendor)> TemplateClassesAsync(AppDbContext db, CancellationToken ct)
+    {
+        var classes = await ResourcingClassCatalog.AllAsync(db, ct);
+        var internalClass = classes.FirstOrDefault(c => !c.IsVendor && c.IsActive) ?? classes.FirstOrDefault(c => !c.IsVendor)
+            ?? new ResourcingClass { Id = ResourcingClass.InternalId, Name = ResourcingClass.InternalName };
+        var vendorClass = classes.FirstOrDefault(c => c.IsVendor && c.IsActive) ?? classes.FirstOrDefault(c => c.IsVendor)
+            ?? new ResourcingClass { Id = ResourcingClass.VendorId, Name = ResourcingClass.VendorName, IsVendor = true };
+        return (internalClass, vendorClass);
+    }
+
+    private async Task<SelectList> ResourcingClassSelect(CancellationToken ct) =>
+        new(await db.ResourcingClasses.Where(c => c.IsActive).OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync(ct), "Id", "Name");
 }

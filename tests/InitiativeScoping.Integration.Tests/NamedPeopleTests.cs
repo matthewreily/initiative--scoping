@@ -50,7 +50,7 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
             var form = new Dictionary<string, string>
             {
                 ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = buId.ToString(), ["ResourceTypeId"] = (typeId ?? engineerId).ToString(),
-                ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte),
+                ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(),
                 ["Quantity"] = qty, ["EstimatedHours"] = "40"
             };
             for (var i = 0; i < people.Length; i++)
@@ -165,7 +165,7 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
         Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = buId.ToString(), ["ResourceTypeId"] = engineerId.ToString(),
-            ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte),
+            ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(),
             ["PersonIds[0]"] = jane.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "40"
         })).StatusCode);
 
@@ -220,7 +220,7 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
         var created = await PostFormAsync(client, "/Admin/People/Create", "/Admin/People/Create", new()
         {
             ["DisplayName"] = name, ["ExternalIds"] = externalIds ?? string.Empty, ["ResourceTypeId"] = typeId.ToString(), ["BusinessUnitId"] = buId.ToString(),
-            ["SeniorityId"] = seniorityId.ToString(), ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["IsActive"] = active ? "true" : "false"
+            ["SeniorityId"] = seniorityId.ToString(), ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["IsActive"] = active ? "true" : "false"
         });
         Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
         using var scope = factory.Services.CreateScope();

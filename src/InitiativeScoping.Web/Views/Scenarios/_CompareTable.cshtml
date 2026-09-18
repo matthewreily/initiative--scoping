@@ -67,8 +67,10 @@
             <th scope="row">People (allocation quantity)</th>
             @foreach (var c in cols) { <td class="text-end">@c.HeadCount@Html.Raw(c.IsParent ? "" : Delta(c.HeadCount, parent.HeadCount, "N0"))</td> }
         </tr>
-        @foreach (var (cls, label) in new[] { (ResourcingClass.InternalFte, "Internal FTE hours"), (ResourcingClass.Vendor, "Vendor hours") })
+        @foreach (var scenarioClass in cmp.Classes)
         {
+            var cls = scenarioClass.Id;
+            var label = $"{scenarioClass.Name} hours";
             <tr class="compare-class-row">
                 <th scope="row">@label</th>
                 @foreach (var c in cols) { <td class="text-end fw-semibold">@c.HoursByClass(cls).ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.HoursByClass(cls), parent.HoursByClass(cls), "N1"))</td> }

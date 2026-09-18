@@ -101,7 +101,7 @@ public class NotesTests
         await PostFormAsync(admin, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "50"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "50"
         });
         Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(admin, details, $"/Initiatives/{id}/Activate", new())).StatusCode);
         int baselineId;

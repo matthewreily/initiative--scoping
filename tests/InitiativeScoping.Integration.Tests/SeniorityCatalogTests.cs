@@ -59,7 +59,7 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
             db.RateCardEntries.Add(new RateCardEntry
             {
                 RateCardId = card.Id, ResourceTypeId = type.Id, SeniorityId = levelId,
-                Location = "Moon", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 1m
+                Location = "Moon", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = 1m
             });
             await db.SaveChangesAsync();
         }
@@ -239,7 +239,7 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
             {
                 DisplayName = $"P {Guid.NewGuid():N}"[..20], ResourceTypeId = await db.ResourceTypes.Select(t => t.Id).FirstAsync(),
                 BusinessUnitId = await db.BusinessUnits.Select(b => b.Id).FirstAsync(), Seniority = level, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte
+                ResourcingClassId = ResourcingClass.InternalId
             };
             db.People.Add(person);
             await db.SaveChangesAsync();
@@ -270,7 +270,7 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
             {
                 DisplayName = $"P {Guid.NewGuid():N}"[..20], ResourceTypeId = resourceTypeId, BusinessUnitId = businessUnitId,
                 SeniorityId = await db.SeniorityLevels.Where(s => s.IsActive).Select(s => s.Id).FirstAsync(), Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte
+                ResourcingClassId = ResourcingClass.InternalId
             };
             db.People.Add(person);
             await db.SaveChangesAsync();
@@ -281,7 +281,7 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
         var response = await PostFormAsync(client, $"/Admin/People/Edit/{personId}", $"/Admin/People/Edit/{personId}", new()
         {
             ["Id"] = personId.ToString(), ["DisplayName"] = "", ["ResourceTypeId"] = resourceTypeId.ToString(), ["BusinessUnitId"] = businessUnitId.ToString(),
-            ["SeniorityId"] = levelId.ToString(), ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["IsActive"] = "true"
+            ["SeniorityId"] = levelId.ToString(), ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["IsActive"] = "true"
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains(name + " (inactive)", await response.Content.ReadAsStringAsync());
@@ -335,7 +335,7 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
         var unknown = await PostFormAsync(client, detailsUrl, $"/Initiatives/AddAllocation/{initiativeId}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "999999",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         Assert.Equal(HttpStatusCode.Redirect, unknown.StatusCode);
         Assert.Contains("Select a seniority level", await client.GetStringAsync(detailsUrl));
@@ -348,7 +348,7 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
         var ok = await PostFormAsync(client, detailsUrl, $"/Initiatives/AddAllocation/{initiativeId}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = levelId.ToString(),
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "10"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "10"
         });
         Assert.Equal(HttpStatusCode.Redirect, ok.StatusCode);
         Assert.Contains(name, await client.GetStringAsync(detailsUrl));

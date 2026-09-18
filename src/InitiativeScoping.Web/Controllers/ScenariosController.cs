@@ -181,6 +181,7 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.Phases)
             .Include(i => i.Allocations).ThenInclude(a => a.BusinessUnit)
             .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
+            .Include(i => i.Allocations).ThenInclude(a => a.ResourcingClass)
             .Include(i => i.Allocations).ThenInclude(a => a.People).ThenInclude(p => p.Person)
             .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
             .Include(i => i.NonLaborCosts)

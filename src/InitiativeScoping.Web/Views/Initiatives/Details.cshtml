@@ -3,7 +3,8 @@
     var i = Model.Initiative;
     ViewData["Title"] = i.Name;
     ViewData["Tour"] = "details";
-    var classes = Html.GetEnumSelectList<ResourcingClass>();
+    var classes = new SelectList(Model.RateOptions.Classes, "Id", "Name", Model.NewAllocation.ResourcingClassId);
+    var vendorClassIds = Model.RateOptions.Classes.Where(c => c.IsVendor).Select(c => c.Id.ToString()).ToList();
     var roles = Html.GetEnumSelectList<InitiativeMemberRole>();
     var nonLaborCategories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString()).ToList();
     var billingModels = Html.GetEnumSelectList<BillingModel>();
@@ -421,7 +422,7 @@ else
                     <td data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
                     <td>@if (a.HasNamedPeople) { foreach (var p in a.NamedPeople) { <span class="allocation-person d-block text-nowrap">@p.DisplayName @if (!p.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } @if (Model.ScopeWritable) { <form asp-action="UnassignPerson" asp-route-id="@a.Id" method="post" class="d-inline"><input type="hidden" name="personId" value="@p.Id" /><button type="submit" class="btn btn-link btn-sm p-0 align-baseline text-danger text-decoration-none" title="Unassign @p.DisplayName (the seat stays, unassigned)" aria-label="Unassign @p.DisplayName">&times;</button></form> }</span> } if (a.UnassignedSeats > 0) { <span class="text-muted small d-block">+ @a.UnassignedSeats unassigned</span> } } else { <span class="text-muted">—</span> }</td>
                     <td>@a.Location</td>
-                    <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}")</td>
+                    <td>@(a.Vendor is null ? a.ResourcingClass?.Name ?? "—" : $"{a.ResourcingClass?.Name ?? "Vendor"}: {a.Vendor.Name}")</td>
                     <td class="allocation-capitalization" data-sort="@a.CapexPercent" title="@a.CapexPercent.ToString("0.##")% Capex / @((100m - a.CapexPercent).ToString("0.##"))% Opex">@CapexSplit.Label(a.CapexPercent)</td>
                     <td class="text-end">@a.Quantity</td>
                     @if (fixedDuration) { <td class="text-end">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
@@ -497,7 +498,7 @@ else
                 </div>
                 <div class="col-md-2">
                     <label for="resourcingclass" class="form-label small mb-0">Class</label>
-                    <select name="ResourcingClass" id="resourcingclass" asp-items="classes" class="form-select form-select-sm"></select>
+                    <select name="ResourcingClassId" id="resourcingclass" asp-items="classes" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-2" data-vendor-field hidden>
                     <label for="vendorid" class="form-label small mb-0">Vendor</label>
@@ -599,7 +600,7 @@ else
                 </div>
                 <div class="col-4">
                     <label for="resourcingclass-2" class="form-label small mb-0">Class</label>
-                    <select name="ResourcingClass" id="resourcingclass-2" asp-items="classes" class="form-select form-select-sm"></select>
+                    <select name="ResourcingClassId" id="resourcingclass-2" asp-items="classes" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-3" id="vendor-2-wrap" hidden>
                     <label for="vendorid-2" class="form-label small mb-0">Vendor</label>
@@ -616,7 +617,8 @@ else
                 (function () {
                     const cls2 = document.getElementById('resourcingclass-2'), wrap2 = document.getElementById('vendor-2-wrap'), vendor2 = document.getElementById('vendorid-2');
                     function toggleVendor() {
-                        const isVendor = cls2.value === '@((int)ResourcingClass.Vendor)' || cls2.value === '@ResourcingClass.Vendor';
+                        const vendorClasses = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(vendorClassIds));
+                        const isVendor = vendorClasses.includes(cls2.value);
                         wrap2.hidden = !isVendor;
                         vendor2.disabled = !isVendor;
                     }

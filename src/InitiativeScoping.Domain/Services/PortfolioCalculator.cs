@@ -20,8 +20,8 @@ public sealed record PortfolioRow(
     public decimal? ApprovedBudget => Budget.Budget;
     public decimal? BudgetRemaining => Budget.Remaining;
     public bool OverBudget => Budget.OverBudget;
-    public decimal InternalForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte).Sum(l => l.Cost);
-    public decimal VendorForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.Vendor).Sum(l => l.Cost);
+    public decimal InternalForecastCost => Forecast.Lines.Where(l => !l.Allocation.IsVendor).Sum(l => l.Cost);
+    public decimal VendorForecastCost => Forecast.Lines.Where(l => l.Allocation.IsVendor).Sum(l => l.Cost);
     public decimal NonLaborForecastCost => Forecast.NonLaborCost;
     public bool HasBaseline => Variance.Baseline is not null;
     public int? BaselineVersion => Variance.Baseline?.Version;
@@ -108,7 +108,7 @@ public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
 
     /// <summary>Labor forecast for vendor resources, by vendor.</summary>
     public IReadOnlyList<LaborSplitGroup> ByVendor =>
-        SplitLabor(l => l.Allocation.Vendor?.Name ?? "(no vendor)", l => l.Allocation.ResourcingClass == ResourcingClass.Vendor);
+        SplitLabor(l => l.Allocation.Vendor?.Name ?? "(no vendor)", l => l.Allocation.IsVendor);
 
     private IReadOnlyList<LaborSplitGroup> SplitLabor(Func<ForecastLine, string> key, Func<ForecastLine, bool> filter) =>
         Rows.SelectMany(r => r.Forecast.Lines.Where(filter).Select(l => (Row: r, Line: l)))

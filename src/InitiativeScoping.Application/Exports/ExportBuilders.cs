@@ -172,7 +172,7 @@ public static class InitiativeExport
             forecast.Lines.Select(l => (IReadOnlyList<object?>)
             [
                 phases.GetValueOrDefault(l.Allocation.PhaseId), l.Allocation.BusinessUnit?.Name, resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
-                seniorityNames.GetValueOrDefault(l.Allocation.SeniorityId), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
+                seniorityNames.GetValueOrDefault(l.Allocation.SeniorityId), l.Allocation.Location, l.Allocation.ResourcingClass?.Name ?? $"Class #{l.Allocation.ResourcingClassId}", l.Allocation.Vendor?.Name,
                 l.Allocation.PersonNames, l.Allocation.UnassignedSeats, l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
                 l.Allocation.CapexPercent, l.IsUnpriced ? null : CapexSplit.Capex(l.Cost, l.Allocation.CapexPercent), l.IsUnpriced ? null : CapexSplit.Opex(l.Cost, l.Allocation.CapexPercent), l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
@@ -191,7 +191,7 @@ public static class InitiativeExport
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
                 baseline!.Version, l.PhaseName, l.BusinessUnitName, l.ResourceTypeName,
-                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.PersonName, l.Hours, l.HourlyRate, l.Cost, l.CapexPercent, CapexSplit.Capex(l.Cost, l.CapexPercent), CapexSplit.Opex(l.Cost, l.CapexPercent)
+                l.SeniorityName, l.Location, l.ResourcingClassName, l.VendorName, l.PersonName, l.Hours, l.HourlyRate, l.Cost, l.CapexPercent, CapexSplit.Capex(l.Cost, l.CapexPercent), CapexSplit.Opex(l.Cost, l.CapexPercent)
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",

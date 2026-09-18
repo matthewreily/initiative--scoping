@@ -66,9 +66,9 @@
             <span asp-validation-for="Location" class="text-danger"></span>
         </div>
         <div class="col-md-3">
-            <label asp-for="ResourcingClass" class="form-label"></label>
-            <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
-            <span asp-validation-for="ResourcingClass" class="text-danger"></span>
+            <label asp-for="ResourcingClassId" class="form-label"></label>
+            <select asp-for="ResourcingClassId" asp-items="@(new SelectList(rateOptions.Classes, "Id", "Name"))" class="form-select"></select>
+            <span asp-validation-for="ResourcingClassId" class="text-danger"></span>
         </div>
         <div class="col-md-3" data-vendor-field hidden>
             <label asp-for="VendorId" class="form-label"></label>
@@ -135,7 +135,7 @@
 </form>
 @section Scripts {
     @if (!panel) { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }
-    <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("PhaseId", "ResourceTypeId", "SeniorityId", "Location", "ResourcingClass", "rate-preview", rateOptions, Model))" />
+    <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("PhaseId", "ResourceTypeId", "SeniorityId", "Location", "ResourcingClassId", "rate-preview", rateOptions, Model))" />
     @if (fixedDuration)
     {
         <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("PhaseId", "AllocationPercent", "computed-hours", (IReadOnlyDictionary<int, int>)ViewBag.PhaseWorkingDays, (decimal)ViewBag.HoursPerDay))" />

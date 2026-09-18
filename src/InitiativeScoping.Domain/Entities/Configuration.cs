@@ -9,12 +9,41 @@ public class BusinessUnit
     public bool IsActive { get; set; } = true;
 }
 
-/// <summary>External supplier of resources; rate-card rows, allocations and people with <see cref="ResourcingClass.Vendor"/> reference one.</summary>
+/// <summary>External supplier of resources; rate-card rows, allocations and people of a vendor <see cref="ResourcingClass"/> reference one.</summary>
 public class Vendor
 {
     public int Id { get; set; }
     public required string Name { get; set; }
     public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
+/// Admin-managed catalog of how a resource is sourced (e.g. Internal, Vendor). <see cref="IsVendor"/> classes require a
+/// <see cref="Vendor"/> on rate-card rows, allocations and people; <see cref="DefaultCapexPercent"/> prefills new labor lines.
+/// </summary>
+public class ResourcingClass
+{
+    public const int MaxNameLength = 100;
+    /// <summary>Seeded ids: every database starts with these two classes.</summary>
+    public const int InternalId = 1;
+    public const int VendorId = 2;
+    public const string InternalName = "Internal";
+    public const string VendorName = "Vendor";
+    /// <summary>Name the seeded internal class carried before it became configurable; still accepted in CSV imports.</summary>
+    public const string LegacyInternalName = "InternalFte";
+
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    /// <summary>Resources of this class come from an external supplier, so a vendor is chosen and vendor-specific rates apply.</summary>
+    public bool IsVendor { get; set; }
+    /// <summary>Capex % a new labor allocation of this class starts with (0–100); the user can still override it per line.</summary>
+    public decimal DefaultCapexPercent { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+
+    public static bool NameMatches(string name, string value) =>
+        string.Equals(name, value, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, InternalName, StringComparison.OrdinalIgnoreCase) && string.Equals(value, LegacyInternalName, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>Admin-managed career level (e.g. "Senior", "Level 1 (0-2 Years)"); rate-card rows, allocations, people and templates reference one. Ordered by <see cref="SortOrder"/>.</summary>
@@ -72,8 +101,9 @@ public class RateCardEntry
     public int SeniorityId { get; set; }
     public SeniorityLevel? Seniority { get; set; }
     public required string Location { get; set; }
-    public ResourcingClass ResourcingClass { get; set; }
-    /// <summary>Required when <see cref="ResourcingClass"/> is <see cref="ResourcingClass.Vendor"/>; null for internal resources.</summary>
+    public int ResourcingClassId { get; set; }
+    public ResourcingClass? ResourcingClass { get; set; }
+    /// <summary>Required when the class <see cref="ResourcingClass.IsVendor"/>; null otherwise.</summary>
     public int? VendorId { get; set; }
     public Vendor? Vendor { get; set; }
     public decimal HourlyRate { get; set; }
@@ -94,10 +124,6 @@ public class WorkCalendarSettings
     public decimal HoursPerDay { get; set; } = 8;
     /// <summary>Calendar month (1–12) in which the fiscal year starts; 1 = fiscal year equals calendar year.</summary>
     public int FiscalYearStartMonth { get; set; } = 1;
-    /// <summary>Capex % prefilled on new internal-FTE labor allocations.</summary>
-    public decimal InternalCapexPercent { get; set; } = 70;
-    /// <summary>Capex % prefilled on new vendor labor allocations.</summary>
-    public decimal VendorCapexPercent { get; set; } = 100;
 }
 
 /// <summary>Admin-managed non-labor cost item (software license, hardware SKU, ...) initiatives can pick to prefill a cost line.</summary>

@@ -21,7 +21,7 @@ public class BaselineTests
             initiative.Allocations.Add(new InitiativeAllocation
             {
                 Id = a, InitiativeId = 7, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = a, SeniorityId = 2, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte, Quantity = 2, EstimatedHours = 50m
+                ResourcingClassId = ResourcingClass.InternalId, Quantity = 2, EstimatedHours = 50m
             });
         }
 
@@ -75,7 +75,7 @@ public class BaselineTests
         allocation.BusinessUnit = new BusinessUnit { Id = 1, Name = "Retail" };
         allocation.ResourceType = new ResourceType { Id = 1, Name = "Engineer", DisciplineId = 1 };
         allocation.Seniority = new SeniorityLevel { Id = 2, Name = "Mid" };
-        allocation.ResourcingClass = ResourcingClass.Vendor;
+        allocation.ResourcingClassId = ResourcingClass.VendorId;
         allocation.VendorId = 9;
         allocation.Vendor = new Vendor { Id = 9, Name = "Acme" };
 

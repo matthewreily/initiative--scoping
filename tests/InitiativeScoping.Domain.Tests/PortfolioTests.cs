@@ -13,10 +13,10 @@ public class PortfolioCalculatorTests
     private static RateCard Card() => new()
     {
         Id = 1, Name = "c", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = 100m }]
     };
 
-    private static Initiative Initiative(int id, string bu, InitiativeStatus status, ResourcingClass cls = ResourcingClass.InternalFte, decimal? baselineCost = null, decimal? threshold = null)
+    private static Initiative Initiative(int id, string bu, InitiativeStatus status, bool vendor = false, decimal? baselineCost = null, decimal? threshold = null)
     {
         var i = new Initiative
         {
@@ -24,13 +24,13 @@ public class PortfolioCalculatorTests
             TargetStart = new DateOnly(2026, 3, 1), CreatedBy = "u", VarianceThresholdPct = threshold
         };
         i.Phases.Add(new Phase { Id = id * 10, InitiativeId = id, Name = "Build", Sequence = 1, PlannedStart = new DateOnly(2026, 3, 1), PlannedEnd = new DateOnly(2026, 3, 31) });
-        i.Allocations.Add(new InitiativeAllocation { Id = id * 100, InitiativeId = id, PhaseId = id * 10, BusinessUnitId = 1, BusinessUnit = i.BusinessUnit, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = cls, Quantity = 1, EstimatedHours = 100m });
+        i.Allocations.Add(new InitiativeAllocation { Id = id * 100, InitiativeId = id, PhaseId = id * 10, BusinessUnitId = 1, BusinessUnit = i.BusinessUnit, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = vendor ? ResourcingClass.VendorId : ResourcingClass.InternalId, ResourcingClass = vendor ? TestClasses.Vendor : TestClasses.Internal, Quantity = 1, EstimatedHours = 100m });
         if (baselineCost is not null)
         {
             i.Baselines.Add(new ForecastBaseline
             {
                 Id = id, InitiativeId = id, Version = 1, IsCurrent = true, SnapshotBy = "u", TotalHours = 100m, TotalCost = baselineCost.Value,
-                Lines = [new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", PhaseId = id * 10, ResourceTypeId = 1, Location = "Onshore", Hours = 100m, HourlyRate = baselineCost.Value / 100m, Cost = baselineCost.Value }]
+                Lines = [new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", ResourcingClassName = "Internal", PhaseId = id * 10, ResourceTypeId = 1, Location = "Onshore", Hours = 100m, HourlyRate = baselineCost.Value / 100m, Cost = baselineCost.Value }]
             });
         }
         return i;
@@ -46,7 +46,7 @@ public class PortfolioCalculatorTests
     public void Rolls_up_forecast_baseline_and_actuals_per_initiative_and_in_total()
     {
         var a = Initiative(1, "Boarding", InitiativeStatus.Active, baselineCost: 10_000m);
-        var b = Initiative(2, "Boarding", InitiativeStatus.Active, ResourcingClass.Vendor, baselineCost: 10_000m, threshold: 10m);
+        var b = Initiative(2, "Boarding", InitiativeStatus.Active, true, baselineCost: 10_000m, threshold: 10m);
         var c = Initiative(3, "Payments", InitiativeStatus.Draft);
         var entries = new List<ActualEntry> { Entry(1, 10, 1_000m), Entry(2, 50, 12_000m), Entry(2, 5, 999m, unmapped: true), Entry(3, 1, 100m) };
         var adjustments = new List<ActualAdjustment> { new() { InitiativeId = 1, Hours = 0, Cost = 500m, Reason = "r", CreatedBy = "u" } };

@@ -79,6 +79,7 @@ public static class ScenarioPlanner
             ResourceTypeId = a.ResourceTypeId,
             SeniorityId = a.SeniorityId,
             Location = a.Location,
+            ResourcingClassId = a.ResourcingClassId,
             ResourcingClass = a.ResourcingClass,
             VendorId = a.VendorId,
             People = a.People.Select(p => new InitiativeAllocationPerson { PersonId = p.PersonId }).ToList(),
@@ -133,25 +134,28 @@ public sealed record ScenarioColumn(Initiative Initiative, ForecastResult Foreca
     public decimal TotalCost => Forecast.TotalCost;
     public decimal ContingencyCost => Forecast.ContingencyCost;
     public decimal TotalCostWithContingency => Forecast.TotalCostWithContingency;
-    public decimal InternalHours => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte).Sum(l => l.Hours);
-    public decimal VendorHours => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.Vendor).Sum(l => l.Hours);
-    public decimal VendorCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.Vendor).Sum(l => l.Cost);
+    public decimal InternalHours => Forecast.Lines.Where(l => !l.Allocation.IsVendor).Sum(l => l.Hours);
+    public decimal VendorHours => Forecast.Lines.Where(l => l.Allocation.IsVendor).Sum(l => l.Hours);
+    public decimal VendorCost => Forecast.Lines.Where(l => l.Allocation.IsVendor).Sum(l => l.Cost);
     public int HeadCount => Initiative.Allocations.Sum(a => a.Quantity);
     public int UnpricedLines => Forecast.Lines.Count(l => l.IsUnpriced);
     public DateOnly? PlanStart => Initiative.Phases.Count == 0 ? null : Initiative.Phases.Min(p => p.PlannedStart);
     public DateOnly? PlanEnd => Initiative.Phases.Count == 0 ? null : Initiative.Phases.Max(p => p.PlannedEnd);
 
-    public decimal HoursByClass(ResourcingClass resourcingClass) =>
-        Forecast.Lines.Where(l => l.Allocation.ResourcingClass == resourcingClass).Sum(l => l.Hours);
+    public decimal HoursByClass(int resourcingClassId) =>
+        Forecast.Lines.Where(l => l.Allocation.ResourcingClassId == resourcingClassId).Sum(l => l.Hours);
 
-    public decimal HoursByResourceType(int resourceTypeId, ResourcingClass resourcingClass) =>
-        Forecast.Lines.Where(l => l.Allocation.ResourceTypeId == resourceTypeId && l.Allocation.ResourcingClass == resourcingClass).Sum(l => l.Hours);
+    public decimal HoursByResourceType(int resourceTypeId, int resourcingClassId) =>
+        Forecast.Lines.Where(l => l.Allocation.ResourceTypeId == resourceTypeId && l.Allocation.ResourcingClassId == resourcingClassId).Sum(l => l.Hours);
 
     public decimal HoursByResourceType(int resourceTypeId) =>
         Forecast.Lines.Where(l => l.Allocation.ResourceTypeId == resourceTypeId).Sum(l => l.Hours);
 }
 
-public sealed record ScenarioComparison(IReadOnlyList<ScenarioColumn> Columns, IReadOnlyList<int> ResourceTypeIds)
+/// <summary>A resourcing class that appears in at least one compared plan, in catalog order.</summary>
+public sealed record ScenarioClass(int Id, string Name, bool IsVendor);
+
+public sealed record ScenarioComparison(IReadOnlyList<ScenarioColumn> Columns, IReadOnlyList<int> ResourceTypeIds, IReadOnlyList<ScenarioClass> Classes)
 {
     public ScenarioColumn Parent => Columns[0];
     public IEnumerable<ScenarioColumn> Scenarios => Columns.Skip(1);
@@ -161,6 +165,12 @@ public sealed record ScenarioComparison(IReadOnlyList<ScenarioColumn> Columns, I
         var columns = new List<ScenarioColumn> { new(parent, ForecastCalculator.Calculate(parent, cards), true) };
         columns.AddRange(scenarios.OrderBy(s => s.Id).Select(s => new ScenarioColumn(s, ForecastCalculator.Calculate(s, cards), false)));
         var types = columns.SelectMany(c => c.Initiative.Allocations.Select(a => a.ResourceTypeId)).Distinct().OrderBy(t => t).ToList();
-        return new ScenarioComparison(columns, types);
+        var classes = columns.SelectMany(c => c.Initiative.Allocations)
+            .GroupBy(a => a.ResourcingClassId)
+            .Select(g => (Class: g.First().ResourcingClass, Id: g.Key))
+            .OrderBy(x => x.Class?.IsVendor ?? false).ThenBy(x => x.Class?.SortOrder ?? int.MaxValue).ThenBy(x => x.Class?.Name ?? string.Empty)
+            .Select(x => new ScenarioClass(x.Id, x.Class?.Name ?? $"Class #{x.Id}", x.Class?.IsVendor ?? false))
+            .ToList();
+        return new ScenarioComparison(columns, types, classes);
     }
 }

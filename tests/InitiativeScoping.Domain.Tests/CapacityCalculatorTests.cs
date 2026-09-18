@@ -18,7 +18,7 @@ public class CapacityCalculatorTests
             i.Allocations.Add(new InitiativeAllocation
             {
                 PhaseId = id * 10, BusinessUnitId = 1, ResourceTypeId = type, SeniorityId = 1, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte, Quantity = qty, EstimatedHours = hours
+                ResourcingClassId = ResourcingClass.InternalId, Quantity = qty, EstimatedHours = hours
             });
         }
 

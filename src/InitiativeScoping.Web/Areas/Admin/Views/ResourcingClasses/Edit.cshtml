@@ -1,0 +1,40 @@
+@model ResourcingClassEditModel
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "New resourcing class" : "Edit resourcing class";
+}
+<h2 class="h4">@ViewData["Title"]</h2>
+<form asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsVendor" class="form-check-input" />
+        <label asp-for="IsVendor" class="form-check-label"></label>
+        <div class="form-text">Vendor-backed classes require a vendor on rate-card rows, allocations and people, and roll up under vendor cost.</div>
+        <span asp-validation-for="IsVendor" class="text-danger d-block"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="DefaultCapexPercent" class="form-label"></label>
+        <input asp-for="DefaultCapexPercent" class="form-control" type="number" step="0.01" min="0" max="100" />
+        <div class="form-text">Prefilled on new allocations of this class (0 = all Opex, 100 = all Capex). Existing lines keep their own value.</div>
+        <span asp-validation-for="DefaultCapexPercent" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="SortOrder" class="form-label"></label>
+        <input asp-for="SortOrder" class="form-control" />
+        <div class="form-text">Lower numbers list first.</div>
+        <span asp-validation-for="SortOrder" class="text-danger"></span>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label">Active</label>
+        <div class="form-text">Inactive classes stay on existing records but cannot be chosen for new ones.</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+@section Scripts { <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" /> }

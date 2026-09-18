@@ -11,7 +11,7 @@ public class BudgetCalculatorTests
     private static RateCard Card() => new()
     {
         Name = "2026", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = 100m }]
     };
 
     /// <summary>100 h × $100 = $10,000 forecast (+ contingency if set).</summary>
@@ -25,7 +25,7 @@ public class BudgetCalculatorTests
             new InitiativeAllocation
             {
                 Id = 1, PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 100
+                ResourcingClassId = ResourcingClass.InternalId, Quantity = 1, EstimatedHours = 100
             }
         ]
     };

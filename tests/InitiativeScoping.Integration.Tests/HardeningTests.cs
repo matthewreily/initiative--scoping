@@ -143,7 +143,7 @@ public class HardeningTests(WebAppFactory factory) : IClassFixture<WebAppFactory
                 initiative.Allocations.Add(new InitiativeAllocation
                 {
                     Phase = phase, BusinessUnitId = initiative.BusinessUnitId, ResourceTypeId = typeId, SeniorityId = 3, Location = "Onshore",
-                    ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 100
+                    ResourcingClassId = ResourcingClass.InternalId, Quantity = 1, EstimatedHours = 100
                 });
             }
 
@@ -166,7 +166,7 @@ public class HardeningTests(WebAppFactory factory) : IClassFixture<WebAppFactory
                 {
                     PhaseId = allocation.PhaseId, ResourceTypeId = typeId, SeniorityId = 3, Location = "Onshore",
                     PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior",
-                    ResourcingClass = ResourcingClass.InternalFte, Hours = 100, HourlyRate = 120, Cost = 12000
+                    ResourcingClassId = ResourcingClass.InternalId, ResourcingClassName = ResourcingClass.InternalName, Hours = 100, HourlyRate = 120, Cost = 12000
                 });
             }
 

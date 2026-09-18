@@ -16,7 +16,7 @@ public class MonthlyPhasingCalculatorTests
         i.Allocations.Add(new InitiativeAllocation
         {
             Id = 1, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore",
-            ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 60
+            ResourcingClassId = ResourcingClass.InternalId, Quantity = 1, EstimatedHours = 60
         });
         return i;
     }
@@ -65,7 +65,7 @@ public class MonthlyPhasingCalculatorTests
         var baseline = new ForecastBaseline
         {
             Version = 1, SnapshotBy = "t", IsCurrent = true, TotalHours = 60, TotalCost = 6000m,
-            Lines = [new ForecastBaselineLine { PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", PhaseName = "Build", BusinessUnitName = "BU", ResourceTypeName = "RT", SeniorityName = "S", Hours = 60, HourlyRate = 100m, Cost = 6000m }]
+            Lines = [new ForecastBaselineLine { PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", PhaseName = "Build", BusinessUnitName = "BU", ResourceTypeName = "RT", SeniorityName = "S", ResourcingClassName = "Internal", Hours = 60, HourlyRate = 100m, Cost = 6000m }]
         };
 
         var phasing = MonthlyPhasingCalculator.Calculate(i, forecast, baseline, [], []);

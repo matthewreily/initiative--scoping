@@ -68,13 +68,13 @@ public class ActualsCostingTests
     private static Person Jane(string? ids = "PV-42;jane@x.com") => new()
     {
         Id = 1, DisplayName = "Jane", ExternalIds = ids, ResourceTypeId = 1, BusinessUnitId = 1,
-        SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte
+        SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId
     };
 
     private static RateCard Card(DateOnly effective, decimal rate) => new()
     {
         Id = (int)rate, Name = "c", EffectiveStart = effective, Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = rate }]
     };
 
     private static ActualEntry Entry(DateOnly date, decimal hours = 8m) => new() { ExternalProjectId = "P", SourceReference = "r", WorkDate = date, Hours = hours };
@@ -156,8 +156,8 @@ public class VarianceCalculatorTests
                 Id = 1, InitiativeId = 5, Version = 1, IsCurrent = true, SnapshotBy = "u", TotalHours = 300m, TotalCost = 30_000m,
                 Lines =
                 [
-                    new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", PhaseId = 1, ResourceTypeId = 1, Location = "Onshore", Hours = 200m, HourlyRate = 100m, Cost = 20_000m },
-                    new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", PhaseId = 2, ResourceTypeId = 2, Location = "Onshore", Hours = 100m, HourlyRate = 100m, Cost = 10_000m }
+                    new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", ResourcingClassName = "Internal", PhaseId = 1, ResourceTypeId = 1, Location = "Onshore", Hours = 200m, HourlyRate = 100m, Cost = 20_000m },
+                    new ForecastBaselineLine { PhaseName = "Phase", BusinessUnitName = "BU", ResourceTypeName = "Type", SeniorityName = "Senior", ResourcingClassName = "Internal", PhaseId = 2, ResourceTypeId = 2, Location = "Onshore", Hours = 100m, HourlyRate = 100m, Cost = 10_000m }
                 ]
             });
         }

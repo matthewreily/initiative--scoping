@@ -46,6 +46,30 @@ public class SeniorityEditModel
     public bool IsActive { get; set; } = true;
 }
 
+public class ResourcingClassEditModel
+{
+    public int Id { get; set; }
+    [Required, StringLength(ResourcingClass.MaxNameLength)]
+    public string Name { get; set; } = string.Empty;
+    [Display(Name = "Vendor-backed")]
+    public bool IsVendor { get; set; }
+    [Required, Range(0, 100), Display(Name = "Default labor Capex %")]
+    public decimal DefaultCapexPercent { get; set; }
+    [Required, Range(0, 1000), Display(Name = "Sort order")]
+    public int SortOrder { get; set; } = 1;
+    public bool IsActive { get; set; } = true;
+}
+
+public class ResourcingClassListItem
+{
+    public required ResourcingClass Class { get; init; }
+    public int RateCardEntries { get; init; }
+    public int Allocations { get; init; }
+    public int People { get; init; }
+    public int BaselineLines { get; init; }
+    public bool IsReferenced => RateCardEntries + Allocations + People + BaselineLines > 0;
+}
+
 public class SeniorityListItem
 {
     public required SeniorityLevel Level { get; init; }
@@ -110,7 +134,7 @@ public class RateCardEntryEditModel
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
-    public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    public int ResourcingClassId { get; set; } = ResourcingClass.InternalId;
     [Display(Name = "Vendor")]
     public int? VendorId { get; set; }
     [Required, Range(0, 100000), Display(Name = "Hourly rate")]
@@ -127,7 +151,10 @@ public class RateCardDetailsModel
     public string? FilterResourceType { get; init; }
     public required SelectList FilterVendors { get; init; }
     public int? FilterVendorId { get; init; }
-    public ResourcingClass? FilterResourcingClass { get; init; }
+    public required SelectList ResourcingClasses { get; init; }
+    public required IReadOnlyList<int> VendorClassIds { get; init; }
+    public required SelectList FilterResourcingClasses { get; init; }
+    public int? FilterResourcingClassId { get; init; }
     public bool IsEditable => Card.Status != RateCardStatus.Retired;
 }
 
@@ -196,7 +223,7 @@ public class PersonEditModel
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
-    public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    public int ResourcingClassId { get; set; } = ResourcingClass.InternalId;
     [Display(Name = "Vendor")]
     public int? VendorId { get; set; }
     public bool IsActive { get; set; } = true;
@@ -222,12 +249,6 @@ public class WorkCalendarViewModel
     [Display(Name = "Fiscal year starts in")]
     [Range(1, 12)]
     public int FiscalYearStartMonth { get; set; } = 1;
-    [Display(Name = "Internal labor Capex %")]
-    [Range(0, 100)]
-    public decimal InternalCapexPercent { get; set; } = WorkCalendar.DefaultInternalCapexPercent;
-    [Display(Name = "Vendor labor Capex %")]
-    [Range(0, 100)]
-    public decimal VendorCapexPercent { get; set; } = WorkCalendar.DefaultVendorCapexPercent;
     public IReadOnlyList<Holiday> Holidays { get; set; } = [];
 }
 

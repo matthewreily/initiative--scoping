@@ -13,8 +13,8 @@ public class ScenarioPlannerTests
         Name = "2026", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
         Entries =
         [
-            new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m },
-            new RateCardEntry { ResourceTypeId = 2, SeniorityId = 3, Location = "Offshore", ResourcingClass = ResourcingClass.Vendor, HourlyRate = 50m }
+            new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = 100m },
+            new RateCardEntry { ResourceTypeId = 2, SeniorityId = 3, Location = "Offshore", ResourcingClassId = ResourcingClass.VendorId, HourlyRate = 50m }
         ]
     };
 
@@ -33,8 +33,8 @@ public class ScenarioPlannerTests
         ],
         Allocations =
         [
-            new InitiativeAllocation { Id = 100, InitiativeId = 7, PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, Quantity = 2, EstimatedHours = 100, AllocationPercent = 50, CostCenter = "CC1" },
-            new InitiativeAllocation { Id = 101, InitiativeId = 7, PhaseId = 11, BusinessUnitId = 2, ResourceTypeId = 2, SeniorityId = 3, Location = "Offshore", ResourcingClass = ResourcingClass.Vendor, VendorId = 9, Quantity = 1, EstimatedHours = 80, ContractReference = "PO-1" }
+            new InitiativeAllocation { Id = 100, InitiativeId = 7, PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, ResourcingClass = TestClasses.Internal, Quantity = 2, EstimatedHours = 100, AllocationPercent = 50, CostCenter = "CC1" },
+            new InitiativeAllocation { Id = 101, InitiativeId = 7, PhaseId = 11, BusinessUnitId = 2, ResourceTypeId = 2, SeniorityId = 3, Location = "Offshore", ResourcingClassId = ResourcingClass.VendorId, ResourcingClass = TestClasses.Vendor, VendorId = 9, Quantity = 1, EstimatedHours = 80, ContractReference = "PO-1" }
         ],
         NonLaborCosts =
         [
@@ -70,7 +70,7 @@ public class ScenarioPlannerTests
         Assert.Same(s.Phases[0], s.Allocations[0].Phase);
         Assert.Same(s.Phases[1], s.Allocations[1].Phase);
         Assert.Equal((2, 100m, 50m, "CC1"), (s.Allocations[0].Quantity, s.Allocations[0].EstimatedHours, s.Allocations[0].AllocationPercent, s.Allocations[0].CostCenter));
-        Assert.Equal((9, "PO-1", ResourcingClass.Vendor), (s.Allocations[1].VendorId, s.Allocations[1].ContractReference, s.Allocations[1].ResourcingClass));
+        Assert.Equal((9, "PO-1", ResourcingClass.VendorId), (s.Allocations[1].VendorId, s.Allocations[1].ContractReference, s.Allocations[1].ResourcingClassId));
         Assert.Same(s.Phases[1], s.NonLaborCosts[0].Phase);
         Assert.Null(s.NonLaborCosts[1].Phase);
         Assert.Equal(100m, s.NonLaborCosts[1].UnitCost);
@@ -184,12 +184,13 @@ public class ScenarioPlannerTests
         Assert.Equal(3, cmp.Parent.HeadCount);
         Assert.Equal(2, col.HeadCount);
         Assert.Equal([1, 2], cmp.ResourceTypeIds);
+        Assert.Equal([(ResourcingClass.InternalId, "Internal", false), (ResourcingClass.VendorId, "Vendor", true)], cmp.Classes.Select(c => (c.Id, c.Name, c.IsVendor)));
         Assert.Equal(100m, col.HoursByResourceType(1));
-        Assert.Equal(100m, col.HoursByClass(ResourcingClass.InternalFte));
-        Assert.Equal(80m, col.HoursByClass(ResourcingClass.Vendor));
-        Assert.Equal(100m, col.HoursByResourceType(1, ResourcingClass.InternalFte));
-        Assert.Equal(0m, col.HoursByResourceType(1, ResourcingClass.Vendor));
-        Assert.Equal(80m, col.HoursByResourceType(2, ResourcingClass.Vendor));
+        Assert.Equal(100m, col.HoursByClass(ResourcingClass.InternalId));
+        Assert.Equal(80m, col.HoursByClass(ResourcingClass.VendorId));
+        Assert.Equal(100m, col.HoursByResourceType(1, ResourcingClass.InternalId));
+        Assert.Equal(0m, col.HoursByResourceType(1, ResourcingClass.VendorId));
+        Assert.Equal(80m, col.HoursByResourceType(2, ResourcingClass.VendorId));
         Assert.Equal(new DateOnly(2026, 3, 1), col.PlanStart);
         Assert.Equal(new DateOnly(2026, 4, 30), col.PlanEnd);
         Assert.Equal(0, col.UnpricedLines);

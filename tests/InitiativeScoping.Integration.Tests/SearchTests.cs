@@ -34,7 +34,7 @@ public class SearchTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
             var rt = await db.ResourceTypes.FirstAsync();
             var sen = await db.SeniorityLevels.FirstAsync();
             var initiative = new Initiative { Name = $"Zeta {tag}", BusinessUnit = bu, CreatedBy = "admin", TargetStart = new DateOnly(2027, 1, 1) };
-            var person = new Person { DisplayName = $"Pat {tag}", ResourceType = rt, Seniority = sen, BusinessUnit = bu, ResourcingClass = ResourcingClass.InternalFte, Location = "Onshore" };
+            var person = new Person { DisplayName = $"Pat {tag}", ResourceType = rt, Seniority = sen, BusinessUnit = bu, ResourcingClassId = ResourcingClass.InternalId, Location = "Onshore" };
             var card = new RateCard { Name = $"Card {tag}", EffectiveStart = new DateOnly(2027, 1, 1) };
             var vendor = new Vendor { Name = $"Vendor {tag}", IsActive = false };
             db.AddRange(initiative, person, card, vendor);
@@ -72,7 +72,7 @@ public class SearchTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
             db.AddRange(
                 new UserAccount { ObjectId = "no-role-user", Email = "no.role@example.com", DisplayName = "x", Role = AppRole.Viewer, Status = UserAccountStatus.Active, CreatedAt = DateTimeOffset.UtcNow },
                 new Initiative { Name = $"Zeta {tag}", BusinessUnit = bu, CreatedBy = "admin", TargetStart = new DateOnly(2027, 1, 1) },
-                new Person { DisplayName = $"Pat {tag}", ResourceType = rt, Seniority = sen, BusinessUnit = bu, ResourcingClass = ResourcingClass.InternalFte, Location = "Onshore" },
+                new Person { DisplayName = $"Pat {tag}", ResourceType = rt, Seniority = sen, BusinessUnit = bu, ResourcingClassId = ResourcingClass.InternalId, Location = "Onshore" },
                 new Vendor { Name = $"Vendor {tag}" });
             await db.SaveChangesAsync();
         }
