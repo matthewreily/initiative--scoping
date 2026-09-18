@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
+using InitiativeScoping.Web.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace InitiativeScoping.Web.Areas.Admin.Models;
@@ -239,6 +241,18 @@ public class PersonListItem
 {
     public required Person Person { get; init; }
     public int EntryCount { get; init; }
+}
+
+public class PeopleIndexModel
+{
+    public required IReadOnlyList<PersonListItem> Items { get; init; }
+    public string? Search { get; init; }
+    public int Total { get; init; }
+    public int Page { get; init; }
+    public int PageSize { get; init; }
+
+    public PagerModel Pager(IUrlHelper url) => new(Page, PageSize, Total, (page, size) =>
+        url.Action("Index", "People", new { area = "Admin", search = Search, page, size })!);
 }
 
 public class WorkCalendarViewModel

@@ -5,6 +5,7 @@ using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Models;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InitiativeScoping.Integration.Tests;
@@ -94,6 +95,46 @@ public class PagingTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         Assert.Contains($"entity={entity}&amp;page=2&amp;size=25", small);
 
         var beyond = await client.GetStringAsync($"/Audit?entity={entity}&page=42");
+        Assert.Contains("Showing 51&ndash;60 of 60", beyond);
+    }
+
+    [Fact]
+    public async Task Admin_people_pages_server_side_and_keeps_search_in_links()
+    {
+        var tag = $"Pager{Guid.NewGuid():N}";
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bu = await db.BusinessUnits.FirstAsync();
+            var rt = await db.ResourceTypes.FirstAsync();
+            var sen = await db.SeniorityLevels.FirstAsync();
+            for (var n = 0; n < 60; n++)
+            {
+                db.People.Add(new Person { DisplayName = $"{tag} {n:D2}", ResourceType = rt, Seniority = sen, BusinessUnit = bu, ResourcingClassId = ResourcingClass.InternalId, Location = "Onshore" });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        var client = factory.CreateClient(NoRedirect);
+        var page1 = await client.GetStringAsync($"/Admin/People?search={tag}");
+        Assert.Equal(50, Regex.Matches(page1, $"<td>{tag} \\d\\d</td>").Count);
+        Assert.Contains($"<td>{tag} 00</td>", page1);
+        Assert.DoesNotContain($"<td>{tag} 50</td>", page1);
+        Assert.Contains("Showing 1&ndash;50 of 60", page1);
+        Assert.Contains($"search={tag}&amp;page=2", page1);
+        Assert.Contains("table-responsive table-scroll", page1);
+
+        var page2 = await client.GetStringAsync($"/Admin/People?search={tag}&page=2");
+        Assert.Equal(10, Regex.Matches(page2, $"<td>{tag} \\d\\d</td>").Count);
+        Assert.Contains($"<td>{tag} 50</td>", page2);
+        Assert.Contains("Showing 51&ndash;60 of 60", page2);
+
+        var small = await client.GetStringAsync($"/Admin/People?search={tag}&size=25&page=3");
+        Assert.Equal(10, Regex.Matches(small, $"<td>{tag} \\d\\d</td>").Count);
+        Assert.Contains($"search={tag}&amp;page=2&amp;size=25", small);
+
+        var beyond = await client.GetStringAsync($"/Admin/People?search={tag}&page=42");
         Assert.Contains("Showing 51&ndash;60 of 60", beyond);
     }
 

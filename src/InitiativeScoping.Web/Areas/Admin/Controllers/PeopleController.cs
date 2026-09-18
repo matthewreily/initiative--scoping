@@ -6,6 +6,7 @@ using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Services;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Areas.Admin.Models;
+using InitiativeScoping.Web.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -17,8 +18,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
     private const long MaxImportBytes = 5 * 1024 * 1024;
     private const long MaxImportRequestBytes = MaxImportBytes + 2 * 1024 * 1024;
 
-    public async Task<IActionResult> Index(string? search, CancellationToken ct)
+    private const int DefaultPageSize = 50;
+
+    public async Task<IActionResult> Index(string? search, int page = 1, int? size = null, CancellationToken ct = default)
     {
+        var pageSize = Paging.NormalizeSize(size, DefaultPageSize);
         var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.ResourcingClass).Include(p => p.Seniority).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -26,12 +30,14 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             query = query.Where(p => p.DisplayName.ToLower().Contains(s) || (p.ExternalIds != null && p.ExternalIds.ToLower().Contains(s)));
         }
 
+        var total = await query.CountAsync(ct);
+        page = Paging.ClampPage(page, total, pageSize);
         var items = await query
-            .OrderBy(p => p.DisplayName)
+            .OrderBy(p => p.DisplayName).ThenBy(p => p.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(p => new PersonListItem { Person = p, EntryCount = db.ActualEntries.Count(e => e.PersonId == p.Id) })
             .ToListAsync(ct);
-        ViewBag.Search = search;
-        return View(items);
+        return View(new PeopleIndexModel { Items = items, Search = search, Total = total, Page = page, PageSize = pageSize });
     }
 
     public async Task<IActionResult> Create(CancellationToken ct)
