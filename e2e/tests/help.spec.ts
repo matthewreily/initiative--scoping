@@ -29,6 +29,13 @@ test.describe('In-app help', () => {
     await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('.tour-overlay')).toHaveCount(0);
+
+    // Replaying from another page goes to Home first so step 1 is included
+    await page.goto('/Home/Help');
+    await page.getByRole('button', { name: 'Take the tour' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+    await expect(page.getByText('1 of 6')).toBeVisible();
     await context.close();
   });
 
@@ -40,6 +47,8 @@ test.describe('In-app help', () => {
     await hint.hover();
     await expect(page.getByRole('tooltip')).toContainText('What the current plan is expected to cost');
     await hint.click();
+    await hint.press('Enter');
+    await hint.press('Space');
     await expect(header).not.toHaveAttribute('aria-sort', /ascending|descending/);
 
     await page.getByRole('button', { name: 'Help' }).click();

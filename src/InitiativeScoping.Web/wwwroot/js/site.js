@@ -432,6 +432,7 @@ document.addEventListener('keydown', e => {
 // bubble to sortable headers or collapsible cards.
 (function () {
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => bootstrap.Tooltip.getOrCreateInstance(el));
+    document.querySelectorAll('.help-hint').forEach(el => el.addEventListener('keydown', e => e.stopPropagation()));
     document.addEventListener('click', e => {
         const hint = e.target.closest('.help-hint');
         if (!hint) return;
@@ -446,6 +447,7 @@ document.addEventListener('keydown', e => {
 // in this browser; "Take the tour" (data-tour-start) replays it.
 (function () {
     const seenKey = name => 'is-tour-seen:' + name;
+    const replayKey = 'is-tour-replay';
     const seen = name => { try { return localStorage.getItem(seenKey(name)) === '1'; } catch { return true; } };
     const markSeen = name => { try { localStorage.setItem(seenKey(name), '1'); } catch { /* storage unavailable */ } };
 
@@ -546,11 +548,22 @@ document.addEventListener('keydown', e => {
     }
 
     const pageTour = document.body.dataset.tour;
+    const homeHref = document.body.dataset.tourHome || '/';
+    // Steps only exist in the current document, so a tour whose steps live on another page is replayed
+    // there: remember the request, navigate, and start on arrival.
     document.querySelectorAll('[data-tour-start]').forEach(el => el.addEventListener('click', e => {
         e.preventDefault();
-        start(el.dataset.tourStart || pageTour || 'welcome');
+        const name = el.dataset.tourStart || pageTour || 'welcome';
+        if (name === 'welcome' && pageTour !== 'welcome') {
+            try { sessionStorage.setItem(replayKey, name); } catch { /* storage unavailable */ }
+            location.assign(homeHref);
+            return;
+        }
+        start(name);
     }));
-    if (pageTour && !seen(pageTour) && !window.matchMedia('(max-width: 575.98px)').matches) {
+    let replay = null;
+    try { replay = sessionStorage.getItem(replayKey); sessionStorage.removeItem(replayKey); } catch { /* storage unavailable */ }
+    if (replay === pageTour || (pageTour && !seen(pageTour) && !window.matchMedia('(max-width: 575.98px)').matches)) {
         window.setTimeout(() => start(pageTour), 300);
     }
 })();

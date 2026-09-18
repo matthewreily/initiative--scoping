@@ -263,7 +263,7 @@ else
             @if (budget.OverBudget) { <span class="badge text-bg-danger">Over budget</span> } else if (budget.NearBudget) { <span class="badge text-bg-warning">Near budget</span> }
         </div></div></div>
         <div class="col-md-3"><div class="card"><div class="card-body">
-            <div class="text-muted small">@(budget.UsesEac ? "Estimate at completion" : "Expected at completion")<help for="@(budget.UsesEac ? "eac" : "with-contingency")" /></div>
+            <div class="text-muted small">@(budget.UsesEac ? "Estimate at completion" : "Expected at completion")<help for="@(budget.UsesEac ? "eac-budget" : "with-contingency")" /></div>
             <div class="fs-3" id="budget-eac">@budget.Expected.ToString("C0")</div>
             <div class="small text-muted">@(budget.UsesEac ? $"Spent {budget.Actual:C0} + remaining plan" : "Live forecast")@(Model.Forecast.ContingencyPct > 0 ? " incl. contingency" : "")</div>
         </div></div></div>

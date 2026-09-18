@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/InitiativeScoping.Web.styles.css" asp-append-version="true" />
 </head>
-<body data-tour="@ViewData["Tour"]">
+<body data-tour="@ViewData["Tour"]" data-tour-home="@Url.Action("Index", "Home", new { area = "" })">
     <a class="skip-link" href="#main">Skip to content</a>
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">

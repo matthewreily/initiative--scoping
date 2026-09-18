@@ -28,7 +28,7 @@ public class HelpTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var client = factory.CreateClient();
 
         var home = await client.GetStringAsync("/");
-        Assert.Contains("<body data-tour=\"welcome\">", home);
+        Assert.Contains("<body data-tour=\"welcome\" data-tour-home=\"/\">", home);
         Assert.Contains("data-tour=\"welcome:1\"", home);
         Assert.Contains("data-tour=\"welcome:2\"", home);
         Assert.Contains("href=\"/Home/Help\"", home);
@@ -38,6 +38,6 @@ public class HelpTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         Assert.Contains($"data-help=\"budget\" data-bs-toggle=\"tooltip\" data-bs-title=\"{budget.Text}\"", portfolio);
         Assert.Contains("aria-label=\"What is Variance?\"", portfolio);
         Assert.DoesNotContain("data-tour=\"welcome:1\"", portfolio);
-        Assert.DoesNotContain("<body data-tour=\"welcome\">", portfolio);
+        Assert.Contains("<body data-tour=\"\" data-tour-home=\"/\">", portfolio);
     }
 }
