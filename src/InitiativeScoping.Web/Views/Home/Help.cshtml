@@ -1,0 +1,40 @@
+@model IReadOnlyList<InitiativeScoping.Web.Services.HelpTerm>
+@{
+    ViewData["Title"] = "Help";
+}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a asp-action="Index">Home</a></li><li class="breadcrumb-item active">Help</li></ol></nav>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Help</h1>
+        <p class="text-muted mb-0">What each number means, and how to get around. Hover a <span class="help-hint" aria-hidden="true"></span> next to any metric for the same definition in place.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-tour-start="welcome">Take the tour</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-shortcut-help>Keyboard shortcuts <kbd class="ms-1">?</kbd></button>
+    </div>
+</div>
+
+<section class="card mb-4" aria-labelledby="how-it-flows">
+    <div class="card-body">
+        <h2 class="h5" id="how-it-flows">How an initiative flows</h2>
+        <ol class="mb-0 small">
+            <li><strong>Plan</strong> – create the initiative, add phases, then allocations (or apply a T-shirt size). The forecast prices itself from published rate cards.</li>
+            <li><strong>Activate</strong> – the owner requests activation; an Administrator approves. The forecast is frozen as <em>baseline v1</em> and scope locks.</li>
+            <li><strong>Track</strong> – actuals are imported and mapped; variance, ETC and EAC are measured against the current baseline and the approved budget.</li>
+            <li><strong>Change</strong> – request a re-baseline to re-open scope; approval captures the next baseline version. What-if <em>scenarios</em> let you compare alternatives first.</li>
+        </ol>
+    </div>
+</section>
+
+<h2 class="h5" id="glossary">Glossary</h2>
+<div class="table-responsive">
+    <table class="table table-sm align-middle" id="glossary-table">
+        <thead><tr><th style="width: 16rem">Term</th><th>Meaning</th></tr></thead>
+        <tbody>
+        @foreach (var t in Model)
+        {
+            <tr id="term-@t.Key"><th scope="row" class="fw-semibold">@t.Label</th><td>@t.Text</td></tr>
+        }
+        </tbody>
+    </table>
+</div>

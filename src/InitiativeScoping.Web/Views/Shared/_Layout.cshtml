@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/InitiativeScoping.Web.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body data-tour="@ViewData["Tour"]" data-tour-home="@Url.Action("Index", "Home", new { area = "" })">
     <a class="skip-link" href="#main">Skip to content</a>
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
@@ -30,13 +30,13 @@
                             <a class="@NavCls("", "Home")" data-shortcut="g h" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
                         <li class="nav-item">
-                            <a class="@NavCls("", "Initiatives")" data-shortcut="g i" asp-area="" asp-controller="Initiatives" asp-action="Index">Initiatives</a>
+                            <a class="@NavCls("", "Initiatives")" data-shortcut="g i" asp-area="" asp-controller="Initiatives" asp-action="Index" data-tour="welcome:2" data-tour-title="Initiatives" data-tour-text="Every plan lives here. Create an initiative, add phases and allocations, and the forecast prices itself from the rate cards.">Initiatives</a>
                         </li>
                         <li class="nav-item">
-                            <a class="@NavCls("", "Portfolio")" data-shortcut="g p" asp-area="" asp-controller="Portfolio" asp-action="Index">Portfolio</a>
+                            <a class="@NavCls("", "Portfolio")" data-shortcut="g p" asp-area="" asp-controller="Portfolio" asp-action="Index" data-tour="welcome:3" data-tour-title="Portfolio" data-tour-text="Forecast, baseline, actuals, EAC and budget for all initiatives side by side, with rollups by business unit, status and vendor, and CSV/XLSX export.">Portfolio</a>
                         </li>
                         <li class="nav-item">
-                            <a class="@NavCls("", "Capacity")" data-shortcut="g y" asp-area="" asp-controller="Capacity" asp-action="Index">Capacity</a>
+                            <a class="@NavCls("", "Capacity")" data-shortcut="g y" asp-area="" asp-controller="Capacity" asp-action="Index" data-tour="welcome:4" data-tour-title="Capacity" data-tour-text="Planned hours per resource type and month across every initiative, compared with the roster – over-allocation shows in red.">Capacity</a>
                         </li>
                         @if (User.IsInRole(InitiativeScoping.Application.AppRoles.Admin))
                         {
@@ -63,9 +63,17 @@
                         {
                             <form asp-area="" asp-controller="Search" asp-action="Index" method="get" role="search" class="d-flex align-items-center me-3 nav-search">
                                 <label for="global-search" class="visually-hidden">Search</label>
-                                <input id="global-search" type="search" name="q" class="form-control form-control-sm" placeholder="Search…  /" aria-keyshortcuts="/" minlength="2" autocomplete="off" value="@(controller == "Search" ? Context.Request.Query["q"].ToString() : "")" />
+                                <input id="global-search" type="search" name="q" class="form-control form-control-sm" placeholder="Search…  /" aria-keyshortcuts="/" minlength="2" autocomplete="off" value="@(controller == "Search" ? Context.Request.Query["q"].ToString() : "")" data-tour="welcome:5" data-tour-title="Search" data-tour-text="Find initiatives (and people, rate cards or vendors for admins) from anywhere. Press / to jump here." />
                             </form>
                         }
+                        <div class="dropdown me-3" data-tour="welcome:6" data-tour-title="Help" data-tour-text="The glossary explains every metric (or hover a ? next to one), keyboard shortcuts are under ?, and you can replay this tour any time.">
+                            <button class="btn btn-link btn-sm p-0 text-dark" type="button" id="help-menu" data-bs-toggle="dropdown" aria-expanded="false">Help</button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="help-menu">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Home" asp-action="Help">Glossary</a></li>
+                                <li><button type="button" class="dropdown-item" data-shortcut-help>Keyboard shortcuts <kbd class="ms-1">?</kbd></button></li>
+                                <li><button type="button" class="dropdown-item" data-tour-start>Take the tour</button></li>
+                            </ul>
+                        </div>
                         <form asp-area="" asp-controller="Access" asp-action="EndSession" method="post" class="d-flex align-items-center gap-2">
                             <span class="navbar-text small text-muted">@User.Identity.Name</span>
                             <button type="submit" class="btn btn-link btn-sm p-0 text-dark">Sign out</button>
