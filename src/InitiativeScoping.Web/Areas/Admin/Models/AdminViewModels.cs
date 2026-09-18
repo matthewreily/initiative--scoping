@@ -246,8 +246,9 @@ public class CostCatalogItemEditModel
     public BillingModel? BillingModel { get; set; } = Domain.Enums.BillingModel.Monthly;
     [Required, Range(0, 999_999_999), Display(Name = "Unit cost")]
     public decimal? UnitCost { get; set; }
-    [Required, Display(Name = "Capex / Opex")]
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    [Required, Range(0, 100), Display(Name = "Capex %")]
+    public decimal CapexPercent { get; set; }
     public bool IsActive { get; set; } = true;
 }
 

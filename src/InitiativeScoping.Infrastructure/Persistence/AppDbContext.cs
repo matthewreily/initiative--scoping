@@ -130,6 +130,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
             e.Property(x => x.Vendor).HasMaxLength(200);
             e.Property(x => x.UnitCost).HasPrecision(18, 2);
+            e.Property(x => x.CapexPercent).HasPrecision(5, 2);
             e.HasIndex(x => new { x.Category, x.Name }).IsUnique();
         });
 
@@ -202,6 +203,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Location).HasMaxLength(100);
             e.Property(x => x.EstimatedHours).HasPrecision(18, 2);
             e.Property(x => x.AllocationPercent).HasPrecision(6, 2);
+            e.Property(x => x.CapexPercent).HasPrecision(5, 2);
             e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
@@ -226,6 +228,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Description).HasMaxLength(300);
             e.Property(x => x.UnitCost).HasPrecision(18, 2);
+            e.Property(x => x.CapexPercent).HasPrecision(5, 2);
             e.Property(x => x.ContractReference).HasMaxLength(200);
             e.Property(x => x.CostCenter).HasMaxLength(100);
             e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
@@ -250,6 +253,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Description).HasMaxLength(300);
             e.Property(x => x.PhaseName).HasMaxLength(200);
             e.Property(x => x.UnitCost).HasPrecision(18, 2);
+            e.Property(x => x.CapexPercent).HasPrecision(5, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);
         });
 
@@ -315,6 +319,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<ForecastBaselineLine>(e =>
         {
             e.Property(x => x.Location).HasMaxLength(100);
+            e.Property(x => x.CapexPercent).HasPrecision(5, 2);
             e.Property(x => x.PhaseName).HasMaxLength(200);
             e.Property(x => x.BusinessUnitName).HasMaxLength(200);
             e.Property(x => x.ResourceTypeName).HasMaxLength(200);

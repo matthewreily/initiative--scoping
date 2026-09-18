@@ -2,7 +2,7 @@
 @{
     var catalog = Model.Catalog.ToDictionary(
         c => c.Id,
-        c => new { category = (int)c.Category, name = c.Label, billing = (int)c.BillingModel, unitCost = c.UnitCost, capitalization = (int)c.Capitalization });
+        c => new { category = (int)c.Category, name = c.Label, billing = (int)c.BillingModel, unitCost = c.UnitCost, capexPercent = c.CapexPercent });
     var windows = Model.Windows.ToDictionary(
         w => w.Key,
         w => new { start = w.Value.Start.ToString("yyyy-MM-dd"), end = w.Value.End.ToString("yyyy-MM-dd") });
@@ -50,7 +50,7 @@
             category.value = item.category;
             billing.value = item.billing;
             unitCost.value = item.unitCost;
-            if (capitalization) { capitalization.value = item.capitalization; }
+            if (capitalization) { capitalization.value = item.capexPercent; }
             if (!description.value) { description.value = item.name; }
             sync();
         }

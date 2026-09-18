@@ -79,9 +79,9 @@
             <div class="form-text">Leave both blank to bill over the phase/initiative window.</div>
         </div>
         <div class="col-md-2">
-            <label asp-for="Capitalization" for="@(pfx)capitalization" class="form-label"></label>
-            <select asp-for="Capitalization" id="@(pfx)capitalization" asp-items="Html.GetEnumSelectList<CapitalizationType>()" class="form-select"></select>
-            <span asp-validation-for="Capitalization" class="text-danger"></span>
+            <label asp-for="CapexPercent" for="@(pfx)capitalization" class="form-label"></label>
+            <input asp-for="CapexPercent" id="@(pfx)capitalization" class="form-control" type="number" min="0" max="100" step="0.01" title="Share of this line's cost that is capitalised; the rest is Opex. Catalog items prefill it." />
+            <span asp-validation-for="CapexPercent" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="ContractReference" class="form-label"></label>

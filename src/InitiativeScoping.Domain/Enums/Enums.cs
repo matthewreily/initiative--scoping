@@ -86,13 +86,6 @@ public enum EstimateConfidence
     High = 3
 }
 
-/// <summary>Accounting treatment of a cost line: expensed as incurred (Opex) or capitalised (Capex).</summary>
-public enum CapitalizationType
-{
-    Opex = 1,
-    Capex = 2
-}
-
 /// <summary>What a cost line pays for. Labor is priced from rate cards; the rest are non-labor lines.</summary>
 public enum CostCategory
 {

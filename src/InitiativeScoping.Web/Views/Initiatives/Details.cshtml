@@ -7,7 +7,6 @@
     var roles = Html.GetEnumSelectList<InitiativeMemberRole>();
     var nonLaborCategories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString()).ToList();
     var billingModels = Html.GetEnumSelectList<BillingModel>();
-    var capitalizationTypes = Html.GetEnumSelectList<CapitalizationType>();
     var phaseNames = i.Phases.ToDictionary(p => p.Id, p => p.Name);
     var lineByAllocation = Model.Forecast.Lines.ToDictionary(l => l.Allocation.Id);
     var orderedAllocations = i.Allocations
@@ -423,7 +422,7 @@ else
                     <td>@if (a.HasNamedPeople) { foreach (var p in a.NamedPeople) { <span class="allocation-person d-block">@p.DisplayName @if (!p.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> }</span> } if (a.UnassignedSeats > 0) { <span class="text-muted small d-block">+ @a.UnassignedSeats unassigned</span> } } else { <span class="text-muted">—</span> }</td>
                     <td>@a.Location</td>
                     <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}")</td>
-                    <td class="allocation-capitalization">@a.Capitalization</td>
+                    <td class="allocation-capitalization" data-sort="@a.CapexPercent" title="@a.CapexPercent.ToString("0.##")% Capex / @((100m - a.CapexPercent).ToString("0.##"))% Opex">@CapexSplit.Label(a.CapexPercent)</td>
                     <td class="text-end">@a.Quantity</td>
                     @if (fixedDuration) { <td class="text-end">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
                     <td class="text-end" data-sort="@line.Hours">@line.Hours.ToString("N1")</td>
@@ -539,8 +538,8 @@ else
                     </div>
                 }
                 <div class="col-md-2">
-                    <label for="capitalization" class="form-label small mb-0">Capex / Opex</label>
-                    <select name="Capitalization" id="capitalization" asp-items="capitalizationTypes" class="form-select form-select-sm"></select>
+                    <label for="capitalization" class="form-label small mb-0">Capex %</label>
+                    <input name="CapexPercent" id="capitalization" type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" value="@Model.NewAllocation.CapexPercent.ToString("0.##")" title="Share of this line's cost that is capitalised; the rest is Opex" required />
                 </div>
                 <div class="col-md-3">
                     <label for="contractreference" class="form-label small mb-0">Contract ref</label>
@@ -660,7 +659,7 @@ else
                     <td>@VarianceCalculator.CategoryLabel(c.Category)</td>
                     <td>@c.Description @if (c.CostCatalogItem is not null) { <span class="badge bg-light text-dark border" title="From catalog">catalog</span> }</td>
                     <td>@Html.DisplayFor(_ => c.BillingModel)</td>
-                    <td class="non-labor-capitalization">@c.Capitalization</td>
+                    <td class="non-labor-capitalization" data-sort="@c.CapexPercent" title="@c.CapexPercent.ToString("0.##")% Capex / @((100m - c.CapexPercent).ToString("0.##"))% Opex">@CapexSplit.Label(c.CapexPercent)</td>
                     <td class="text-end">@c.Quantity</td>
                     <td class="text-end" data-sort="@c.UnitCost">@c.UnitCost.ToString("C2")</td>
                     <td class="text-nowrap">@(nl.HasWindow ? $"{nl.Start:yyyy-MM-dd} → {nl.End:yyyy-MM-dd}" : "—")</td>
@@ -741,8 +740,8 @@ else
                     <input name="EndDate" id="nl-end" type="date" class="form-control form-control-sm" />
                 </div>
                 <div class="col-md-2">
-                    <label for="nl-capitalization" class="form-label small mb-0">Capex / Opex</label>
-                    <select name="Capitalization" id="nl-capitalization" asp-items="capitalizationTypes" class="form-select form-select-sm"></select>
+                    <label for="nl-capitalization" class="form-label small mb-0">Capex %</label>
+                    <input name="CapexPercent" id="nl-capitalization" type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" value="0" title="Share of this line's cost that is capitalised; the rest is Opex. Catalog items prefill it." required />
                 </div>
                 <div class="col-md-3">
                     <label for="nl-contract" class="form-label small mb-0">Contract ref</label>

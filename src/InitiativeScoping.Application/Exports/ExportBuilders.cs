@@ -168,39 +168,39 @@ public static class InitiativeExport
             initiative.ChangeRequests.OrderBy(c => c.Number).Select(ChangeRequestExport.Row).ToList());
 
         var forecastLines = new ExportTable("Forecast",
-            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "People", "Unassigned seats", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Capex / Opex", "Contract", "Cost center"],
+            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "People", "Unassigned seats", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Capex %", "Capex cost", "Opex cost", "Contract", "Cost center"],
             forecast.Lines.Select(l => (IReadOnlyList<object?>)
             [
                 phases.GetValueOrDefault(l.Allocation.PhaseId), l.Allocation.BusinessUnit?.Name, resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
                 seniorityNames.GetValueOrDefault(l.Allocation.SeniorityId), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
                 l.Allocation.PersonNames, l.Allocation.UnassignedSeats, l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
-                l.Allocation.Capitalization.ToString(), l.Allocation.ContractReference, l.Allocation.CostCenter
+                l.Allocation.CapexPercent, l.IsUnpriced ? null : CapexSplit.Capex(l.Cost, l.Allocation.CapexPercent), l.IsUnpriced ? null : CapexSplit.Opex(l.Cost, l.Allocation.CapexPercent), l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
 
         var nonLaborLines = new ExportTable("Non-labor forecast",
-            ["Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Capex / Opex", "Contract", "Cost center"],
+            ["Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Capex %", "Capex cost", "Opex cost", "Contract", "Cost center"],
             forecast.NonLaborLines.Select(l => (IReadOnlyList<object?>)
             [
                 l.Line.PhaseId is { } pid ? phases.GetValueOrDefault(pid) : VarianceCalculator.WholeInitiative,
                 VarianceCalculator.CategoryLabel(l.Line.Category), l.Line.Description, l.Line.BillingModel.ToString(),
-                l.Line.Quantity, l.Line.UnitCost, l.Start, l.End, l.Periods, l.Cost, l.Line.Capitalization.ToString(), l.Line.ContractReference, l.Line.CostCenter
+                l.Line.Quantity, l.Line.UnitCost, l.Start, l.End, l.Periods, l.Cost, l.Line.CapexPercent, CapexSplit.Capex(l.Cost, l.Line.CapexPercent), CapexSplit.Opex(l.Cost, l.Line.CapexPercent), l.Line.ContractReference, l.Line.CostCenter
             ]).ToList());
 
         var baselineLines = new ExportTable("Baseline",
-            ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Hours", "Hourly rate", "Cost", "Capex / Opex"],
+            ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Hours", "Hourly rate", "Cost", "Capex %", "Capex cost", "Opex cost"],
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
                 baseline!.Version, l.PhaseName, l.BusinessUnitName, l.ResourceTypeName,
-                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.PersonName, l.Hours, l.HourlyRate, l.Cost, l.Capitalization.ToString()
+                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.PersonName, l.Hours, l.HourlyRate, l.Cost, l.CapexPercent, CapexSplit.Capex(l.Cost, l.CapexPercent), CapexSplit.Opex(l.Cost, l.CapexPercent)
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",
-            ["Version", "Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Capex / Opex"],
+            ["Version", "Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Capex %", "Capex cost", "Opex cost"],
             (baseline?.NonLaborLines ?? []).Select(l => (IReadOnlyList<object?>)
             [
                 baseline!.Version, l.PhaseId is { } pid ? l.PhaseName ?? $"Phase #{pid}" : VarianceCalculator.WholeInitiative,
                 VarianceCalculator.CategoryLabel(l.Category), l.Description, l.BillingModel.ToString(),
-                l.Quantity, l.UnitCost, l.StartDate, l.EndDate, l.Periods, l.Cost, l.Capitalization.ToString()
+                l.Quantity, l.UnitCost, l.StartDate, l.EndDate, l.Periods, l.Cost, l.CapexPercent, CapexSplit.Capex(l.Cost, l.CapexPercent), CapexSplit.Opex(l.Cost, l.CapexPercent)
             ]).ToList());
 
         var variancePhase = VarianceTable("Variance by phase", variance.ByPhase);

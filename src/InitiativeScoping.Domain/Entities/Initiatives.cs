@@ -222,7 +222,8 @@ public class InitiativeAllocation
     /// <summary>Staffing level per person over the phase window (100 = full time); fixed-duration initiatives only.</summary>
     public decimal? AllocationPercent { get; set; }
     public decimal EstimatedHours { get; set; }
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    public decimal CapexPercent { get; set; }
     public string? ContractReference { get; set; }
     public string? CostCenter { get; set; }
 
@@ -264,7 +265,8 @@ public class InitiativeNonLaborCost
     public decimal UnitCost { get; set; }
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    public decimal CapexPercent { get; set; }
     public string? ContractReference { get; set; }
     public string? CostCenter { get; set; }
 }
@@ -310,7 +312,8 @@ public class ForecastBaselineNonLaborLine
     public int Periods { get; set; }
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    public decimal CapexPercent { get; set; }
     public decimal Cost { get; set; }
 }
 
@@ -334,7 +337,8 @@ public class ForecastBaselineLine
     public string? VendorName { get; set; }
     public int? PersonId { get; set; }
     public string? PersonName { get; set; }
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    public decimal CapexPercent { get; set; }
     public decimal Hours { get; set; }
     public decimal HourlyRate { get; set; }
     public decimal Cost { get; set; }

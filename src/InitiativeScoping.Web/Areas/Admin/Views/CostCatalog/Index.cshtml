@@ -24,7 +24,7 @@
             <td>@row.Item.Vendor</td>
             <td>@Html.DisplayFor(_ => row.Item.BillingModel)</td>
             <td class="text-end">@row.Item.UnitCost.ToString("N2")</td>
-            <td>@row.Item.Capitalization</td>
+            <td data-sort="@row.Item.CapexPercent">@CapexSplit.Label(row.Item.CapexPercent)</td>
             <td>@(row.Item.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
             <td>@row.ReferenceCount</td>
             <td class="text-end">

@@ -51,9 +51,9 @@ public class FiscalPeriodTests
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
             ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100",
-            ["Capitalization"] = nameof(CapitalizationType.Capex)
+            ["CapexPercent"] = "100"
         })).StatusCode);
-        // 4 months x 250 = 1,000 opex (the default when the flag is omitted).
+        // 4 months x 250 = 1,000 opex (0% Capex is the default when the field is omitted).
         Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddNonLaborCost/{id}", new()
         {
             ["Category"] = nameof(CostCategory.SoftwareLicense), ["Description"] = "IDE seats", ["BillingModel"] = nameof(BillingModel.Monthly),
@@ -63,8 +63,8 @@ public class FiscalPeriodTests
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Equal(CapitalizationType.Capex, (await db.InitiativeAllocations.SingleAsync(a => a.InitiativeId == id)).Capitalization);
-            Assert.Equal(CapitalizationType.Opex, (await db.InitiativeNonLaborCosts.SingleAsync(c => c.InitiativeId == id)).Capitalization);
+            Assert.Equal(100m, (await db.InitiativeAllocations.SingleAsync(a => a.InitiativeId == id)).CapexPercent);
+            Assert.Equal(0m, (await db.InitiativeNonLaborCosts.SingleAsync(c => c.InitiativeId == id)).CapexPercent);
         }
 
         var html = WebUtility.HtmlDecode(await client.GetStringAsync(details));
@@ -78,19 +78,19 @@ public class FiscalPeriodTests
         Assert.Contains("$24,000", html);
         Assert.Contains("$1,000", html);
 
-        // Baseline v1 snapshots the flags; scenarios clone them.
+        // Baseline v1 snapshots the percentages; scenarios clone them.
         Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new())).StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/{id}/Scenarios", new() { ["Name"] = $"Lean {tag}" })).StatusCode);
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var baseline = await db.ForecastBaselines.Include(b => b.Lines).Include(b => b.NonLaborLines).SingleAsync(b => b.InitiativeId == id);
-            Assert.Equal(CapitalizationType.Capex, Assert.Single(baseline.Lines).Capitalization);
-            Assert.Equal(CapitalizationType.Opex, Assert.Single(baseline.NonLaborLines).Capitalization);
+            Assert.Equal(100m, Assert.Single(baseline.Lines).CapexPercent);
+            Assert.Equal(0m, Assert.Single(baseline.NonLaborLines).CapexPercent);
 
             var scenario = await db.Initiatives.Include(i => i.Allocations).Include(i => i.NonLaborCosts).SingleAsync(i => i.ScenarioOfId == id);
-            Assert.Equal(CapitalizationType.Capex, Assert.Single(scenario.Allocations).Capitalization);
-            Assert.Equal(CapitalizationType.Opex, Assert.Single(scenario.NonLaborCosts).Capitalization);
+            Assert.Equal(100m, Assert.Single(scenario.Allocations).CapexPercent);
+            Assert.Equal(0m, Assert.Single(scenario.NonLaborCosts).CapexPercent);
         }
 
         var portfolio = WebUtility.HtmlDecode(await client.GetStringAsync("/Portfolio"));
@@ -105,7 +105,7 @@ public class FiscalPeriodTests
         Assert.Contains("2027,1,FY2027 Q1,2026-07-01,2026-09-30,", csv);
         Assert.Contains("Forecast capex,24000", csv);
         Assert.Contains("Forecast opex,1000", csv);
-        Assert.Contains(",120,24000,Capex,", csv);
+        Assert.Contains(",120,24000,100,24000,0,", csv);
 
         var portfolioCsv = await client.GetStringAsync("/Portfolio/Export?format=csv");
         Assert.Contains("# By fiscal period", portfolioCsv);
