@@ -408,7 +408,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         ValidateFixedDurationTiling(initiative, initiative.Phases.Append(phase));
         if (!ModelState.IsValid)
         {
-            return RedirectWithError(FirstError(), id);
+            return RedirectWithFormErrors("add-phase-form", id);
         }
 
         initiative.Phases.Add(phase);
@@ -560,7 +560,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await ValidateAllocation(model, initiative, ct);
         if (!ModelState.IsValid)
         {
-            return RedirectWithError(FirstError(), id);
+            return RedirectWithFormErrors("add-allocation-form", id);
         }
 
         var allocation = new InitiativeAllocation
@@ -749,7 +749,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await ValidateNonLaborCost(model, initiative, ct);
         if (!ModelState.IsValid)
         {
-            return RedirectWithError(FirstError(), id);
+            return RedirectWithFormErrors("nl-form", id);
         }
 
         var line = new InitiativeNonLaborCost { Description = model.Description.Trim() };
@@ -1633,6 +1633,14 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     private IActionResult RedirectWithError(string message, int id)
     {
         TempData["Error"] = message;
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>Redirect to Details with ModelState errors and the posted values for the inline form <paramref name="formId"/>, so it redisplays them field by field.</summary>
+    private IActionResult RedirectWithFormErrors(string formId, int id)
+    {
+        TempData["Error"] = FirstError();
+        TempData[InlineFormErrors.Key] = InlineFormErrors.Serialize(formId, ModelState, Request.Form);
         return RedirectToAction(nameof(Details), new { id });
     }
 

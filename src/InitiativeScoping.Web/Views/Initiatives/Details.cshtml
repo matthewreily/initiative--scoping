@@ -385,7 +385,7 @@ else
         </div>
         @if (Model.ScopeWritable)
         {
-            <form asp-action="AddPhase" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4">
+            <form asp-action="AddPhase" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4" id="add-phase-form">
                 <div class="col-md-5">
                     <label for="name" class="form-label small mb-0">Phase name</label>
                     <input name="Name" id="name" class="form-control form-control-sm" placeholder="e.g. Discovery" required />
@@ -469,7 +469,7 @@ else
                     <a asp-area="Admin" asp-controller="RateCards" asp-action="Index">Manage rate cards</a>
                 }
             </p>
-            <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4" aria-describedby="allocation-bu-hint">
+            <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4" aria-describedby="allocation-bu-hint" id="add-allocation-form">
                 <div class="col-md-3">
                     <label for="phaseid" class="form-label small mb-0">Phase</label>
                     <select name="PhaseId" id="phaseid" asp-items="Model.Phases" class="form-select form-select-sm"></select>

@@ -653,3 +653,55 @@ document.addEventListener('keydown', e => {
         opener = null;
     });
 })();
+
+
+
+// Inline-form validation: when a POST from an inline (non-full-page) form fails, the server redirects back
+// with the posted values and per-field errors as JSON (<script data-inline-form-errors>). Restore the values
+// into the form, mark invalid fields, show the tab holding the form and focus the first problem.
+(function () {
+    const script = document.querySelector('script[data-inline-form-errors]');
+    if (!script) return;
+    let state;
+    try { state = JSON.parse(script.textContent); } catch { return; }
+    const form = document.getElementById(state.form);
+    if (!form) return;
+
+    for (const [name, value] of Object.entries(state.values ?? {})) {
+        const field = form.elements.namedItem(name);
+        const el = field instanceof RadioNodeList ? [...field].find(f => f.type !== 'hidden') : field;
+        if (!el || el.type === 'hidden' || el.type === 'submit') continue;
+        if (el.type === 'checkbox') el.checked = value === 'true' || value === 'on';
+        else el.value = value;
+        el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+    }
+
+    const formErrors = [];
+    let first = null;
+    for (const [name, message] of Object.entries(state.errors ?? {})) {
+        const field = form.elements.namedItem(name);
+        const el = field instanceof RadioNodeList ? [...field].find(f => f.type !== 'hidden') : field;
+        if (!el || el.type === 'hidden') { formErrors.push(message); continue; }
+        el.classList.add('is-invalid');
+        el.setAttribute('aria-invalid', 'true');
+        const feedback = document.createElement('div');
+        feedback.className = 'invalid-feedback d-block';
+        feedback.textContent = message;
+        (el.closest('.input-group') ?? el).insertAdjacentElement('afterend', feedback);
+        el.addEventListener('input', () => { el.classList.remove('is-invalid'); el.removeAttribute('aria-invalid'); feedback.remove(); }, { once: true });
+        first ??= el;
+    }
+    if (formErrors.length) {
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-danger py-2 small col-12 mb-0';
+        alert.setAttribute('role', 'alert');
+        alert.textContent = formErrors.join(' ');
+        form.prepend(alert);
+    }
+
+    const pane = form.closest('.tab-pane');
+    const tab = pane ? document.querySelector(`[data-bs-toggle="tab"][data-bs-target="#${pane.id}"]`) : null;
+    if (tab && window.bootstrap?.Tab && !pane.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(tab).show();
+    (first ?? form).scrollIntoView({ block: 'center' });
+    first?.focus();
+})();
