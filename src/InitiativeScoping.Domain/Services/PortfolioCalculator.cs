@@ -16,6 +16,10 @@ public sealed record PortfolioRow(
     public decimal ContingencyCost => Forecast.ContingencyCost;
     public decimal ForecastCostWithContingency => Forecast.TotalCostWithContingency;
     public EstimateConfidence? Confidence => Initiative.EstimateConfidence;
+    public BudgetPosition Budget => BudgetCalculator.Calculate(Initiative, Forecast, Variance);
+    public decimal? ApprovedBudget => Budget.Budget;
+    public decimal? BudgetRemaining => Budget.Remaining;
+    public bool OverBudget => Budget.OverBudget;
     public decimal InternalForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte).Sum(l => l.Cost);
     public decimal VendorForecastCost => Forecast.Lines.Where(l => l.Allocation.ResourcingClass == ResourcingClass.Vendor).Sum(l => l.Cost);
     public decimal NonLaborForecastCost => Forecast.NonLaborCost;
@@ -61,6 +65,11 @@ public sealed record PortfolioResult(IReadOnlyList<PortfolioRow> Rows)
     public decimal ForecastCostWithContingency => Rows.Sum(r => r.ForecastCostWithContingency);
     public int LowConfidence => Rows.Count(r => r.Confidence == EstimateConfidence.Low);
     public int UnratedConfidence => Rows.Count(r => r.Confidence is null);
+    public int Budgeted => Rows.Count(r => r.Budget.HasBudget);
+    public decimal ApprovedBudget => Rows.Sum(r => r.ApprovedBudget ?? 0m);
+    /// <summary>Budget minus expected cost, summed over budgeted initiatives only.</summary>
+    public decimal BudgetRemaining => Rows.Sum(r => r.BudgetRemaining ?? 0m);
+    public int OverBudget => Rows.Count(r => r.OverBudget);
     public decimal InternalForecastCost => Rows.Sum(r => r.InternalForecastCost);
     public decimal VendorForecastCost => Rows.Sum(r => r.VendorForecastCost);
     public decimal NonLaborForecastCost => Rows.Sum(r => r.NonLaborForecastCost);

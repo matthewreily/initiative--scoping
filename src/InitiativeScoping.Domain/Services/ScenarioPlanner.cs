@@ -116,6 +116,8 @@ public static class ScenarioPlanner
         to.VarianceThresholdPct = from.VarianceThresholdPct;
         to.ContingencyPct = from.ContingencyPct;
         to.EstimateConfidence = from.EstimateConfidence;
+        to.ApprovedBudget = from.ApprovedBudget;
+        to.BudgetFiscalYear = from.BudgetFiscalYear;
     }
 }
 

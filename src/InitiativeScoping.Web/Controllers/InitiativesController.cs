@@ -95,6 +95,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             VarianceThresholdPct = model.VarianceThresholdPct,
             ContingencyPct = model.ContingencyPct,
             EstimateConfidence = model.EstimateConfidence,
+            ApprovedBudget = model.ApprovedBudget,
+            BudgetFiscalYear = NormalizeFiscalYear(model.BudgetFiscalYear),
             CreatedBy = currentUser.UserId,
             CreatedAt = clock.GetUtcNow()
         };
@@ -102,7 +104,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         SyncParticipants(initiative, model.ParticipatingBusinessUnitIds);
         db.Initiatives.Add(initiative);
         await db.SaveChangesAsync(ct);
-        audit.Record(Entity, initiative.Id, AuditActions.Create, new { initiative.Name, initiative.BusinessUnitId, ParticipatingBusinessUnitIds = initiative.ParticipatingBusinessUnitIds.ToList(), initiative.SizingMethod, initiative.SizeKey, initiative.PlanningMode, initiative.TargetStart, initiative.TargetEnd });
+        audit.Record(Entity, initiative.Id, AuditActions.Create, new { initiative.Name, initiative.BusinessUnitId, ParticipatingBusinessUnitIds = initiative.ParticipatingBusinessUnitIds.ToList(), initiative.SizingMethod, initiative.SizeKey, initiative.PlanningMode, initiative.TargetStart, initiative.TargetEnd, initiative.ApprovedBudget, initiative.BudgetFiscalYear });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Initiative '{initiative.Name}' created. Add phases and allocations to build the forecast.", initiative.Id);
     }
@@ -127,7 +129,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ParticipatingBusinessUnitIds = initiative.ParticipatingBusinessUnits.Select(p => p.BusinessUnitId).ToList(),
             SponsoringTeam = initiative.SponsoringTeam, SizingMethod = initiative.SizingMethod, SizeKey = initiative.SizeKey,
             PlanningMode = initiative.PlanningMode, TargetStart = initiative.TargetStart, TargetEnd = initiative.TargetEnd,
-            VarianceThresholdPct = initiative.VarianceThresholdPct, ContingencyPct = initiative.ContingencyPct, EstimateConfidence = initiative.EstimateConfidence
+            VarianceThresholdPct = initiative.VarianceThresholdPct, ContingencyPct = initiative.ContingencyPct, EstimateConfidence = initiative.EstimateConfidence,
+            ApprovedBudget = initiative.ApprovedBudget, BudgetFiscalYear = initiative.BudgetFiscalYear
         });
     }
 
@@ -198,6 +201,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         initiative.VarianceThresholdPct = model.VarianceThresholdPct;
         initiative.ContingencyPct = model.ContingencyPct;
         initiative.EstimateConfidence = model.EstimateConfidence;
+        initiative.ApprovedBudget = model.ApprovedBudget;
+        initiative.BudgetFiscalYear = NormalizeFiscalYear(model.BudgetFiscalYear);
         var recomputed = 0;
         if (scheduleChanged && initiative.PlanningMode == PlanningMode.FixedDuration)
         {
@@ -1632,7 +1637,10 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     }
 
     private static object Snapshot(Initiative i) =>
-        new { i.Name, i.Description, i.BusinessUnitId, ParticipatingBusinessUnitIds = i.ParticipatingBusinessUnitIds.ToList(), i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct, i.ContingencyPct, i.EstimateConfidence };
+        new { i.Name, i.Description, i.BusinessUnitId, ParticipatingBusinessUnitIds = i.ParticipatingBusinessUnitIds.ToList(), i.SponsoringTeam, i.SizingMethod, i.SizeKey, i.PlanningMode, i.TargetStart, i.TargetEnd, i.VarianceThresholdPct, i.ContingencyPct, i.EstimateConfidence, i.ApprovedBudget, i.BudgetFiscalYear };
+
+    private static string? NormalizeFiscalYear(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
         new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
