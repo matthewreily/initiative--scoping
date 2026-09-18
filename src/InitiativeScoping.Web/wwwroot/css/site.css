@@ -306,6 +306,42 @@ th .help-hint { font-weight: 600; }
 }
 .tour-card { position: fixed; width: 320px; max-width: calc(100vw - 24px); }
 
+/* Capacity: tapped/focused cell detail (hover titles are unreachable on touch) */
+.heatmap .heat-cell[tabindex] { cursor: pointer; }
+.heatmap .heat-cell.is-selected { outline: 2px solid var(--bs-link-color); outline-offset: -2px; }
+.heat-detail { white-space: pre-line; }
+
+/* Scenario compare: row labels stay put while the scenario columns scroll */
+.scenario-compare th[scope="row"], .scenario-compare thead th:first-child, .scenario-compare tfoot th:first-child {
+  position: sticky; left: 0; z-index: 1; background: var(--bs-body-bg);
+}
+.scenario-compare .compare-section { display: inline-block; position: sticky; left: .5rem; }
+
+@media (max-width: 575.98px) {
+  .heatmap .heat-sticky { min-width: 6.5rem; max-width: 7.5rem; white-space: normal; box-shadow: 2px 0 0 var(--is-border); }
+  .heatmap .heat-cell { min-width: 3.4rem; padding: .3rem .15rem; }
+  .heatmap .heat-fte { display: none; }
+  .heatmap tfoot .small { display: none; }
+
+  .scenario-compare th[scope="row"], .scenario-compare thead th:first-child { min-width: 7rem !important; max-width: 8.5rem; white-space: normal; box-shadow: 2px 0 0 var(--is-border); }
+  .scenario-compare thead th { min-width: 8rem !important; }
+  .scenario-compare .inline-form { width: 100%; }
+
+  /* Drill-down: each allocation / non-labor line becomes a stacked card instead of a 4-column row */
+  .table-responsive > .table.explain-lines { white-space: normal; }
+  .explain-lines thead { display: none; }
+  .explain-lines tr { display: block; border-bottom: 1px solid var(--is-border); padding: .25rem 0; }
+  .explain-lines td { display: block; border: 0; padding: .2rem 0; }
+  .explain-lines td::before { content: attr(data-label); display: block; color: var(--is-text-muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; }
+  .explain-lines td.text-end { text-align: left !important; }
+  .explain-lines tfoot td { display: flex; justify-content: space-between; }
+  .explain-lines tfoot td::before { content: none; }
+  .explain-lines tfoot td[colspan] { flex: 1; }
+  .explain-lines tfoot tr { display: flex; border-bottom: 0; }
+  .explain-lines .text-nowrap { white-space: normal !important; }
+  .explain-sum td { padding-right: .5rem; }
+}
+
 /* Loading feedback: top progress bar on navigation, placeholder layout while Portfolio / Capacity load */
 .page-progress {
   position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 1090; pointer-events: none;

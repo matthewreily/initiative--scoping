@@ -732,6 +732,35 @@ document.addEventListener('keydown', e => {
     first?.focus();
 })();
 
+// Capacity heatmap: tap / focus a cell to show its title text in a panel under the table (touch has no hover).
+(function () {
+    const table = document.getElementById('capacity-heatmap');
+    const panel = document.getElementById('capacity-detail');
+    if (!table || !panel) return;
+    const body = panel.querySelector('.heat-detail');
+    let selected = null;
+    function show(cell) {
+        if (selected) selected.classList.remove('is-selected');
+        selected = cell;
+        cell.classList.add('is-selected');
+        body.textContent = cell.getAttribute('title');
+        panel.classList.remove('d-none');
+    }
+    table.addEventListener('click', e => {
+        const cell = e.target.closest('.heat-cell[tabindex]');
+        if (cell) show(cell);
+    });
+    table.addEventListener('focusin', e => {
+        const cell = e.target.closest('.heat-cell[tabindex]');
+        if (cell) show(cell);
+    });
+    table.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const cell = e.target.closest('.heat-cell[tabindex]');
+        if (cell) { e.preventDefault(); show(cell); }
+    });
+})();
+
 
 // Loading skeletons: the Portfolio and Capacity pages aggregate every initiative, so when the user navigates
 // to one (nav link, filter form, keyboard shortcut) swap <main> for a placeholder layout of the destination

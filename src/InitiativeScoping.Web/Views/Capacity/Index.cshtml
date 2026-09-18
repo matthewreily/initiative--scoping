@@ -41,7 +41,7 @@
 <p class="text-muted small">
     Planned hours per resource type and month across the initiatives shown, compared with the People roster
     (active people of that type × working hours in the month at @Model.HoursPerDay.ToString("0.#") h/day, Mon–Fri minus holidays).
-    Allocation hours are spread over each phase by calendar days. Hover a cell for the initiatives behind it.
+    Allocation hours are spread over each phase by calendar days. Hover, tap or focus a cell for the initiatives behind it.
 </p>
 
 <form method="get" data-remember-filters class="row g-2 align-items-center mb-3">
@@ -106,7 +106,7 @@ else
                         <td class="text-end">@r.Headcount</td>
                         @foreach (var c in r.Cells)
                         {
-                            <td class="text-center heat-cell @HeatClass(c)" title="@Title(r, c)" data-utilization="@(c.Utilization?.ToString("0.####", inv))">
+                            <td class="text-center heat-cell @HeatClass(c)" title="@Title(r, c)" data-utilization="@(c.Utilization?.ToString("0.####", inv))" tabindex="@(c.DemandHours > 0 ? "0" : null)">
                                 @if (c.DemandHours > 0)
                                 {
                                     <span class="heat-value">@c.DemandHours.ToString("N0")</span>
@@ -136,5 +136,8 @@ else
                 </tr>
             </tfoot>
         </table>
+    </div>
+    <div class="card mt-2 d-none" id="capacity-detail" role="status" aria-live="polite">
+        <div class="card-body py-2 small heat-detail"></div>
     </div>
 }
