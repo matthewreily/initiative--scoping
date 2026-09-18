@@ -173,6 +173,8 @@ else
                     @if (r.HasUnpricedForecast) { <span class="badge bg-warning text-dark" title="One or more allocations have no matching rate">Unpriced forecast</span> }
                     @if (r.HasUnpricedActuals) { <span class="badge bg-warning text-dark" title="@r.Variance.UnpricedEntries actual rows without a rate">Unpriced actuals</span> }
                     @if (i.OpenRebaseline is not null) { <span class="badge bg-info text-dark">Re-baseline @i.OpenRebaseline.Status.ToString().ToLower()</span> }
+                    @if (r.PendingChangeRequests > 0) { <a class="badge text-bg-warning text-decoration-none" asp-controller="Initiatives" asp-action="Details" asp-route-id="@i.Id" asp-fragment="pane-changes" title="@(r.PendingChangeCostImpact is null ? "Change requests awaiting approval" : $"Estimated cost impact {r.PendingChangeCostImpact.Value:+#,##0;-#,##0;0}")">@r.PendingChangeRequests change @(r.PendingChangeRequests == 1 ? "request" : "requests") pending</a> }
+                    @if (r.ApprovedChangeRequests > 0) { <a class="badge text-bg-info text-decoration-none" asp-controller="Initiatives" asp-action="Details" asp-route-id="@i.Id" asp-fragment="pane-changes" title="Approved change requests awaiting the next baseline">@r.ApprovedChangeRequests change @(r.ApprovedChangeRequests == 1 ? "request" : "requests") approved</a> }
                     <partial name="_Confidence" model="r.Confidence" />
                 </td>
             </tr>

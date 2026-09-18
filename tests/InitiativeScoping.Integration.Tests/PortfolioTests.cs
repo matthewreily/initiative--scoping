@@ -66,7 +66,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         var initiativesSection = text[..text.IndexOf("\n# ", StringComparison.Ordinal)];
         var row = Assert.Single(initiativesSection.Split('\n'), l => l.StartsWith($"{id},Export {tag},"));
         Assert.StartsWith($"{id},Export {tag},Boarding,Active,2026-03-01,1,200,24000,24000,0,0,0,0,24000,,200,24000,5,500,-23500,-97.9,", row);
-        Assert.EndsWith(",10,No,No,No,EffortDriven,", row.TrimEnd('\r'));
+        Assert.EndsWith(",10,No,No,No,EffortDriven,,0,0,0,", row.TrimEnd('\r'));
         Assert.Contains("ETC cost,EAC cost,Projected variance,Projected variance %", text);
         Assert.Contains("# By status", text);
         Assert.Contains("# By month", text);
@@ -75,7 +75,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         var xlsx = await client.GetAsync("/Portfolio/Export?format=XLSX");
         Assert.Equal(HttpStatusCode.OK, xlsx.StatusCode);
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx.Content.Headers.ContentType!.MediaType);
-        Assert.Equal(["By fiscal period", "By month", "By resourcing business unit", "By sponsor business unit", "By status", "By vendor", "Initiative by fiscal period", "Initiative by month", "Initiatives"], await SheetNamesAsync(xlsx));
+        Assert.Equal(["By fiscal period", "By month", "By resourcing business unit", "By sponsor business unit", "By status", "By vendor", "Change requests", "Initiative by fiscal period", "Initiative by month", "Initiatives"], await SheetNamesAsync(xlsx));
 
         var initiative = await client.GetAsync($"/Initiatives/{id}/Export?format=xlsx");
         Assert.Equal(HttpStatusCode.OK, initiative.StatusCode);

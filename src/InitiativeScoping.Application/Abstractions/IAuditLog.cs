@@ -18,6 +18,9 @@ public static class AuditActions
     public const string Baseline = "Baseline";
     public const string RebaselineRequest = "RebaselineRequest";
     public const string RebaselineDecision = "RebaselineDecision";
+    public const string ChangeRequest = "ChangeRequest";
+    public const string ChangeRequestDecision = "ChangeRequestDecision";
+    public const string ChangeRequestImplemented = "ChangeRequestImplemented";
     public const string ActivationRequest = "ActivationRequest";
     public const string ActivationDecision = "ActivationDecision";
     public const string NoteAdded = "NoteAdded";

@@ -346,6 +346,25 @@ public class ApprovalsModel
 {
     public required IReadOnlyList<ActivationRequest> Activations { get; init; }
     public required IReadOnlyList<RebaselineRequest> Rebaselines { get; init; }
+    public IReadOnlyList<ChangeRequest> Changes { get; init; } = [];
+}
+
+public class ChangeRequestEditModel
+{
+    [Required]
+    public ChangeRequestType Type { get; set; } = ChangeRequestType.Scope;
+    [Required, StringLength(200)]
+    public string Title { get; set; } = string.Empty;
+    [Required, StringLength(4000)]
+    public string Description { get; set; } = string.Empty;
+    [Required, StringLength(2000)]
+    public string Reason { get; set; } = string.Empty;
+    [Display(Name = "Estimated cost impact")]
+    public decimal? EstimatedCostImpact { get; set; }
+    [Display(Name = "Estimated hours impact")]
+    public decimal? EstimatedHoursImpact { get; set; }
+    [Display(Name = "Proposed target end")]
+    public DateOnly? ProposedTargetEnd { get; set; }
 }
 
 public sealed record BaselineLineRow(

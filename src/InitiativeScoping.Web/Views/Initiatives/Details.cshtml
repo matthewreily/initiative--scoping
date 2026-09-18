@@ -290,11 +290,12 @@ else
         ("team", "Team", i.Members.Count),
         ("actuals", "Actuals", null),
         ("history", "History", i.Baselines.Count),
+        ("changes", "Changes", i.ChangeRequests.Count),
         ("notes", "Notes", i.Notes.Count)
     };
 }
 <div class="details-sticky" id="details-sticky">
-    <ul class="nav nav-tabs" role="tablist" id="details-tabs" data-tab-memory="initiative-@i.Id" data-tour="details:2" data-tour-title="Tabs" data-tour-text="Plan holds phases and allocations; Costs has non-labor lines, rollups and cost by month; Team, Actuals, History (baselines) and Notes follow. Your last tab is remembered.">
+    <ul class="nav nav-tabs" role="tablist" id="details-tabs" data-tab-memory="initiative-@i.Id" data-tour="details:2" data-tour-title="Tabs" data-tour-text="Plan holds phases and allocations; Costs has non-labor lines, rollups and cost by month; Team, Actuals, History (baselines), Changes (change requests) and Notes follow. Your last tab is remembered.">
         @foreach (var (key, label, count) in tabList)
         {
             <li class="nav-item" role="presentation">
@@ -1019,6 +1020,9 @@ else
         <p class="small text-muted mt-2">Created by @Users.Display(i.CreatedBy) on @i.CreatedAt.ToString("yyyy-MM-dd")</p>
             </div>
         </div>
+    </div>
+    <div class="tab-pane fade" id="pane-changes" role="tabpanel" aria-labelledby="tab-changes">
+        <partial name="_ChangeRequests" model="Model" />
     </div>
     <div class="tab-pane fade" id="pane-notes" role="tabpanel" aria-labelledby="tab-notes">
         @{

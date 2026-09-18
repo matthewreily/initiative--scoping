@@ -31,6 +31,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ForecastBaselineLine> ForecastBaselineLines => Set<ForecastBaselineLine>();
     public DbSet<ForecastBaselineNonLaborLine> ForecastBaselineNonLaborLines => Set<ForecastBaselineNonLaborLine>();
     public DbSet<RebaselineRequest> RebaselineRequests => Set<RebaselineRequest>();
+    public DbSet<ChangeRequest> ChangeRequests => Set<ChangeRequest>();
     public DbSet<ActivationRequest> ActivationRequests => Set<ActivationRequest>();
     public DbSet<InitiativeNote> InitiativeNotes => Set<InitiativeNote>();
     public DbSet<Person> People => Set<Person>();
@@ -155,6 +156,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<Initiative>(e =>
         {
+            e.Ignore(x => x.PendingChangeRequests);
             e.Property(x => x.Name).HasMaxLength(300);
             e.Property(x => x.SizeKey).HasMaxLength(50);
             e.Property(x => x.CreatedBy).HasMaxLength(200);
@@ -237,6 +239,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.PhaseName).HasMaxLength(200);
             e.Property(x => x.UnitCost).HasPrecision(18, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);
+        });
+
+        b.Entity<ChangeRequest>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(4000);
+            e.Property(x => x.Reason).HasMaxLength(2000);
+            e.Property(x => x.RequestedBy).HasMaxLength(200);
+            e.Property(x => x.DecidedBy).HasMaxLength(200);
+            e.Property(x => x.DecisionNote).HasMaxLength(1000);
+            e.Property(x => x.EstimatedCostImpact).HasPrecision(18, 2);
+            e.Property(x => x.EstimatedHoursImpact).HasPrecision(18, 2);
+            e.Property(x => x.ForecastHoursBefore).HasPrecision(18, 2);
+            e.Property(x => x.ForecastCostBefore).HasPrecision(18, 2);
+            e.Property(x => x.ForecastHoursAfter).HasPrecision(18, 2);
+            e.Property(x => x.ForecastCostAfter).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.InitiativeId, x.Number }).IsUnique();
+            e.HasIndex(x => new { x.InitiativeId, x.Status });
+            e.HasOne(x => x.Initiative)
+                .WithMany(i => i.ChangeRequests)
+                .HasForeignKey(x => x.InitiativeId);
+            e.HasOne(x => x.RebaselineRequest)
+                .WithMany()
+                .HasForeignKey(x => x.RebaselineRequestId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ResultingBaseline)
+                .WithMany()
+                .HasForeignKey(x => x.ResultingBaselineId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<RebaselineRequest>(e =>

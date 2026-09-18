@@ -109,16 +109,30 @@ public class PortfolioCalculatorTests
     public void Portfolio_export_has_one_row_per_initiative_and_group_tables()
     {
         var a = Initiative(1, "Boarding", InitiativeStatus.Active, baselineCost: 10_000m);
+        a.ChangeRequests.Add(new ChangeRequest { Id = 1, InitiativeId = 1, Number = 1, Type = ChangeRequestType.Scope, Title = "Add QA", Description = "d", Reason = "r", RequestedBy = "u", EstimatedCostImpact = 2_000m, ForecastCostBefore = 10_000m, ForecastHoursBefore = 100m });
+        a.ChangeRequests.Add(new ChangeRequest { Id = 2, InitiativeId = 1, Number = 2, Type = ChangeRequestType.Cost, Title = "Cheaper vendor", Description = "d", Reason = "r", RequestedBy = "u", Status = ChangeRequestStatus.Pending, ForecastCostBefore = 10_000m, ForecastHoursBefore = 100m });
+        a.ChangeRequests.Add(new ChangeRequest { Id = 3, InitiativeId = 1, Number = 3, Type = ChangeRequestType.Schedule, Title = "Slip", Description = "d", Reason = "r", RequestedBy = "u", Status = ChangeRequestStatus.Implemented, ForecastCostBefore = 8_000m, ForecastHoursBefore = 80m, ForecastCostAfter = 10_000m, ForecastHoursAfter = 100m, ResultingBaseline = a.Baselines[0] });
         var result = PortfolioCalculator.Calculate([a], [Card()], [], [], TypeNames, null);
 
         var tables = PortfolioExport.Build(result);
 
-        Assert.Equal(["Initiatives", "By sponsor business unit", "By status", "By resourcing business unit", "By vendor", "By month", "By fiscal period", "Initiative by month", "Initiative by fiscal period"], tables.Select(t => t.Name));
+        Assert.Equal(["Initiatives", "Change requests", "By sponsor business unit", "By status", "By resourcing business unit", "By vendor", "By month", "By fiscal period", "Initiative by month", "Initiative by fiscal period"], tables.Select(t => t.Name));
         var row = Assert.Single(tables[0].Rows);
         Assert.Equal(tables[0].Headers.Count, row.Count);
         Assert.Equal("I1", row[1]);
         Assert.Equal(10_000m, row[tables[0].Headers.ToList().IndexOf("Forecast cost")]);
         Assert.Equal(false, row[tables[0].Headers.ToList().IndexOf("Over threshold")]);
+        Assert.Equal(2, row[tables[0].Headers.ToList().IndexOf("Pending change requests")]);
+        Assert.Equal(1, row[tables[0].Headers.ToList().IndexOf("Implemented change requests")]);
+        Assert.Equal(2_000m, row[tables[0].Headers.ToList().IndexOf("Pending change cost impact")]);
+
+        var changes = tables[1];
+        Assert.Equal(3, changes.Rows.Count);
+        Assert.All(changes.Rows, r => Assert.Equal(changes.Headers.Count, r.Count));
+        var implemented = changes.Rows.Single(r => Equals(r[changes.Headers.ToList().IndexOf("Code")], "CR-3"));
+        Assert.Equal(2_000m, implemented[changes.Headers.ToList().IndexOf("Actual cost impact")]);
+        Assert.Equal(20m, implemented[changes.Headers.ToList().IndexOf("Actual hours impact")]);
+        Assert.Equal(1, implemented[changes.Headers.ToList().IndexOf("Resulting baseline version")]);
     }
 }
 

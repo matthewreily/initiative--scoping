@@ -1267,7 +1267,8 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         if (includeHistory)
         {
             query = query.Include(i => i.Phases).ThenInclude(p => p.DateHistory)
-                .Include(i => i.Notes).ThenInclude(n => n.ForecastBaseline);
+                .Include(i => i.Notes).ThenInclude(n => n.ForecastBaseline)
+                .Include(i => i.ChangeRequests).ThenInclude(c => c.ResultingBaseline);
         }
 
         return query.FirstOrDefaultAsync(i => i.Id == id, ct);

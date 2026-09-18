@@ -403,6 +403,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         open.Status = RebaselineStatus.Completed;
         open.ResultingBaseline = baseline;
         audit.Record(Entity, id, AuditActions.Baseline, BaselineDiff(baseline, open.Id));
+        ChangeRequestsController.Implement(initiative, open, baseline, forecast, audit);
         await db.SaveChangesAsync(ct);
         AppTelemetry.BaselinesCaptured.Add(1, new KeyValuePair<string, object?>("kind", "rebaseline"));
         return RedirectWithSuccess($"Forecast baseline v{baseline.Version} captured ({baseline.TotalHours:N1} h, {baseline.TotalCost:C0}). Scope is locked.", id);
@@ -417,10 +418,13 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Where(r => r.Status == ActivationRequestStatus.Pending).AsNoTracking().ToListAsync(ct);
         var rebaselines = await db.RebaselineRequests.Include(r => r.Initiative)
             .Where(r => r.Status == RebaselineStatus.Pending).AsNoTracking().ToListAsync(ct);
+        var changes = await db.ChangeRequests.Include(r => r.Initiative)
+            .Where(r => r.Status == ChangeRequestStatus.Pending).AsNoTracking().ToListAsync(ct);
         return View(new ApprovalsModel
         {
             Activations = activations.OrderBy(r => r.Id).ToList(),
-            Rebaselines = rebaselines.OrderBy(r => r.Id).ToList()
+            Rebaselines = rebaselines.OrderBy(r => r.Id).ToList(),
+            Changes = changes.OrderBy(r => r.Id).ToList()
         });
     }
 
@@ -476,6 +480,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines)
             .Include(i => i.RebaselineRequests)
+            .Include(i => i.ChangeRequests)
             .Include(i => i.ActivationRequests)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Id == id, ct);

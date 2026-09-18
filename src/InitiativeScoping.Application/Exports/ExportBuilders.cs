@@ -15,7 +15,8 @@ public static class PortfolioExport
              "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Cost variance", "Cost variance %",
              "ETC cost", "EAC cost", "Projected variance", "Projected variance %",
              "Approved budget", "Budget fiscal year", "Budget remaining", "Budget used %", "Over budget",
-             "Threshold %", "Over threshold", "Unpriced forecast", "Unpriced actuals", "Planning mode", "Target end"],
+             "Threshold %", "Over threshold", "Unpriced forecast", "Unpriced actuals", "Planning mode", "Target end",
+             "Pending change requests", "Approved change requests", "Implemented change requests", "Pending change cost impact"],
             portfolio.Rows.Select(r => (IReadOnlyList<object?>)
             [
                 r.Initiative.Id, r.Initiative.Name, r.Initiative.BusinessUnit?.Name, r.Initiative.Status.ToString(), r.Initiative.TargetStart, r.BaselineVersion,
@@ -25,12 +26,14 @@ public static class PortfolioExport
                 r.Variance.EtcCost, r.Variance.EacCost, r.Variance.EacCostVariance, r.Variance.EacCostVariancePct,
                 r.ApprovedBudget, r.Budget.FiscalYear, r.BudgetRemaining, r.Budget.UtilizationPct, r.Budget.HasBudget ? r.OverBudget : null,
                 r.Variance.ThresholdPct, r.ExceedsThreshold, r.HasUnpricedForecast, r.HasUnpricedActuals,
-                r.Initiative.PlanningMode.ToString(), r.Initiative.TargetEnd
+                r.Initiative.PlanningMode.ToString(), r.Initiative.TargetEnd,
+                r.PendingChangeRequests, r.ApprovedChangeRequests, r.ImplementedChangeRequests, r.PendingChangeCostImpact
             ]).ToList());
 
         return
         [
             initiatives,
+            ChangeRequests(portfolio.Rows),
             Groups("By sponsor business unit", portfolio.ByBusinessUnit),
             Groups("By status", portfolio.ByStatus),
             LaborSplit("By resourcing business unit", "Business unit", portfolio.ByResourcingBusinessUnit),
@@ -41,6 +44,11 @@ public static class PortfolioExport
             InitiativeFiscalPeriods(portfolio.Rows, fiscal)
         ];
     }
+
+    private static ExportTable ChangeRequests(IReadOnlyList<PortfolioRow> rows) =>
+        new("Change requests",
+            ["Id", "Initiative", .. ChangeRequestExport.Headers],
+            rows.SelectMany(r => r.Initiative.ChangeRequests.OrderBy(c => c.Number).Select(c => (IReadOnlyList<object?>)[r.Initiative.Id, r.Initiative.Name, .. ChangeRequestExport.Row(c)])).ToList());
 
     private static ExportTable InitiativeFiscalPeriods(IReadOnlyList<PortfolioRow> rows, FiscalCalendar fiscal) =>
         new("Initiative by fiscal period",
@@ -150,8 +158,14 @@ public static class InitiativeExport
             ["Over budget", budget.HasBudget ? budget.OverBudget : null],
             ["Threshold %", variance.ThresholdPct],
             ["Over threshold", variance.ExceedsThreshold],
-            ["Unpriced actual rows", variance.UnpricedEntries]
+            ["Unpriced actual rows", variance.UnpricedEntries],
+            ["Pending change requests", initiative.ChangeRequests.Count(c => c.Status == Domain.Enums.ChangeRequestStatus.Pending)],
+            ["Approved change requests", initiative.ChangeRequests.Count(c => c.Status == Domain.Enums.ChangeRequestStatus.Approved)],
+            ["Implemented change requests", initiative.ChangeRequests.Count(c => c.Status == Domain.Enums.ChangeRequestStatus.Implemented)]
         ]);
+
+        var changeRequests = new ExportTable("Change requests", ChangeRequestExport.Headers,
+            initiative.ChangeRequests.OrderBy(c => c.Number).Select(ChangeRequestExport.Row).ToList());
 
         var forecastLines = new ExportTable("Forecast",
             ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Capex / Opex", "Contract", "Cost center"],
@@ -206,13 +220,30 @@ public static class InitiativeExport
             ["Created", "Created by", "Category", "Hours", "Cost", "Reason"],
             adjustments.Select(a => (IReadOnlyList<object?>)[a.CreatedAt, a.CreatedBy, VarianceCalculator.CategoryLabel(a.Category), a.Hours, a.Cost, a.Reason]).ToList());
 
-        return [summary, forecastLines, nonLaborLines, MonthlyPhasingExport.Table("By month", phasing), MonthlyPhasingExport.FiscalTable("By fiscal period", phasing, fiscal), baselineLines, baselineNonLabor, variancePhase, varianceType, variancePerson, varianceCategory, actuals, adjustmentTable];
+        return [summary, forecastLines, nonLaborLines, MonthlyPhasingExport.Table("By month", phasing), MonthlyPhasingExport.FiscalTable("By fiscal period", phasing, fiscal), baselineLines, baselineNonLabor, variancePhase, varianceType, variancePerson, varianceCategory, actuals, adjustmentTable, changeRequests];
     }
 
     private static ExportTable VarianceTable(string name, IReadOnlyList<VarianceRow> rows) =>
         new(name,
             ["Group", "Baseline hours", "Baseline cost", "Actual hours", "Actual cost", "Hours variance", "Cost variance", "Cost variance %", "ETC hours", "ETC cost", "EAC hours", "EAC cost", "Projected variance", "Projected variance %"],
             rows.Select(r => (IReadOnlyList<object?>)[r.Label, r.BaselineHours, r.BaselineCost, r.ActualHours, r.ActualCost, r.HoursVariance, r.CostVariance, r.CostVariancePct, r.EtcHours, r.EtcCost, r.EacHours, r.EacCost, r.EacCostVariance, r.EacCostVariancePct]).ToList());
+}
+
+public static class ChangeRequestExport
+{
+    public static readonly IReadOnlyList<string> Headers =
+        ["Code", "Type", "Status", "Title", "Description", "Reason", "Requested by", "Requested at",
+         "Estimated cost impact", "Estimated hours impact", "Proposed target end",
+         "Baseline version before", "Forecast hours before", "Forecast cost before", "Target end before",
+         "Forecast hours after", "Forecast cost after", "Target end after", "Actual cost impact", "Actual hours impact",
+         "Decided by", "Decided at", "Decision note", "Resulting baseline version"];
+
+    public static IReadOnlyList<object?> Row(ChangeRequest c) =>
+        [c.Code, c.Type.ToString(), c.Status.ToString(), c.Title, c.Description, c.Reason, c.RequestedBy, c.RequestedAt,
+         c.EstimatedCostImpact, c.EstimatedHoursImpact, c.ProposedTargetEnd,
+         c.BaselineVersionBefore, c.ForecastHoursBefore, c.ForecastCostBefore, c.TargetEndBefore,
+         c.ForecastHoursAfter, c.ForecastCostAfter, c.TargetEndAfter, c.ActualCostImpact, c.ActualHoursImpact,
+         c.DecidedBy, c.DecidedAt, c.DecisionNote, c.ResultingBaseline?.Version];
 }
 
 public static class CapacityExport

@@ -40,6 +40,23 @@ public enum RebaselineStatus
     Withdrawn = 5
 }
 
+public enum ChangeRequestType
+{
+    Scope = 1,
+    Schedule = 2,
+    Cost = 3,
+    Resource = 4
+}
+
+public enum ChangeRequestStatus
+{
+    Pending = 1,
+    Approved = 2,
+    Rejected = 3,
+    Implemented = 4,
+    Withdrawn = 5
+}
+
 public enum ActivationRequestStatus
 {
     Pending = 1,
