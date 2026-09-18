@@ -407,7 +407,7 @@ else
         <h2 class="h5" data-tour="details:4" data-tour-title="Allocations" data-tour-text="Each row is a resource type × seniority × business unit on a phase. Only combinations priced on a published rate card can be chosen, so every line gets a rate. Apply a T-shirt size to fill this from a template.">Allocations</h2>
         <div class="table-responsive table-scroll" id="allocations-table">
         <table class="table table-sm align-middle" data-sortable>
-            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
+            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Person</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
             <tbody>
             @foreach (var a in orderedAllocations)
             {
@@ -418,6 +418,7 @@ else
                     <td>@a.BusinessUnit?.Name</td>
                     <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
                     <td data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
+                    <td>@if (a.Person is not null) { <span class="allocation-person">@a.Person.DisplayName</span> @if (!a.Person.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } } else { <span class="text-muted">—</span> }</td>
                     <td>@a.Location</td>
                     <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}")</td>
                     <td class="text-end">@a.Quantity</td>
@@ -438,12 +439,12 @@ else
             }
             @if (i.Allocations.Count == 0)
             {
-                <tr data-nosort><td colspan="13" class="text-muted">No allocations yet.</td></tr>
+                <tr data-nosort><td colspan="14" class="text-muted">No allocations yet.</td></tr>
             }
             </tbody>
             @if (i.Allocations.Count > 0)
             {
-                <tfoot class="fw-semibold"><tr><td colspan="@((fixedDuration ? 8 : 7) + (Model.ScopeWritable ? 1 : 0))" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td></td></tr></tfoot>
+                <tfoot class="fw-semibold"><tr><td colspan="@((fixedDuration ? 9 : 8) + (Model.ScopeWritable ? 1 : 0))" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td></td></tr></tfoot>
             }
         </table>
         </div>
@@ -500,6 +501,12 @@ else
                     <label for="vendorid" class="form-label small mb-0">Vendor</label>
                     <select name="VendorId" id="vendorid" asp-items="@(new SelectList(Model.RateOptions.Vendors, "Id", "Name"))" class="form-select form-select-sm"></select>
                 </div>
+                <div class="col-md-3">
+                    <label for="personid" class="form-label small mb-0">Person</label>
+                    <select name="PersonId" id="personid" asp-items="@(new SelectList(Model.RateOptions.People, "Id", "Name"))" class="form-select form-select-sm" title="Optional roster person matching this resource type, seniority, business unit and class">
+                        <option value="">Unassigned</option>
+                    </select>
+                </div>
                 <div class="col-md-2">
                     <label for="rate-preview-new" class="form-label small mb-0">Hourly rate</label>
                     <input id="rate-preview-new" class="form-control form-control-sm" readonly tabindex="-1" />
@@ -538,7 +545,7 @@ else
                 </div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
-            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { VendorSelectId = "vendorid" })" />
+            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { VendorSelectId = "vendorid", BusinessUnitSelectId = "businessunitid", PersonSelectId = "personid", QuantityInputId = "quantity" })" />
             @if (fd is not null)
             {
                 <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />
@@ -853,6 +860,39 @@ else
             </form>
         }
 
+            </div>
+            <div class="col-lg-5" id="assigned-people">
+        <h2 class="h5">Assigned people</h2>
+        @{
+            var assigned = i.Allocations.Where(a => a.Person is not null)
+                .GroupBy(a => a.Person!)
+                .OrderBy(g => g.Key.DisplayName)
+                .ToList();
+        }
+        @if (assigned.Count == 0)
+        {
+            <p class="text-muted small mb-0">No named people yet — pick a Person on an allocation to staff a seat from the roster.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Person</th><th>Role</th><th>Phases</th><th class="text-end">Hours</th></tr></thead>
+                <tbody>
+                @foreach (var g in assigned)
+                {
+                    var hours = g.Sum(a => lineByAllocation[a.Id].Hours);
+                    <tr>
+                        <td>@g.Key.DisplayName @if (!g.Key.IsActive) { <span class="badge bg-secondary">inactive</span> }</td>
+                        <td>@Model.ResourceTypeNames.GetValueOrDefault(g.Key.ResourceTypeId) · @g.First().Seniority?.Name</td>
+                        <td class="small">@string.Join(", ", g.Select(a => $"{phaseNames.GetValueOrDefault(a.PhaseId)} ({lineByAllocation[a.Id].Hours:N0} h)"))</td>
+                        <td class="text-end">@hours.ToString("N1")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
             </div>
         </div>
     </div>

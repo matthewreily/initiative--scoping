@@ -9,6 +9,7 @@
     });
     var phaseStarts = Model.Data.PhaseStarts.ToDictionary(p => p.Key, p => p.Value.ToString("yyyy-MM-dd"));
     var vendorClass = (int)InitiativeScoping.Domain.Enums.ResourcingClass.Vendor;
+    var people = Model.Data.People.Select(p => new { id = p.Id, type = p.ResourceTypeId, seniority = p.SeniorityId, bu = p.BusinessUnitId, cls = (int)p.ResourcingClass, vendor = p.VendorId });
 }
 <script>
     (function () {
@@ -16,10 +17,12 @@
         const phase = byId('@Model.PhaseSelectId'), type = byId('@Model.ResourceTypeSelectId'), seniority = byId('@Model.SenioritySelectId');
         const location = byId('@Model.LocationSelectId'), cls = byId('@Model.ClassSelectId'), vendor = byId('@Model.VendorSelectId'), output = byId('@Model.RateOutputId');
         const vendorWrap = vendor ? (vendor.closest('[data-vendor-field]') ?? vendor) : null;
+        const bu = byId('@Model.BusinessUnitSelectId'), person = byId('@Model.PersonSelectId'), quantity = byId('@Model.QuantityInputId');
+        const people = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(people));
         const cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cards));
         const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
         const VENDOR = '@vendorClass';
-        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)' };
+        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)', person: '@(Model.Current.PersonId?.ToString() ?? string.Empty)' };
         const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
 
         function pricedFor(phaseId) {
@@ -83,6 +86,7 @@
             } else {
                 match = byCls[0];
             }
+            syncPeople(preferCurrent);
             if (match) {
                 output.value = money.format(match.rate) + ' /h';
                 output.classList.remove('is-invalid');
@@ -96,12 +100,37 @@
             }
         }
 
+        // Offers only roster people whose type / seniority / BU / class (and vendor) match the chosen dimensions; a named person is one seat.
+        function syncPeople(preferCurrent) {
+            if (!person) { return; }
+            const vendorId = isVendor() && vendor ? vendor.value : '';
+            const eligible = people.filter(p => same(p.type, type.value) && same(p.seniority, seniority.value) && (!bu || same(p.bu, bu.value))
+                && same(p.cls, cls.value) && (!same(p.cls, VENDOR) || sameVendor(p.vendor, vendorId)));
+            const wanted = preferCurrent ? current.person : person.value;
+            let kept = '';
+            for (const opt of person.options) {
+                const ok = opt.value === '' || eligible.some(p => same(p.id, opt.value)) || (preferCurrent && same(opt.value, current.person) && current.person !== '');
+                opt.hidden = !ok;
+                opt.disabled = !ok;
+                if (ok && opt.value !== '' && same(opt.value, wanted)) { kept = opt.value; }
+            }
+            person.value = kept;
+            const anyEligible = Array.from(person.options).some(o => o.value !== '' && !o.disabled);
+            person.title = anyEligible ? 'Roster people matching this resource type, seniority, business unit and class' : 'No active roster person matches this combination';
+            if (quantity) {
+                if (kept !== '') { quantity.value = '1'; quantity.readOnly = true; quantity.title = 'One allocation per named person'; }
+                else { quantity.readOnly = false; quantity.title = ''; }
+            }
+        }
+
         phase.addEventListener('change', () => sync(false));
         type.addEventListener('change', () => sync(false));
         seniority.addEventListener('change', () => sync(false));
         location.addEventListener('change', () => sync(false));
         cls.addEventListener('change', () => sync(false));
         if (vendor) { vendor.addEventListener('change', () => sync(false)); }
+        if (bu) { bu.addEventListener('change', () => syncPeople(false)); }
+        if (person) { person.addEventListener('change', () => syncPeople(false)); }
         sync(true);
     })();
 </script>

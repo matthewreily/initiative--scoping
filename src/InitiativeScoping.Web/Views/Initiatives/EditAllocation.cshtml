@@ -82,6 +82,14 @@
     </div>
     <div class="row g-3 mb-3">
         <div class="col-md-3">
+            <label asp-for="PersonId" class="form-label"></label>
+            <select asp-for="PersonId" asp-items="@(new SelectList(rateOptions.People, "Id", "Name"))" class="form-select" aria-describedby="person-help">
+                <option value="">Unassigned</option>
+            </select>
+            <span asp-validation-for="PersonId" class="text-danger"></span>
+            <span class="visually-hidden" id="person-help">Optional roster person; only people matching the resource type, seniority, business unit and class are offered.</span>
+        </div>
+        <div class="col-md-3">
             <label asp-for="Quantity" class="form-label"></label>
             <input asp-for="Quantity" class="form-control" type="number" min="1" />
             <span asp-validation-for="Quantity" class="text-danger"></span>

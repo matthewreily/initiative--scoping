@@ -31,6 +31,7 @@ public class ActualsImporter(AppDbContext db, ICurrentUser currentUser, IAuditLo
             .Where(m => m.Source == source)
             .ToDictionaryAsync(m => m.ExternalProjectId, m => m.InitiativeId, StringComparer.OrdinalIgnoreCase, ct);
         var people = await db.People.Where(p => p.IsActive).ToListAsync(ct);
+        var named = await NamedPeopleByInitiativeAsync(db, ct);
         var cards = await LoadRateCardsAsync(ct);
 
         var references = entries.Select(e => e.SourceReference).ToList();
@@ -69,7 +70,10 @@ public class ActualsImporter(AppDbContext db, ICurrentUser currentUser, IAuditLo
                 log.AppendLine($"'{e.SourceReference}': no initiative mapped to project '{e.ExternalProjectId}'.");
             }
 
-            var person = people.FirstOrDefault(p => ActualsCosting.MatchesExternalId(p, e.ExternalPersonId));
+            var person = ActualsCosting.ResolvePerson(
+                people,
+                entry.InitiativeId is { } iid ? named.GetValueOrDefault(iid, []) : [],
+                e.ExternalPersonId);
             if (person is not null)
             {
                 entry.PersonId = person.Id;
@@ -126,6 +130,18 @@ public class ActualsImporter(AppDbContext db, ICurrentUser currentUser, IAuditLo
         Apply(entry, person, await LoadRateCardsAsync(ct));
         audit.Record(nameof(ActualEntry), entry.Id, AuditActions.Remap,
             new { Before = before, After = new { entry.InitiativeId, entry.PersonId, entry.CalculatedCost } });
+    }
+
+    /// <summary>Active roster people named on each initiative's allocations, for name-based matching of imported time.</summary>
+    public static async Task<Dictionary<int, IReadOnlyList<Person>>> NamedPeopleByInitiativeAsync(AppDbContext db, CancellationToken ct)
+    {
+        var rows = await db.InitiativeAllocations
+            .Where(a => a.PersonId != null && a.Person!.IsActive)
+            .Select(a => new { a.InitiativeId, a.Person })
+            .AsNoTracking()
+            .ToListAsync(ct);
+        return rows.GroupBy(r => r.InitiativeId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<Person>)g.Select(r => r.Person!).DistinctBy(p => p.Id).ToList());
     }
 
     private static void Apply(ActualEntry entry, Person? person, List<RateCard> cards)

@@ -5,6 +5,7 @@ using InitiativeScoping.Application.Actuals;
 using InitiativeScoping.Application.Initiatives;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Services;
+using InitiativeScoping.Infrastructure.Actuals;
 using InitiativeScoping.Infrastructure.Persistence;
 using InitiativeScoping.Web.Models;
 using InitiativeScoping.Web.Services;
@@ -298,14 +299,16 @@ public class ActualsController(AppDbContext db, ICurrentUser currentUser, IAudit
         var unmapped = await db.ActualEntries.Include(e => e.ActualsImport).Where(e => e.IsUnmapped).ToListAsync(ct);
         var mappings = await db.InitiativeSourceMappings.ToListAsync(ct);
         var people = await db.People.Where(p => p.IsActive).ToListAsync(ct);
+        var named = await ActualsImporter.NamedPeopleByInitiativeAsync(db, ct);
         var changed = 0;
         foreach (var entry in unmapped)
         {
             int? initiativeId = entry.InitiativeId is null
                 ? mappings.FirstOrDefault(m => string.Equals(m.Source, entry.ActualsImport!.Source, StringComparison.OrdinalIgnoreCase) && string.Equals(m.ExternalProjectId, entry.ExternalProjectId, StringComparison.OrdinalIgnoreCase))?.InitiativeId
                 : null;
+            var onInitiative = (initiativeId ?? entry.InitiativeId) is { } iid ? named.GetValueOrDefault(iid, []) : [];
             int? personId = entry.PersonId is null
-                ? people.FirstOrDefault(p => ActualsCosting.MatchesExternalId(p, entry.ExternalPersonId))?.Id
+                ? ActualsCosting.ResolvePerson(people, onInitiative, entry.ExternalPersonId)?.Id
                 : null;
             if (initiativeId is null && personId is null)
             {

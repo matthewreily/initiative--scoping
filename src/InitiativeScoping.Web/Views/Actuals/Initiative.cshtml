@@ -87,6 +87,31 @@
         </table>
         </div>
 
+        @if (v.Baseline?.Lines.Any(l => l.PersonName is not null) == true)
+        {
+            <h2 class="h5 mt-4">By person <span class="text-muted small fw-normal">(named on baseline allocations; unassigned lines grouped by resource type)</span></h2>
+            <div class="table-responsive">
+            <table class="table table-sm" id="variance-by-person">
+                <thead><tr><th>Person</th><th class="text-end">Baseline h</th><th class="text-end">Actual h</th><th class="text-end">Baseline $</th><th class="text-end">Actual $</th><th class="text-end">Variance</th><th class="text-end">EAC $</th><th class="text-end">Projected</th></tr></thead>
+                <tbody>
+                @foreach (var r in v.ByPerson)
+                {
+                    <tr>
+                        <td>@r.Label</td>
+                        <td class="text-end">@r.BaselineHours.ToString("N1")</td>
+                        <td class="text-end">@r.ActualHours.ToString("N1")</td>
+                        <td class="text-end">@r.BaselineCost.ToString("C0")</td>
+                        <td class="text-end">@r.ActualCost.ToString("C0")</td>
+                        <td class="text-end @VarClass(r.CostVariance)">@Signed(r.CostVariance, "C0") @(r.CostVariancePct is null ? "" : $"({Signed(r.CostVariancePct.Value, "0.0")}%)")</td>
+                        <td class="text-end">@r.EacCost.ToString("C0")</td>
+                        <td class="text-end @VarClass(r.EacCostVariance)">@Signed(r.EacCostVariance, "C0") @(r.EacCostVariancePct is null ? "" : $"({Signed(r.EacCostVariancePct.Value, "0.0")}%)")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+
         <h2 class="h5 mt-4">By cost category <span class="text-muted small fw-normal">(imported time is labor; adjustments count against their category)</span></h2>
         <div class="table-responsive">
         <table class="table table-sm" id="variance-by-category">

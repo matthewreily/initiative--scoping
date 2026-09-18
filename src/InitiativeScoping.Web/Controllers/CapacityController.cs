@@ -13,17 +13,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InitiativeScoping.Web.Controllers;
 
-/// <summary>Cross-initiative resource demand by resource type and month against the People roster.</summary>
+/// <summary>Cross-initiative resource demand by resource type (or named person) and month against the People roster.</summary>
 [Authorize(Policy = AppPolicies.CanView)]
 public class CapacityController(AppDbContext db, IAuditLog audit, IEnumerable<IExportWriter> writers, IWorkCalendar workCalendar) : Controller
 {
     [HttpGet("Capacity")]
-    public async Task<IActionResult> Index(InitiativeStatus? status, int? businessUnitId, bool includeClosed, CancellationToken ct)
+    public async Task<IActionResult> Index(InitiativeStatus? status, int? businessUnitId, bool includeClosed, CapacityView view, CancellationToken ct)
     {
-        var (heatmap, calendar) = await LoadAsync(new PortfolioFilter(status, businessUnitId, includeClosed), ct);
+        var (heatmap, calendar) = await LoadAsync(new PortfolioFilter(status, businessUnitId, includeClosed), view, ct);
         return View(new CapacityModel
         {
             Heatmap = heatmap,
+            View = view,
             Status = status,
             BusinessUnitId = businessUnitId,
             IncludeClosed = includeClosed,
@@ -34,7 +35,7 @@ public class CapacityController(AppDbContext db, IAuditLog audit, IEnumerable<IE
     }
 
     [HttpGet("Capacity/Export")]
-    public async Task<IActionResult> Export(string format, InitiativeStatus? status, int? businessUnitId, bool includeClosed, CancellationToken ct)
+    public async Task<IActionResult> Export(string format, InitiativeStatus? status, int? businessUnitId, bool includeClosed, CapacityView view, CancellationToken ct)
     {
         var writer = writers.FirstOrDefault(w => string.Equals(w.Extension, format?.Trim(), StringComparison.OrdinalIgnoreCase));
         if (writer is null)
@@ -42,21 +43,24 @@ public class CapacityController(AppDbContext db, IAuditLog audit, IEnumerable<IE
             return BadRequest($"Unsupported format '{format}'. Use one of: {string.Join(", ", writers.Select(w => w.Extension))}.");
         }
 
-        var (heatmap, _) = await LoadAsync(new PortfolioFilter(status, businessUnitId, includeClosed), ct);
-        var bytes = writer.Write(CapacityExport.Build(heatmap));
+        var (heatmap, _) = await LoadAsync(new PortfolioFilter(status, businessUnitId, includeClosed), view, ct);
+        var bytes = writer.Write(CapacityExport.Build(heatmap, byPerson: view == CapacityView.People));
 
-        audit.Record("Capacity", 0, AuditActions.Export, new { Format = writer.Extension, status, businessUnitId, includeClosed, ResourceTypes = heatmap.Rows.Count });
+        audit.Record("Capacity", 0, AuditActions.Export, new { Format = writer.Extension, status, businessUnitId, includeClosed, View = view.ToString(), Rows = heatmap.Rows.Count });
         await db.SaveChangesAsync(ct);
 
         return File(bytes, writer.ContentType, $"capacity-{DateTime.UtcNow:yyyyMMdd}.{writer.Extension}");
     }
 
-    private async Task<(CapacityHeatmap Heatmap, WorkCalendar Calendar)> LoadAsync(PortfolioFilter filter, CancellationToken ct)
+    private async Task<(CapacityHeatmap Heatmap, WorkCalendar Calendar)> LoadAsync(PortfolioFilter filter, CapacityView view, CancellationToken ct)
     {
         var initiatives = await db.FilteredInitiatives(filter).ToListAsync(ct);
         var people = await db.People.AsNoTracking().ToListAsync(ct);
         var typeNames = await db.ResourceTypeNamesAsync(ct);
         var calendar = await workCalendar.GetAsync(ct);
-        return (CapacityCalculator.Calculate(initiatives, people, typeNames, calendar.Holidays, calendar.HoursPerDay), calendar);
+        var heatmap = view == CapacityView.People
+            ? CapacityCalculator.CalculateByPerson(initiatives, people, typeNames, calendar.Holidays, calendar.HoursPerDay)
+            : CapacityCalculator.Calculate(initiatives, people, typeNames, calendar.Holidays, calendar.HoursPerDay);
+        return (heatmap, calendar);
     }
 }

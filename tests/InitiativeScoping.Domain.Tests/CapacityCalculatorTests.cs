@@ -105,4 +105,54 @@ public class CapacityCalculatorTests
         Assert.True(CapacityCalculator.Calculate([a], [], TypeNames, NoHolidays, 8m).IsEmpty);
         Assert.True(CapacityCalculator.Calculate([], [], TypeNames, NoHolidays, 8m).IsEmpty);
     }
+
+    [Fact]
+    public void Person_view_shows_named_people_against_their_own_hours_and_groups_unassigned_by_type()
+    {
+        var a = Make(1, "A", new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), (1, 1, 100m), (2, 1, 30m));
+        var b = Make(2, "B", new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), (1, 1, 120m), (1, 3, 40m));
+        a.Allocations.First(x => x.ResourceTypeId == 1).PersonId = 10;
+        b.Allocations.First(x => x.Quantity == 1).PersonId = 10;
+        a.Allocations.First(x => x.ResourceTypeId == 2).PersonId = 11;
+        var jane = new Person { Id = 10, DisplayName = "Jane", ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", BusinessUnitId = 1 };
+        var gone = new Person { Id = 11, DisplayName = "Former", ResourceTypeId = 2, SeniorityId = 1, Location = "Onshore", BusinessUnitId = 1, IsActive = false };
+
+        var map = CapacityCalculator.CalculateByPerson([a, b], [jane, gone], TypeNames, NoHolidays, 8m);
+
+        Assert.Equal(["Former", "Jane", "Unassigned Developer"], map.Rows.Select(r => r.Label));
+
+        var janeRow = map.Rows[1];
+        Assert.Equal(10, janeRow.PersonId);
+        Assert.Equal("Developer", janeRow.ResourceTypeName);
+        Assert.Equal(1, janeRow.Headcount);
+        // March 2026 has 22 weekdays → 176 h; 220 h demand from two initiatives.
+        Assert.Equal(220m, janeRow.Cells[0].DemandHours);
+        Assert.Equal(176m, janeRow.Cells[0].SupplyHours);
+        Assert.True(janeRow.Cells[0].IsOverAllocated);
+        Assert.Equal(2, janeRow.Cells[0].Contributions.Count);
+        Assert.Equal(1, janeRow.OverAllocatedMonths);
+
+        var former = map.Rows[0];
+        Assert.Equal(0, former.Headcount);
+        Assert.Equal(0m, former.Cells[0].SupplyHours);
+        Assert.True(former.Cells[0].IsOverAllocated);
+
+        var open = map.Rows[2];
+        Assert.True(open.IsUnassigned);
+        Assert.Null(open.PersonId);
+        Assert.Equal(120m, open.Cells[0].DemandHours);
+        Assert.Equal(0, open.OverAllocatedMonths);
+    }
+
+    [Fact]
+    public void Person_view_labels_people_missing_from_the_roster_by_id()
+    {
+        var a = Make(1, "A", new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), (1, 1, 10m));
+        a.Allocations[0].PersonId = 99;
+
+        var map = CapacityCalculator.CalculateByPerson([a], [], TypeNames, NoHolidays, 8m);
+
+        Assert.Equal("Person #99", Assert.Single(map.Rows).Label);
+        Assert.Equal(0, map.Rows[0].Headcount);
+    }
 }

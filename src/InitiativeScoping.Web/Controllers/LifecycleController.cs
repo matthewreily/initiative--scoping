@@ -472,6 +472,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
             .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
             .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
+            .Include(i => i.Allocations).ThenInclude(a => a.Person)
             .Include(i => i.NonLaborCosts)
             .Include(i => i.Baselines)
             .Include(i => i.RebaselineRequests)
@@ -486,7 +487,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
 
     private static List<BaselineLineRow> BaselineLines(ForecastBaseline selected, ForecastBaseline? previous)
     {
-        static string Key(ForecastBaselineLine l) => $"{l.PhaseId}|{l.BusinessUnitId}|{l.ResourceTypeId}|{l.SeniorityId}|{l.Location}|{l.ResourcingClass}|{l.VendorId}";
+        static string Key(ForecastBaselineLine l) => $"{l.PhaseId}|{l.BusinessUnitId}|{l.ResourceTypeId}|{l.SeniorityId}|{l.Location}|{l.ResourcingClass}|{l.VendorId}|{l.PersonId}";
         var prev = (previous?.Lines ?? []).GroupBy(Key).ToDictionary(g => g.Key, g => (Hours: g.Sum(l => l.Hours), Cost: g.Sum(l => l.Cost)));
         var rows = selected.Lines.GroupBy(Key).Select(g =>
         {
@@ -497,7 +498,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
                 first.SeniorityName, first.Location, first.ResourcingClass,
                 g.Sum(l => l.Hours), first.HourlyRate, g.Sum(l => l.Cost),
                 previous is null ? null : g.Sum(l => l.Hours) - p.Hours,
-                previous is null ? null : g.Sum(l => l.Cost) - p.Cost);
+                previous is null ? null : g.Sum(l => l.Cost) - p.Cost) { Person = first.PersonName };
         }).ToList();
 
         // Lines that existed in the previous version but were removed.
@@ -506,7 +507,7 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
             var l = previous!.Lines.First(x => Key(x) == key);
             rows.Add(new BaselineLineRow(
                 l.PhaseName, l.BusinessUnitName, l.VendorName, l.ResourceTypeName,
-                l.SeniorityName, l.Location, l.ResourcingClass, 0m, l.HourlyRate, 0m, -p.Hours, -p.Cost));
+                l.SeniorityName, l.Location, l.ResourcingClass, 0m, l.HourlyRate, 0m, -p.Hours, -p.Cost) { Person = l.PersonName });
         }
 
         return rows.OrderBy(r => r.Phase).ThenBy(r => r.ResourceType).ThenBy(r => r.Seniority).ToList();

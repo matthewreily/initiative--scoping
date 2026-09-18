@@ -165,6 +165,9 @@ public class InitiativeAllocation
     public ResourcingClass ResourcingClass { get; set; }
     public int? VendorId { get; set; }
     public Vendor? Vendor { get; set; }
+    /// <summary>Named roster person filling this allocation; null when it is still a generic (type × seniority) slot.</summary>
+    public int? PersonId { get; set; }
+    public Person? Person { get; set; }
     public int Quantity { get; set; } = 1;
     /// <summary>Staffing level per person over the phase window (100 = full time); fixed-duration initiatives only.</summary>
     public decimal? AllocationPercent { get; set; }
@@ -259,6 +262,8 @@ public class ForecastBaselineLine
     public required string ResourceTypeName { get; set; }
     public required string SeniorityName { get; set; }
     public string? VendorName { get; set; }
+    public int? PersonId { get; set; }
+    public string? PersonName { get; set; }
     public decimal Hours { get; set; }
     public decimal HourlyRate { get; set; }
     public decimal Cost { get; set; }

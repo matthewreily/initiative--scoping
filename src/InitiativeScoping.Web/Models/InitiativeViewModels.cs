@@ -101,6 +101,8 @@ public class AllocationEditModel
     public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
     [Display(Name = "Vendor")]
     public int? VendorId { get; set; }
+    [Display(Name = "Person")]
+    public int? PersonId { get; set; }
     [Required, Range(1, 1000)]
     public int Quantity { get; set; } = 1;
     /// <summary>Entered directly in effort-driven mode; computed from <see cref="AllocationPercent"/> in fixed-duration mode.</summary>
@@ -201,6 +203,9 @@ public sealed record RateOptionsScriptModel(
     AllocationEditModel Current)
 {
     public string VendorSelectId { get; init; } = "VendorId";
+    public string BusinessUnitSelectId { get; init; } = "BusinessUnitId";
+    public string PersonSelectId { get; init; } = "PersonId";
+    public string QuantityInputId { get; init; } = "Quantity";
 }
 
 /// <summary>Global priced combinations per published card, the initiative's participating BUs (for allocation ownership), plus the catalogs needed for the unpriced fallback.</summary>
@@ -212,10 +217,14 @@ public sealed record RateOptionsData(
     IReadOnlyList<NamedId> AllResourceTypes,
     IReadOnlyList<string> AllLocations,
     IReadOnlyList<NamedId> Vendors,
-    IReadOnlyList<NamedId> Seniorities)
+    IReadOnlyList<NamedId> Seniorities,
+    IReadOnlyList<PersonOption> People)
 {
     public bool HasAnyPricing => Cards.Any(c => c.Options.Count > 0);
 }
+
+/// <summary>Roster person selectable on an allocation; the form only offers those matching the chosen dimensions.</summary>
+public sealed record PersonOption(int Id, string Name, int ResourceTypeId, int SeniorityId, int BusinessUnitId, ResourcingClass ResourcingClass, int? VendorId);
 
 public sealed record NamedId(int Id, string Name);
 
@@ -343,7 +352,10 @@ public sealed record BaselineLineRow(
     decimal HourlyRate,
     decimal Cost,
     decimal? HoursDelta,
-    decimal? CostDelta);
+    decimal? CostDelta)
+{
+    public string? Person { get; init; }
+}
 
 public class PortfolioModel
 {
@@ -425,12 +437,19 @@ public static class PortfolioSort
 public class CapacityModel
 {
     public required CapacityHeatmap Heatmap { get; init; }
+    public CapacityView View { get; init; }
     public InitiativeStatus? Status { get; init; }
     public int? BusinessUnitId { get; init; }
     public bool IncludeClosed { get; init; }
     public decimal HoursPerDay { get; init; }
     public required SelectList BusinessUnits { get; init; }
     public required IReadOnlyList<string> Formats { get; init; }
+}
+
+public enum CapacityView
+{
+    ResourceType,
+    People
 }
 
 public class NewScenarioModel
@@ -459,6 +478,7 @@ public class InitiativeOnePagerModel
     public required IReadOnlyList<RollupRow> ByPhase { get; init; }
     public required IReadOnlyList<RollupRow> ByResourceType { get; init; }
     public required IReadOnlyList<RollupRow> ByClass { get; init; }
+    public required IReadOnlyList<RollupRow> ByPerson { get; init; }
     public required VarianceResult Variance { get; init; }
     public required MonthlyPhasing Phasing { get; init; }
     public required DateTimeOffset GeneratedAt { get; init; }

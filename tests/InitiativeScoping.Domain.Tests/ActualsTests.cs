@@ -111,6 +111,35 @@ public class ActualsCostingTests
     }
 }
 
+public class ActualsPersonResolutionTests
+{
+    private static Person P(int id, string name, string? ids = null, bool active = true) => new()
+    {
+        Id = id, DisplayName = name, ExternalIds = ids, ResourceTypeId = 1, BusinessUnitId = 1, SeniorityId = 1, Location = "Onshore", IsActive = active
+    };
+
+    [Fact]
+    public void External_id_match_on_the_roster_wins_over_a_name_on_the_initiative()
+    {
+        var roster = new[] { P(1, "Jane", "PV-1"), P(2, "Jane") };
+
+        Assert.Equal(1, ActualsCosting.ResolvePerson(roster, [roster[1]], "pv-1")!.Id);
+    }
+
+    [Fact]
+    public void Falls_back_to_a_unique_display_name_among_people_named_on_the_initiative()
+    {
+        var jane = P(2, "Jane Doe");
+        var roster = new[] { P(1, "Someone", "PV-1"), jane, P(3, "Jane Doe") };
+
+        Assert.Same(jane, ActualsCosting.ResolvePerson(roster, [jane], " jane doe "));
+        Assert.Null(ActualsCosting.ResolvePerson(roster, [], "Jane Doe"));
+        Assert.Null(ActualsCosting.ResolvePerson(roster, [jane, roster[2]], "Jane Doe"));
+        Assert.Null(ActualsCosting.ResolvePerson(roster, [jane], "Nobody"));
+        Assert.Null(ActualsCosting.ResolvePerson(roster, [jane], null));
+    }
+}
+
 public class VarianceCalculatorTests
 {
     private static readonly Dictionary<int, string> Types = new() { [1] = "Engineer", [2] = "QA" };
@@ -254,5 +283,36 @@ public class VarianceCalculatorTests
         var hot = VarianceCalculator.Calculate(Initiative(threshold: 10m), [Entry(new DateOnly(2026, 3, 5), 100m, 25_000m)], [], Types, asOf: asOf);
         Assert.False(hot.ExceedsThreshold);
         Assert.True(hot.EacExceedsThreshold);
+    }
+
+    [Fact]
+    public void By_person_rows_compare_named_baseline_lines_with_each_persons_actuals()
+    {
+        var initiative = Initiative();
+        var baseline = initiative.CurrentBaseline!;
+        baseline.Lines[0].PersonId = 1;
+        baseline.Lines[0].PersonName = "Jane";
+
+        var jane = new Person { Id = 1, DisplayName = "Jane", ResourceTypeId = 1, Location = "Onshore" };
+        var bob = new Person { Id = 2, DisplayName = "Bob", ResourceTypeId = 2, Location = "Onshore" };
+        var entries = new List<ActualEntry>
+        {
+            Entry(new DateOnly(2026, 3, 2), 8m, 800m),
+            Entry(new DateOnly(2026, 4, 2), 4m, 400m, typeId: 2)
+        };
+        entries[0].Person = jane;
+        entries[1].PersonId = 2;
+        entries[1].Person = bob;
+
+        var result = VarianceCalculator.Calculate(initiative, entries, [], Types, asOf: new DateOnly(2026, 5, 1));
+
+        var rows = result.ByPerson.ToDictionary(r => r.Label);
+        Assert.Equal(["Jane", VarianceCalculator.UnassignedLabel("QA"), "Bob"], result.ByPerson.Select(r => r.Label));
+        Assert.Equal(200m, rows["Jane"].BaselineHours);
+        Assert.Equal(8m, rows["Jane"].ActualHours);
+        Assert.Equal(100m, rows[VarianceCalculator.UnassignedLabel("QA")].BaselineHours);
+        Assert.Equal(0m, rows[VarianceCalculator.UnassignedLabel("QA")].ActualHours);
+        Assert.Equal(0m, rows["Bob"].BaselineHours);
+        Assert.Equal(400m, rows["Bob"].ActualCost);
     }
 }
