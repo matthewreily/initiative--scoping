@@ -87,7 +87,10 @@ public class BudgetCalculatorTests
         baseline.IsCurrent = true;
         initiative.Baselines.Add(baseline);
 
-        // Half-way through the 30-day phase: $7,000 spent, $5,000 of baseline still to come → EAC 12,000 + 1,000 contingency reserve.
+        // Later contingency edits change the live forecast, not the reserve captured on the baseline.
+        initiative.ContingencyPct = 100m;
+
+        // Half-way through the 30-day phase: $7,000 spent, $5,000 of baseline still to come → EAC 12,000 + the baseline's 1,000 reserve.
         var entries = new List<ActualEntry>
         {
             new() { InitiativeId = initiative.Id, ExternalProjectId = "P", SourceReference = "r", WorkDate = new DateOnly(2026, 3, 10), Hours = 70, SourcedCost = 7_000m }
@@ -97,12 +100,33 @@ public class BudgetCalculatorTests
         Assert.True(position.UsesEac);
         Assert.Equal(7_000m, position.Actual);
         Assert.Equal(5_000m, position.Unspent);
-        Assert.Equal(11_000m, position.Forecast);
+        Assert.Equal(20_000m, position.Forecast);
         Assert.Equal(13_000m, position.Eac);
         Assert.Equal(13_000m, position.Expected);
         Assert.Equal(-1_000m, position.Remaining);
         Assert.True(position.OverBudget);
         Assert.Equal(108.3m, position.UtilizationPct);
+    }
+
+    [Fact]
+    public void Recorded_actuals_switch_to_eac_even_when_they_carry_no_cost()
+    {
+        var initiative = Initiative(20_000m, contingencyPct: 10m);
+        var forecast = ForecastCalculator.Calculate(initiative, [Card()]);
+        var baseline = BaselineSnapshot.Create(initiative, forecast, "t", DateTimeOffset.UtcNow, null);
+        baseline.IsCurrent = true;
+        initiative.Baselines.Add(baseline);
+
+        var entries = new List<ActualEntry>
+        {
+            new() { InitiativeId = initiative.Id, ExternalProjectId = "P", SourceReference = "r", WorkDate = new DateOnly(2026, 3, 10), Hours = 40 }
+        };
+        var position = Position(initiative, entries, asOf: new DateOnly(2026, 3, 16));
+
+        Assert.True(position.UsesEac);
+        Assert.Equal(0m, position.Actual);
+        Assert.Equal(6_000m, position.Expected);
+        Assert.Equal(14_000m, position.Remaining);
     }
 
     [Fact]

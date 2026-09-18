@@ -4,7 +4,8 @@ namespace InitiativeScoping.Domain.Services;
 
 /// <summary>
 /// Approved budget against what the initiative is expected to cost. The expected cost is the estimate at completion
-/// (spent + remaining plan) once a baseline exists and actuals are flowing, otherwise the live forecast; contingency is included either way.
+/// (spent + remaining plan + the reserve captured on that baseline) once a baseline exists and actuals have been recorded,
+/// otherwise the live forecast including its contingency.
 /// </summary>
 public sealed record BudgetPosition(decimal? Budget, string? FiscalYear, decimal Forecast, decimal Eac, decimal Actual, bool UsesEac)
 {
@@ -32,8 +33,8 @@ public static class BudgetCalculator
     public static BudgetPosition Calculate(Initiative initiative, ForecastResult forecast, VarianceResult variance)
     {
         var forecastWithContingency = forecast.TotalCostWithContingency;
-        var usesEac = variance.Baseline is not null && variance.ActualCost > 0;
-        var eac = usesEac ? variance.EacCost + forecast.ContingencyCost : forecastWithContingency;
+        var usesEac = variance.Baseline is not null && variance.HasActuals;
+        var eac = usesEac ? variance.EacCost + variance.Baseline!.ContingencyCost : forecastWithContingency;
         return new BudgetPosition(initiative.ApprovedBudget, initiative.BudgetFiscalYear, forecastWithContingency, eac, variance.ActualCost, usesEac);
     }
 }

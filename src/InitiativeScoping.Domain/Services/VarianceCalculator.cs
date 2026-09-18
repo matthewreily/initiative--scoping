@@ -29,11 +29,14 @@ public sealed record VarianceResult(
     decimal AdjustmentHours,
     decimal AdjustmentCost,
     int UnpricedEntries,
+    int ActualRecords,
     IReadOnlyList<VarianceRow> ByPhase,
     IReadOnlyList<VarianceRow> ByResourceType,
     IReadOnlyList<VarianceRow> ByCategory,
     decimal? ThresholdPct)
 {
+    /// <summary>Any mapped actual or adjustment has been recorded, regardless of its hours or cost.</summary>
+    public bool HasActuals => ActualRecords > 0;
     public decimal ActualHours => SourcedHours + AdjustmentHours;
     public decimal ActualCost => SourcedCost + AdjustmentCost;
     public decimal BaselineHours => Baseline?.TotalHours ?? 0m;
@@ -113,6 +116,7 @@ public static class VarianceCalculator
             adjustments.Sum(a => a.Hours),
             adjustments.Sum(a => a.Cost),
             mapped.Count(e => e.EffectiveCost is null),
+            mapped.Count + adjustments.Count,
             byPhase,
             byType,
             byCategory,
