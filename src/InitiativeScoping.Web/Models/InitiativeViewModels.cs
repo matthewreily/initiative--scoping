@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Domain.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace InitiativeScoping.Web.Models;
@@ -353,6 +354,72 @@ public class PortfolioModel
     public required SelectList BusinessUnits { get; init; }
     public bool CanExport { get; init; }
     public required IReadOnlyList<string> Formats { get; init; }
+
+    /// <summary>The initiatives on the current page, in the requested order; totals still come from <see cref="Portfolio"/>.</summary>
+    public required IReadOnlyList<PortfolioRow> PageRows { get; init; }
+    public int Page { get; init; }
+    public int PageSize { get; init; }
+    public string Sort { get; init; } = PortfolioSort.Default;
+    public bool Desc { get; init; }
+
+    private object RouteValues(int page, int size, string? sort = null, bool? desc = null) => new
+    {
+        status = Status, businessUnitId = BusinessUnitId, includeClosed = IncludeClosed ? "true" : null,
+        sort = (sort ?? Sort) == PortfolioSort.Default ? null : sort ?? Sort,
+        dir = (desc ?? Desc) ? "desc" : null,
+        page = page == 1 ? null : (int?)page,
+        size = size == PortfolioSort.DefaultPageSize ? null : (int?)size
+    };
+
+    public PagerModel Pager(IUrlHelper url) =>
+        new(Page, PageSize, Portfolio.Count, (page, size) => url.Action("Index", "Portfolio", RouteValues(page, size))!);
+
+    /// <summary>Link that sorts by <paramref name="key"/>: toggles direction when already sorted by it, resets to page 1.</summary>
+    public string SortUrl(IUrlHelper url, string key) =>
+        url.Action("Index", "Portfolio", RouteValues(1, PageSize, key, key == Sort && !Desc))!;
+
+    public string? AriaSort(string key) => key != Sort ? null : Desc ? "descending" : "ascending";
+    public string SortClass(string key) => key != Sort ? "" : Desc ? "sorted-desc" : "sorted-asc";
+}
+
+/// <summary>Server-side sort keys for the Portfolio table (query string <c>sort</c>).</summary>
+public static class PortfolioSort
+{
+    public const string Default = "bu";
+    public const int DefaultPageSize = 25;
+
+    private static readonly Dictionary<string, Func<PortfolioRow, IComparable?>> Keys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["initiative"] = r => r.Initiative.Name,
+        ["bu"] = r => r.Initiative.BusinessUnit?.Name,
+        ["status"] = r => r.Initiative.Status,
+        ["forecast"] = r => r.ForecastCost,
+        ["contingency"] = r => r.ContingencyCost,
+        ["baseline"] = r => r.HasBaseline ? r.BaselineCost : null,
+        ["actual"] = r => r.ActualCost,
+        ["variance"] = r => r.HasBaseline ? r.CostVariance : null,
+        ["varpct"] = r => r.CostVariancePct,
+        ["eac"] = r => r.HasBaseline ? r.EacCost : null,
+        ["budget"] = r => r.ApprovedBudget,
+        ["remaining"] = r => r.BudgetRemaining,
+        ["burn"] = r => r.BurnPct
+    };
+
+    public static string Normalize(string? sort) =>
+        sort is not null && Keys.ContainsKey(sort) ? sort.ToLowerInvariant() : Default;
+
+    /// <summary>Sorts rows by <paramref name="sort"/>; rows without a value always sink to the bottom, ties fall back to BU then name.</summary>
+    public static IReadOnlyList<PortfolioRow> Apply(IReadOnlyList<PortfolioRow> rows, string sort, bool desc)
+    {
+        var key = Keys[Normalize(sort)];
+        var present = rows.Where(r => key(r) is not null);
+        var ordered = desc ? present.OrderByDescending(r => key(r)) : present.OrderBy(r => key(r));
+        return ordered
+            .ThenBy(r => r.Initiative.BusinessUnit?.Name)
+            .ThenBy(r => r.Initiative.Name)
+            .Concat(rows.Where(r => key(r) is null))
+            .ToList();
+    }
 }
 
 public class CapacityModel

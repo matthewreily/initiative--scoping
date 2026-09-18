@@ -1,4 +1,5 @@
 using InitiativeScoping.Domain.Entities;
+using Microsoft.AspNetCore.Mvc;
 
 namespace InitiativeScoping.Web.Models;
 
@@ -14,5 +15,8 @@ public class AuditIndexModel
     public string? UserId { get; init; }
     public required IReadOnlyList<string> Entities { get; init; }
     public required IReadOnlyList<string> Actions { get; init; }
-    public int PageCount => Math.Max(1, (Total + PageSize - 1) / PageSize);
+    public int PageCount => Paging.PageCount(Total, PageSize);
+
+    public PagerModel Pager(IUrlHelper url) => new(Page, PageSize, Total, (page, size) =>
+        url.Action("Index", "Audit", new { entity = Entity, entityId = EntityId, act = Action, userId = UserId, page, size })!);
 }

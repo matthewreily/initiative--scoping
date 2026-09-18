@@ -90,11 +90,20 @@ public class HardeningTests(WebAppFactory factory) : IClassFixture<WebAppFactory
 
         var client = factory.CreateClient(NoRedirect);
         var stopwatch = Stopwatch.StartNew();
-        var html = await client.GetStringAsync($"/Portfolio?businessUnitId={buId}");
+        var html = await client.GetStringAsync($"/Portfolio?businessUnitId={buId}&size=100");
         stopwatch.Stop();
 
         Assert.Equal(count, Regex.Matches(html, $"Scale {tag} \\d{{3}}").Select(m => m.Value).Distinct().Count());
         Assert.Contains("Over threshold", html);
+
+        // Default page size shows 25 rows but the totals still cover the whole filtered portfolio.
+        var firstPage = await client.GetStringAsync($"/Portfolio?businessUnitId={buId}");
+        Assert.Equal(25, Regex.Matches(firstPage, $"Scale {tag} \\d{{3}}").Select(m => m.Value).Distinct().Count());
+        Assert.Contains($"Total ({count})", firstPage);
+        Assert.Contains($"Showing 1&ndash;25 of {count}", firstPage);
+        var lastPage = await client.GetStringAsync($"/Portfolio?businessUnitId={buId}&page=3");
+        Assert.Equal(count - 50, Regex.Matches(lastPage, $"Scale {tag} \\d{{3}}").Select(m => m.Value).Distinct().Count());
+        Assert.Contains($"Showing 51&ndash;{count} of {count}", lastPage);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10), $"Portfolio took {stopwatch.Elapsed}");
 
         var csv = await client.GetStringAsync("/Portfolio/Export?format=csv");

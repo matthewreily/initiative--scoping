@@ -319,14 +319,20 @@ public class BulkActionsTests(WebAppFactory factory) : IClassFixture<WebAppFacto
     public async Task List_tables_are_sortable_and_portfolio_has_no_bulk_controls()
     {
         var client = factory.CreateClient(NoRedirect);
-        foreach (var path in new[] { "/Initiatives", "/Portfolio", "/Audit", "/Actuals", "/Admin/RateCards", "/Admin/People", "/Admin/Vendors", "/Admin/CostCatalog", "/Admin/WorkCalendar" })
+        foreach (var path in new[] { "/Initiatives", "/Actuals", "/Admin/RateCards", "/Admin/People", "/Admin/Vendors", "/Admin/CostCatalog", "/Admin/WorkCalendar" })
         {
             var html = await client.GetStringAsync(path);
             Assert.Contains("data-sortable", html);
         }
 
+        // Portfolio and Audit are paged by the server: Portfolio sorts via header links, Audit is newest-first.
         var portfolio = await client.GetStringAsync("/Portfolio");
         Assert.DoesNotContain("data-bulk", portfolio);
+        Assert.DoesNotContain("data-sortable", portfolio);
+        Assert.DoesNotContain("data-paginate", portfolio);
+        Assert.Contains("class=\"sort-link\"", portfolio);
+        var audit = await client.GetStringAsync("/Audit");
+        Assert.DoesNotContain("data-sortable", audit);
         var js = await client.GetStringAsync("/js/site.js");
         Assert.Contains("aria-sort", js);
         Assert.Contains("indeterminate", js);
