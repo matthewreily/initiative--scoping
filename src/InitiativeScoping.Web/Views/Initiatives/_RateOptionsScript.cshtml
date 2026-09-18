@@ -116,13 +116,88 @@
                 opt.selected = ok && wanted.some(id => same(id, opt.value));
                 if (opt.selected) { kept++; }
             }
-            const anyEligible = Array.from(person.options).some(o => o.value !== '' && !o.disabled);
-            person.title = anyEligible ? 'Roster people matching this resource type, seniority, business unit and class; one seat each, up to the quantity' : 'No active roster person matches this combination';
             if (quantity) {
                 const qty = parseInt(quantity.value, 10) || 0;
                 if (kept > qty) { quantity.value = String(kept); }
                 quantity.min = String(Math.max(1, kept));
                 quantity.title = kept > 0 ? kept + ' named ' + (kept === 1 ? 'person fills' : 'people fill') + ' seats; quantity cannot go below that' : '';
+            }
+            renderPicker();
+        }
+
+        // People picker over the (hidden) multi-select: type-to-search list of eligible people with checkboxes, and the chosen ones as chips with an Unassign button.
+        const picker = person ? document.createElement('div') : null;
+        const search = picker ? document.createElement('input') : null;
+        const list = picker ? document.createElement('div') : null;
+        const assigned = picker ? document.createElement('div') : null;
+        if (picker) {
+            person.classList.add('d-none');
+            person.setAttribute('aria-hidden', 'true');
+            picker.className = 'people-picker';
+            search.type = 'search';
+            search.className = 'form-control form-control-sm';
+            search.placeholder = 'Search people…';
+            search.autocomplete = 'off';
+            search.setAttribute('aria-label', 'Search people');
+            search.addEventListener('input', renderPicker);
+            list.className = 'people-picker-list list-group list-group-flush border rounded mt-1 overflow-auto';
+            list.style.maxHeight = '9rem';
+            list.setAttribute('role', 'group');
+            list.setAttribute('aria-label', 'Eligible people');
+            assigned.className = 'assigned-people d-flex flex-wrap gap-1 mt-1';
+            assigned.setAttribute('aria-live', 'polite');
+            picker.append(search, list, assigned);
+            person.insertAdjacentElement('afterend', picker);
+        }
+        function renderPicker() {
+            if (!picker) { return; }
+            const q = search.value.trim().toLowerCase();
+            const eligible = Array.from(person.options).filter(o => o.value !== '' && !o.disabled);
+            const shown = eligible.filter(o => q === '' || o.text.toLowerCase().includes(q));
+            list.replaceChildren();
+            for (const opt of shown) {
+                const label = document.createElement('label');
+                label.className = 'list-group-item list-group-item-action py-1 px-2 d-flex align-items-center gap-2 small';
+                const box = document.createElement('input');
+                box.type = 'checkbox';
+                box.className = 'form-check-input m-0';
+                box.checked = opt.selected;
+                box.setAttribute('aria-label', opt.text);
+                box.addEventListener('change', () => { opt.selected = box.checked; syncPeople(false); });
+                label.append(box, opt.text);
+                list.append(label);
+            }
+            if (shown.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'list-group-item text-muted small py-1 px-2';
+                empty.textContent = eligible.length === 0 ? 'No active roster person matches this resource type, seniority, business unit and class' : 'No people match "' + search.value.trim() + '"';
+                list.append(empty);
+            }
+            search.disabled = eligible.length === 0;
+            search.placeholder = eligible.length === 0 ? 'No eligible people' : 'Search ' + eligible.length + ' eligible ' + (eligible.length === 1 ? 'person' : 'people') + '…';
+            assigned.replaceChildren();
+            const selected = Array.from(person.selectedOptions).filter(o => o.value !== '');
+            for (const opt of selected) {
+                const chip = document.createElement('span');
+                chip.className = 'badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 fw-normal';
+                chip.append(opt.text);
+                const x = document.createElement('button');
+                x.type = 'button';
+                x.className = 'btn-close';
+                x.style.fontSize = '0.55em';
+                x.title = 'Unassign ' + opt.text;
+                x.setAttribute('aria-label', 'Unassign ' + opt.text);
+                x.addEventListener('click', () => { opt.selected = false; syncPeople(false); });
+                chip.append(x);
+                assigned.append(chip);
+            }
+            if (selected.length > 1) {
+                const all = document.createElement('button');
+                all.type = 'button';
+                all.className = 'btn btn-link btn-sm p-0 align-self-center';
+                all.textContent = 'Unassign all';
+                all.addEventListener('click', () => { for (const o of person.options) { o.selected = false; } syncPeople(false); });
+                assigned.append(all);
             }
         }
 
