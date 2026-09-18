@@ -19,12 +19,22 @@ namespace InitiativeScoping.Web.Controllers;
 public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<IExportWriter> writers, IConfiguration config) : Controller
 {
     [HttpGet("Portfolio")]
-    public async Task<IActionResult> Index(InitiativeStatus? status, int? businessUnitId, bool includeClosed, CancellationToken ct)
+    public async Task<IActionResult> Index(InitiativeStatus? status, int? businessUnitId, bool includeClosed, string? sort, string? dir, int page = 1, int? size = null, CancellationToken ct = default)
     {
         var portfolio = await db.LoadPortfolioAsync(new PortfolioFilter(status, businessUnitId, includeClosed), DefaultThreshold, ct);
+        var sortKey = PortfolioSort.Normalize(sort);
+        var desc = string.Equals(dir, "desc", StringComparison.OrdinalIgnoreCase);
+        var pageSize = Paging.NormalizeSize(size, PortfolioSort.DefaultPageSize);
+        page = Paging.ClampPage(page, portfolio.Count, pageSize);
+        var pageRows = PortfolioSort.Apply(portfolio.Rows, sortKey, desc).Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return View(new PortfolioModel
         {
             Portfolio = portfolio,
+            PageRows = pageRows,
+            Page = page,
+            PageSize = pageSize,
+            Sort = sortKey,
+            Desc = desc,
             Status = status,
             BusinessUnitId = businessUnitId,
             IncludeClosed = includeClosed,

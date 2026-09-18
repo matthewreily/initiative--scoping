@@ -90,11 +90,11 @@ else
 {
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between">
-            <span>Forecast vs. baseline vs. actual</span>
+            <span>Forecast vs. baseline vs. actual <span class="text-muted small fw-normal">(initiatives on this page)</span></span>
             <span class="small text-muted"><span class="badge bg-secondary">&nbsp;</span> forecast &nbsp; <span class="badge bg-primary">&nbsp;</span> baseline &nbsp; <span class="badge bg-success">&nbsp;</span> actual</span>
         </div>
         <div class="card-body">
-            @foreach (var r in p.Rows)
+            @foreach (var r in Model.PageRows)
             {
                 <div class="row align-items-center mb-2">
                     <div class="col-md-3 text-truncate"><a asp-controller="Initiatives" asp-action="Details" asp-route-id="@r.Initiative.Id">@r.Initiative.Name</a> <span class="text-muted small">@r.Initiative.BusinessUnit?.Name</span></div>
@@ -109,14 +109,27 @@ else
     </div>
 
     <div class="table-responsive">
-    <table data-sortable data-columns data-paginate="25" class="table table-sm align-middle">
+    <table data-columns class="table table-sm align-middle" id="portfolio-table">
         <thead>
         <tr>
-            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast<help for="forecast-cost" /></th><th class="text-end d-none d-xl-table-cell">Contingency<help for="contingency" /></th><th class="text-end">Baseline<help for="baseline" /></th><th class="text-end">Actual<help for="actual" /></th><th class="text-end">Variance<help for="variance" /></th><th class="text-end">Var %</th><th class="text-end">EAC<help for="eac" /></th><th class="text-end">Budget<help for="budget" /></th><th class="text-end">Remaining<help for="remaining" /></th><th style="min-width: 110px">Burn<help for="burn" /></th><th>Flags<help for="flags" /></th>
+            <th class="@Model.SortClass("initiative")" aria-sort="@Model.AriaSort("initiative")"><a class="sort-link" href="@Model.SortUrl(Url, "initiative")">Initiative</a></th>
+            <th class="d-none d-md-table-cell @Model.SortClass("bu")" aria-sort="@Model.AriaSort("bu")"><a class="sort-link" href="@Model.SortUrl(Url, "bu")">Business unit</a></th>
+            <th class="d-none d-md-table-cell @Model.SortClass("status")" aria-sort="@Model.AriaSort("status")"><a class="sort-link" href="@Model.SortUrl(Url, "status")">Status</a></th>
+            <th class="text-end d-none d-lg-table-cell @Model.SortClass("forecast")" aria-sort="@Model.AriaSort("forecast")"><a class="sort-link" href="@Model.SortUrl(Url, "forecast")">Forecast</a><help for="forecast-cost" /></th>
+            <th class="text-end d-none d-xl-table-cell @Model.SortClass("contingency")" aria-sort="@Model.AriaSort("contingency")"><a class="sort-link" href="@Model.SortUrl(Url, "contingency")">Contingency</a><help for="contingency" /></th>
+            <th class="text-end @Model.SortClass("baseline")" aria-sort="@Model.AriaSort("baseline")"><a class="sort-link" href="@Model.SortUrl(Url, "baseline")">Baseline</a><help for="baseline" /></th>
+            <th class="text-end @Model.SortClass("actual")" aria-sort="@Model.AriaSort("actual")"><a class="sort-link" href="@Model.SortUrl(Url, "actual")">Actual</a><help for="actual" /></th>
+            <th class="text-end @Model.SortClass("variance")" aria-sort="@Model.AriaSort("variance")"><a class="sort-link" href="@Model.SortUrl(Url, "variance")">Variance</a><help for="variance" /></th>
+            <th class="text-end @Model.SortClass("varpct")" aria-sort="@Model.AriaSort("varpct")"><a class="sort-link" href="@Model.SortUrl(Url, "varpct")">Var %</a></th>
+            <th class="text-end @Model.SortClass("eac")" aria-sort="@Model.AriaSort("eac")"><a class="sort-link" href="@Model.SortUrl(Url, "eac")">EAC</a><help for="eac" /></th>
+            <th class="text-end @Model.SortClass("budget")" aria-sort="@Model.AriaSort("budget")"><a class="sort-link" href="@Model.SortUrl(Url, "budget")">Budget</a><help for="budget" /></th>
+            <th class="text-end @Model.SortClass("remaining")" aria-sort="@Model.AriaSort("remaining")"><a class="sort-link" href="@Model.SortUrl(Url, "remaining")">Remaining</a><help for="remaining" /></th>
+            <th style="min-width: 110px" class="@Model.SortClass("burn")" aria-sort="@Model.AriaSort("burn")"><a class="sort-link" href="@Model.SortUrl(Url, "burn")">Burn</a><help for="burn" /></th>
+            <th>Flags<help for="flags" /></th>
         </tr>
         </thead>
         <tbody>
-        @foreach (var r in p.Rows)
+        @foreach (var r in Model.PageRows)
         {
             var i = r.Initiative;
             <tr class="@(r.ExceedsThreshold || r.OverBudget ? "table-danger" : "")">
@@ -184,6 +197,7 @@ else
         </tfoot>
     </table>
     </div>
+    <partial name="_Pager" model="Model.Pager(Url)" />
 
     <div class="card mb-4" id="by-month">
         <div class="card-header d-flex justify-content-between align-items-center">

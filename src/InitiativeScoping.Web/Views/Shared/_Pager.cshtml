@@ -1,0 +1,35 @@
+@model PagerModel
+@if (Model.Total > 0)
+{
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-pager>
+        <div class="small text-muted">Showing @Model.First&ndash;@Model.Last of @Model.Total</div>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            @if (Model.PageCount > 1)
+            {
+                <nav aria-label="Pages">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item @(Model.Page == 1 ? "disabled" : "")"><a class="page-link" href="@Model.Url(Model.Page - 1, Model.PageSize)" aria-label="Previous page" rel="prev">&lsaquo;</a></li>
+                        @foreach (var p in Paging.Window(Model.Page, Model.PageCount))
+                        {
+                            if (p is null)
+                            {
+                                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                            }
+                            else
+                            {
+                                <li class="page-item @(p == Model.Page ? "active" : "")" aria-current="@(p == Model.Page ? "page" : null)"><a class="page-link" href="@Model.Url(p.Value, Model.PageSize)">@p</a></li>
+                            }
+                        }
+                        <li class="page-item @(Model.Page == Model.PageCount ? "disabled" : "")"><a class="page-link" href="@Model.Url(Model.Page + 1, Model.PageSize)" aria-label="Next page" rel="next">&rsaquo;</a></li>
+                    </ul>
+                </nav>
+            }
+            <div class="btn-group btn-group-sm" role="group" aria-label="Rows per page">
+                @foreach (var s in Paging.Sizes)
+                {
+                    <a class="btn btn-outline-secondary @(s == Model.PageSize ? "active" : "")" aria-pressed="@(s == Model.PageSize ? "true" : "false")" href="@Model.Url(1, s)">@s</a>
+                }
+            </div>
+        </div>
+    </div>
+}
