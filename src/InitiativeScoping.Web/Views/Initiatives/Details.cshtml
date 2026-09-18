@@ -2,6 +2,7 @@
 @{
     var i = Model.Initiative;
     ViewData["Title"] = i.Name;
+    ViewData["Tour"] = "details";
     var classes = Html.GetEnumSelectList<ResourcingClass>();
     var roles = Html.GetEnumSelectList<InitiativeMemberRole>();
     var nonLaborCategories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString()).ToList();
@@ -239,30 +240,30 @@ else
     </form>
 }
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast hours</div><div class="fs-3">@Model.Forecast.TotalHours.ToString("N1")</div></div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3"><a asp-action="Explain" asp-route-id="@i.Id" asp-fragment="total" class="explain-link" title="Why this number?">@Model.Forecast.TotalCost.ToString("C0")</a></div>
+<div class="row g-3 mb-4" data-tour="details:1" data-tour-title="Forecast" data-tour-text="These tiles recompute live from phases, allocations and rate cards. Hover any ? for the definition; click a cost to see exactly how it was calculated.">
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast hours<help for="forecast-hours" /></div><div class="fs-3">@Model.Forecast.TotalHours.ToString("N1")</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Forecast cost<help for="forecast-cost" /></div><div class="fs-3"><a asp-action="Explain" asp-route-id="@i.Id" asp-fragment="total" class="explain-link" title="Why this number?">@Model.Forecast.TotalCost.ToString("C0")</a></div>
         @if (Model.Forecast.NonLaborLines.Count > 0) { <div class="small text-muted" id="forecast-cost-split">Labor @Model.Forecast.LaborCost.ToString("C0") &middot; Non-labor @Model.Forecast.NonLaborCost.ToString("C0")</div> }
         @if (!Model.Forecast.IsComplete) { <span class="badge bg-warning text-dark">Incomplete – unpriced lines</span> }</div></div></div>
     @if (Model.Forecast.ContingencyPct > 0)
     {
-        <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">With contingency</div><div class="fs-3" id="forecast-with-contingency">@Model.Forecast.TotalCostWithContingency.ToString("C0")</div><div class="small text-muted">+@Model.Forecast.ContingencyCost.ToString("C0") reserve (@Model.Forecast.ContingencyPct.ToString("0.##")%)</div></div></div></div>
+        <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">With contingency<help for="with-contingency" /></div><div class="fs-3" id="forecast-with-contingency">@Model.Forecast.TotalCostWithContingency.ToString("C0")</div><div class="small text-muted">+@Model.Forecast.ContingencyCost.ToString("C0") reserve (@Model.Forecast.ContingencyPct.ToString("0.##")%)</div></div></div></div>
     }
     @if (Model.Budget.HasBudget)
     {
         var budget = Model.Budget;
         var remaining = budget.Remaining!.Value;
         <div class="col-md-3"><div class="card @(budget.OverBudget ? "border-danger" : budget.NearBudget ? "border-warning" : "")" id="budget-card"><div class="card-body">
-            <div class="text-muted small">Approved budget@(string.IsNullOrEmpty(budget.FiscalYear) ? "" : $" · {budget.FiscalYear}")</div>
+            <div class="text-muted small">Approved budget@(string.IsNullOrEmpty(budget.FiscalYear) ? "" : $" · {budget.FiscalYear}")<help for="budget" /></div>
             <div class="fs-3" id="approved-budget">@budget.Budget!.Value.ToString("C0")</div>
             <div class="small">
-                <span class="@(budget.OverBudget ? "text-danger fw-semibold" : "text-muted")" id="budget-remaining" title="Budget minus @(budget.UsesEac ? "estimate at completion" : "forecast incl. contingency")">@(remaining < 0 ? "−" : "")@Math.Abs(remaining).ToString("C0") @(remaining < 0 ? "over budget" : "remaining")</span>
+                <span class="@(budget.OverBudget ? "text-danger fw-semibold" : "text-muted")" id="budget-remaining" title="Budget minus @(budget.UsesEac ? "estimate at completion" : "forecast incl. contingency")">@(remaining < 0 ? "−" : "")@Math.Abs(remaining).ToString("C0") @(remaining < 0 ? "over budget" : "remaining")</span><help for="remaining" />
                 @if (budget.UtilizationPct is not null) { <span class="text-muted"> &middot; @budget.UtilizationPct.Value.ToString("0.#")% of budget</span> }
             </div>
             @if (budget.OverBudget) { <span class="badge text-bg-danger">Over budget</span> } else if (budget.NearBudget) { <span class="badge text-bg-warning">Near budget</span> }
         </div></div></div>
         <div class="col-md-3"><div class="card"><div class="card-body">
-            <div class="text-muted small">@(budget.UsesEac ? "Estimate at completion" : "Expected at completion")</div>
+            <div class="text-muted small">@(budget.UsesEac ? "Estimate at completion" : "Expected at completion")<help for="@(budget.UsesEac ? "eac" : "with-contingency")" /></div>
             <div class="fs-3" id="budget-eac">@budget.Expected.ToString("C0")</div>
             <div class="small text-muted">@(budget.UsesEac ? $"Spent {budget.Actual:C0} + remaining plan" : "Live forecast")@(Model.Forecast.ContingencyPct > 0 ? " incl. contingency" : "")</div>
         </div></div></div>
@@ -290,7 +291,7 @@ else
     };
 }
 <div class="details-sticky" id="details-sticky">
-    <ul class="nav nav-tabs" role="tablist" id="details-tabs" data-tab-memory="initiative-@i.Id">
+    <ul class="nav nav-tabs" role="tablist" id="details-tabs" data-tab-memory="initiative-@i.Id" data-tour="details:2" data-tour-title="Tabs" data-tour-text="Plan holds phases and allocations; Costs has non-labor lines, rollups and cost by month; Team, Actuals, History (baselines) and Notes follow. Your last tab is remembered.">
         @foreach (var (key, label, count) in tabList)
         {
             <li class="nav-item" role="presentation">
@@ -320,7 +321,7 @@ else
     <div class="tab-pane fade show active" id="pane-plan" role="tabpanel" aria-labelledby="tab-plan">
         <div class="row g-4">
             <div class="col-12">
-        <h2 class="h5">Phases</h2>
+        <h2 class="h5" data-tour="details:3" data-tour-title="Phases" data-tour-text="Add phases with dates (or let fixed-duration mode tile them). Working days come from the admin calendar and drive hours in fixed-duration mode.">Phases</h2>
         @if (fd is not null)
         {
             <div class="alert alert-info py-2 small mb-3" role="status" id="fixed-duration-summary">
@@ -401,7 +402,7 @@ else
             </form>
         }
 
-        <h2 class="h5">Allocations</h2>
+        <h2 class="h5" data-tour="details:4" data-tour-title="Allocations" data-tour-text="Each row is a resource type × seniority × business unit on a phase. Only combinations priced on a published rate card can be chosen, so every line gets a rate. Apply a T-shirt size to fill this from a template.">Allocations</h2>
         <div class="table-responsive table-scroll" id="allocations-table">
         <table class="table table-sm align-middle" data-sortable>
             <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
@@ -861,14 +862,14 @@ else
         <div class="table-responsive">
         <table class="table table-sm">
             <tbody>
-            <tr><th>Baseline @(v.Baseline is null ? "" : $"v{v.Baseline.Version}")</th><td class="text-end">@v.BaselineHours.ToString("N1") h</td><td class="text-end">@v.BaselineCost.ToString("C0")</td></tr>
-            <tr><th>Actual to date</th><td class="text-end">@v.ActualHours.ToString("N1") h</td><td class="text-end">@v.ActualCost.ToString("C0")</td></tr>
+            <tr><th>Baseline @(v.Baseline is null ? "" : $"v{v.Baseline.Version}")<help for="baseline" /></th><td class="text-end">@v.BaselineHours.ToString("N1") h</td><td class="text-end">@v.BaselineCost.ToString("C0")</td></tr>
+            <tr><th>Actual to date<help for="actual" /></th><td class="text-end">@v.ActualHours.ToString("N1") h</td><td class="text-end">@v.ActualCost.ToString("C0")</td></tr>
             <tr class="@(v.ExceedsThreshold ? "table-danger" : "")">
-                <th>Variance</th>
+                <th>Variance<help for="variance" /></th>
                 <td class="text-end">@((v.HoursVariance >= 0 ? "+" : "") + v.HoursVariance.ToString("N1")) h</td>
                 <td class="text-end">@((v.CostVariance >= 0 ? "+" : "") + v.CostVariance.ToString("C0")) @(v.CostVariancePct is null ? "" : $"({(v.CostVariancePct >= 0 ? "+" : "")}{v.CostVariancePct}%)")</td>
             </tr>
-            <tr><th>Estimate at completion <span class="text-muted fw-normal small">(actual + ETC @v.EtcCost.ToString("C0"))</span></th><td class="text-end">@v.EacHours.ToString("N1") h</td><td class="text-end">@v.EacCost.ToString("C0")</td></tr>
+            <tr><th>Estimate at completion <span class="text-muted fw-normal small">(actual + ETC @v.EtcCost.ToString("C0"))</span><help for="eac" /></th><td class="text-end">@v.EacHours.ToString("N1") h</td><td class="text-end">@v.EacCost.ToString("C0")</td></tr>
             <tr class="@(v.EacExceedsThreshold ? "table-danger" : "")">
                 <th>Projected variance</th>
                 <td class="text-end">@((v.EacHours - v.BaselineHours >= 0 ? "+" : "") + (v.EacHours - v.BaselineHours).ToString("N1")) h</td>

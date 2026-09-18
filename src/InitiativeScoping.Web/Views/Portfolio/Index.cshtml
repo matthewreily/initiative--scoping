@@ -48,10 +48,10 @@
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Initiatives</div><div class="fs-3">@p.Count</div><div class="small text-muted">@p.Baselined baselined</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost</div><div class="fs-3" title="@p.ForecastCost.ToString("C0")">@Money.Compact(p.ForecastCost)</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Forecast cost<help for="forecast-cost" /></div><div class="fs-3" title="@p.ForecastCost.ToString("C0")">@Money.Compact(p.ForecastCost)</div><div class="small text-muted">@p.ForecastHours.ToString("N0") h</div>
         @if (p.ContingencyCost > 0) { <div class="small text-muted" id="portfolio-contingency" title="@p.ForecastCostWithContingency.ToString("C0")">@Money.Compact(p.ForecastCostWithContingency) incl. @Money.Compact(p.ContingencyCost) contingency</div> }
         @if (p.LowConfidence > 0) { <div class="small text-danger">@p.LowConfidence low-confidence</div> }</div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor / Non-labor</div><div class="fs-6" title="@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0") / @p.NonLaborForecastCost.ToString("C0")">@Money.Compact(p.InternalForecastCost) / @Money.Compact(p.VendorForecastCost) / @Money.Compact(p.NonLaborForecastCost)</div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Internal / Vendor / Non-labor<help for="internal-vendor" /></div><div class="fs-6" title="@p.InternalForecastCost.ToString("C0") / @p.VendorForecastCost.ToString("C0") / @p.NonLaborForecastCost.ToString("C0")">@Money.Compact(p.InternalForecastCost) / @Money.Compact(p.VendorForecastCost) / @Money.Compact(p.NonLaborForecastCost)</div>
         @if (p.ForecastCost > 0)
         {
             var internalPct = Math.Round(p.InternalForecastCost / p.ForecastCost * 100m);
@@ -59,9 +59,9 @@
             <div class="progress mt-1" style="height: 6px" title="Internal @internalPct% · Vendor @vendorPct% · Non-labor @(100 - internalPct - vendorPct)%"><div class="progress-bar bg-primary" style="width: @internalPct%"></div><div class="progress-bar bg-info" style="width: @vendorPct%"></div><div class="progress-bar bg-warning" style="width: @(100 - internalPct - vendorPct)%"></div></div>
         }
     </div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Baseline cost</div><div class="fs-3" title="@p.BaselineCost.ToString("C0")">@Money.Compact(p.BaselineCost)</div><div class="small text-muted">@p.BaselineHours.ToString("N0") h</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Actual cost to date</div><div class="fs-3" title="@p.ActualCost.ToString("C0")">@Money.Compact(p.ActualCost)</div><div class="small text-muted">@p.ActualHours.ToString("N0") h</div></div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100 @(p.OverBudget > 0 ? "border-danger" : "")" id="portfolio-budget"><div class="card-body"><div class="text-muted small">Approved budget</div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Baseline cost<help for="baseline" /></div><div class="fs-3" title="@p.BaselineCost.ToString("C0")">@Money.Compact(p.BaselineCost)</div><div class="small text-muted">@p.BaselineHours.ToString("N0") h</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body"><div class="text-muted small">Actual cost to date<help for="actual" /></div><div class="fs-3" title="@p.ActualCost.ToString("C0")">@Money.Compact(p.ActualCost)</div><div class="small text-muted">@p.ActualHours.ToString("N0") h</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100 @(p.OverBudget > 0 ? "border-danger" : "")" id="portfolio-budget"><div class="card-body"><div class="text-muted small">Approved budget<help for="budget" /></div>
         @if (p.Budgeted == 0)
         {
             <div class="fs-3 text-muted">—</div><div class="small text-muted">No budgets recorded</div>
@@ -74,7 +74,7 @@
             </div>
         }
     </div></div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100 @(p.OverThreshold > 0 ? "border-danger" : "")"><div class="card-body"><div class="text-muted small">Variance vs. baseline</div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100 @(p.OverThreshold > 0 ? "border-danger" : "")"><div class="card-body"><div class="text-muted small">Variance vs. baseline<help for="variance" /></div>
         <div class="fs-3 @VarianceClass(p.CostVariancePct, false)" title="@Signed(p.CostVariance, "C0")">@(p.CostVariance > 0 ? "+" : "")@Money.Compact(p.CostVariance)</div>
         <div class="small">@(p.CostVariancePct is null ? "n/a" : Signed(p.CostVariancePct.Value, "N1") + "%")
             @if (p.OverThreshold > 0) { <span class="badge bg-danger ms-1">@p.OverThreshold over threshold</span> }
@@ -112,7 +112,7 @@ else
     <table data-sortable data-columns data-paginate="25" class="table table-sm align-middle">
         <thead>
         <tr>
-            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast</th><th class="text-end d-none d-xl-table-cell">Contingency</th><th class="text-end">Baseline</th><th class="text-end">Actual</th><th class="text-end">Variance</th><th class="text-end">Var %</th><th class="text-end">EAC</th><th class="text-end">Budget</th><th class="text-end">Remaining</th><th style="min-width: 110px">Burn</th><th>Flags</th>
+            <th>Initiative</th><th class="d-none d-md-table-cell">Business unit</th><th class="d-none d-md-table-cell">Status</th><th class="text-end d-none d-lg-table-cell">Forecast<help for="forecast-cost" /></th><th class="text-end d-none d-xl-table-cell">Contingency<help for="contingency" /></th><th class="text-end">Baseline<help for="baseline" /></th><th class="text-end">Actual<help for="actual" /></th><th class="text-end">Variance<help for="variance" /></th><th class="text-end">Var %</th><th class="text-end">EAC<help for="eac" /></th><th class="text-end">Budget<help for="budget" /></th><th class="text-end">Remaining<help for="remaining" /></th><th style="min-width: 110px">Burn<help for="burn" /></th><th>Flags<help for="flags" /></th>
         </tr>
         </thead>
         <tbody>

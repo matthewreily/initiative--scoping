@@ -26,7 +26,13 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     ...devices['Desktop Chrome'],
-    viewport: { width: 1366, height: 900 }
+    viewport: { width: 1366, height: 900 },
+    // Guided tours auto-start once per browser; mark them seen so they never cover the page mid-test.
+    // help.spec.ts opens its own fresh context to test the first-run behaviour.
+    storageState: {
+      cookies: [],
+      origins: [{ origin: baseURL, localStorage: ['welcome', 'details'].map(t => ({ name: `is-tour-seen:${t}`, value: '1' })) }]
+    }
   },
   webServer: process.env.E2E_BASE_URL
     ? undefined
