@@ -41,9 +41,9 @@
             <span asp-validation-for="Location" class="text-danger"></span>
         </div>
         <div class="col-md-4 mb-3">
-            <label asp-for="ResourcingClass" class="form-label"></label>
-            <select asp-for="ResourcingClass" asp-items="Html.GetEnumSelectList<ResourcingClass>()" class="form-select"></select>
-            <span asp-validation-for="ResourcingClass" class="text-danger"></span>
+            <label asp-for="ResourcingClassId" class="form-label"></label>
+            <select asp-for="ResourcingClassId" asp-items="@((SelectList)ViewBag.ResourcingClasses)" class="form-select"></select>
+            <span asp-validation-for="ResourcingClassId" class="text-danger"></span>
         </div>
         <div class="col-md-4 mb-3" id="vendor-wrap" hidden>
             <label asp-for="VendorId" class="form-label"></label>
@@ -62,8 +62,9 @@
     <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
     <script>
         (function () {
-            const cls = document.getElementById('ResourcingClass'), wrap = document.getElementById('vendor-wrap'), vendor = document.getElementById('VendorId');
-            function sync() { const v = cls.value === '@((int)ResourcingClass.Vendor)' || cls.value === '@ResourcingClass.Vendor'; wrap.hidden = !v; vendor.disabled = !v; }
+            const cls = document.getElementById('ResourcingClassId'), wrap = document.getElementById('vendor-wrap'), vendor = document.getElementById('VendorId');
+            const vendorClasses = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(((List<int>)ViewBag.VendorClassIds).Select(id => id.ToString())));
+            function sync() { const v = vendorClasses.includes(cls.value); wrap.hidden = !v; vendor.disabled = !v; }
             cls.addEventListener('change', sync);
             sync();
         })();

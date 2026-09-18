@@ -363,7 +363,7 @@ public class NonLaborCostTests(WebAppFactory factory) : IClassFixture<WebAppFact
         var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);
         return (phaseId, typeId);

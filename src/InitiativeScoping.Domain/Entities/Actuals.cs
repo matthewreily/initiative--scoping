@@ -14,7 +14,8 @@ public class Person
     public int SeniorityId { get; set; }
     public SeniorityLevel? Seniority { get; set; }
     public required string Location { get; set; }
-    public ResourcingClass ResourcingClass { get; set; }
+    public int ResourcingClassId { get; set; }
+    public ResourcingClass? ResourcingClass { get; set; }
     public int? VendorId { get; set; }
     public Vendor? Vendor { get; set; }
     public int BusinessUnitId { get; set; }

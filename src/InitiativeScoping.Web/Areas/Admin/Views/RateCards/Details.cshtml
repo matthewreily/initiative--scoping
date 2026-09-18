@@ -53,10 +53,8 @@ else if (card.Status == RateCardStatus.Retired)
             </div>
             <div class="col-auto">
                 <label class="form-label small mb-0" for="filter-class">Class</label>
-                <select id="filter-class" name="resourcingClass" class="form-select form-select-sm" onchange="this.form.submit()">
+                <select id="filter-class" name="resourcingClassId" class="form-select form-select-sm" asp-items="Model.FilterResourcingClasses" onchange="this.form.submit()">
                     <option value="">All</option>
-                    <option value="@ResourcingClass.InternalFte" selected="@(Model.FilterResourcingClass == ResourcingClass.InternalFte)">Internal</option>
-                    <option value="@ResourcingClass.Vendor" selected="@(Model.FilterResourcingClass == ResourcingClass.Vendor)">Vendor</option>
                 </select>
             </div>
             <div class="col-auto">
@@ -65,7 +63,7 @@ else if (card.Status == RateCardStatus.Retired)
                     <option value="">All</option>
                 </select>
             </div>
-            @if (Model.FilterResourceType is not null || Model.FilterVendorId is not null || Model.FilterResourcingClass is not null)
+            @if (Model.FilterResourceType is not null || Model.FilterVendorId is not null || Model.FilterResourcingClassId is not null)
             {
                 <div class="col-auto">
                     <a asp-action="Details" asp-route-id="@card.Id" class="btn btn-link btn-sm">Clear</a>
@@ -95,8 +93,8 @@ else if (card.Status == RateCardStatus.Retired)
                     <td>@e.ResourceType!.Name</td>
                     <td data-sort="@e.Seniority!.SortOrder">@e.Seniority.Name</td>
                     <td>@e.Location</td>
-                    <td>@(e.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : "Vendor")</td>
-                    <td>@(e.ResourcingClass == ResourcingClass.Vendor ? e.Vendor?.Name ?? "(any vendor)" : "—")</td>
+                    <td>@(e.ResourcingClass?.Name ?? "—")</td>
+                    <td>@(e.ResourcingClass?.IsVendor == true ? e.Vendor?.Name ?? "(any vendor)" : "—")</td>
                     <td class="text-end" data-sort="@e.HourlyRate">
                         @if (Model.IsEditable)
                         {
@@ -157,11 +155,8 @@ else if (card.Status == RateCardStatus.Retired)
                                 <select asp-for="NewEntry.SeniorityId" asp-items="Model.Seniorities" class="form-select form-select-sm" name="SeniorityId"></select>
                             </div>
                             <div class="col">
-                                <label asp-for="NewEntry.ResourcingClass" class="form-label small"></label>
-                                <select asp-for="NewEntry.ResourcingClass" class="form-select form-select-sm" name="ResourcingClass" id="entry-class">
-                                    <option value="@ResourcingClass.InternalFte">Internal</option>
-                                    <option value="@ResourcingClass.Vendor">Vendor</option>
-                                </select>
+                                <label asp-for="NewEntry.ResourcingClassId" class="form-label small"></label>
+                                <select asp-for="NewEntry.ResourcingClassId" asp-items="Model.ResourcingClasses" class="form-select form-select-sm" name="ResourcingClassId" id="entry-class"></select>
                             </div>
                         </div>
                         <div class="mb-2" id="entry-vendor-wrap" hidden>
@@ -185,7 +180,8 @@ else if (card.Status == RateCardStatus.Retired)
                     <script>
                         (function () {
                             const cls = document.getElementById('entry-class'), wrap = document.getElementById('entry-vendor-wrap'), vendor = wrap.querySelector('select');
-                            function sync() { const v = cls.value === '@ResourcingClass.Vendor'; wrap.hidden = !v; vendor.disabled = !v; }
+                            const vendorClasses = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.VendorClassIds.Select(id => id.ToString())));
+                            function sync() { const v = vendorClasses.includes(cls.value); wrap.hidden = !v; vendor.disabled = !v; }
                             cls.addEventListener('change', sync);
                             sync();
                         })();
@@ -207,7 +203,7 @@ else if (card.Status == RateCardStatus.Retired)
                         <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
                         <a asp-action="Template" class="btn btn-link btn-sm">Download template</a>
                     </form>
-                    <p class="text-muted small mt-2 mb-0">Columns: ResourceType, Seniority (any name; new names are added to Admin → Seniority), Location, ResourcingClass (Internal/Vendor), HourlyRate, Vendor (optional; names a catalog vendor for Vendor rows, blank = generic vendor rate). Rates apply to every business unit; a legacy BusinessUnit column is ignored. The whole file is rejected if any row is invalid.</p>
+                    <p class="text-muted small mt-2 mb-0">Columns: ResourceType, Seniority (any name; new names are added to Admin → Seniority), Location, ResourcingClass (a name from Admin → Resourcing classes, e.g. Internal or Vendor; the legacy "InternalFte" is accepted), HourlyRate, Vendor (optional; names a catalog vendor for vendor-backed rows, blank = generic vendor rate). Rates apply to every business unit; a legacy BusinessUnit column is ignored. The whole file is rejected if any row is invalid.</p>
                 </div>
             </div>
         </div>

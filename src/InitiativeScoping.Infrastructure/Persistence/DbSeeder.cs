@@ -17,8 +17,21 @@ public static class DbSeeder
     /// <summary>Default career ladder; the Seniority migration inserts the same rows (ids 1-5) into existing databases.</summary>
     public static readonly string[] DefaultSeniorityLevels = ["Associate", "Mid", "Senior", "Staff", "Principal"];
 
+    /// <summary>Default resourcing classes; the ResourcingClasses migration inserts the same rows (ids 1-2) into existing databases.</summary>
+    public static IEnumerable<ResourcingClass> DefaultResourcingClasses() =>
+    [
+        new() { Name = ResourcingClass.InternalName, IsVendor = false, DefaultCapexPercent = 70, SortOrder = 1 },
+        new() { Name = ResourcingClass.VendorName, IsVendor = true, DefaultCapexPercent = 100, SortOrder = 2 }
+    ];
+
     public static async Task SeedAsync(AppDbContext db, CancellationToken ct = default)
     {
+        if (!await db.ResourcingClasses.AnyAsync(ct))
+        {
+            db.ResourcingClasses.AddRange(DefaultResourcingClasses());
+            await db.SaveChangesAsync(ct);
+        }
+
         if (!await db.SeniorityLevels.AnyAsync(ct))
         {
             db.SeniorityLevels.AddRange(DefaultSeniorityLevels.Select((n, i) => new SeniorityLevel { Name = n, SortOrder = i + 1 }));
@@ -32,6 +45,8 @@ public static class DbSeeder
         }
 
         var levels = await db.SeniorityLevels.OrderBy(s => s.SortOrder).ToListAsync(ct);
+        var internalClass = await db.ResourcingClasses.FirstAsync(c => !c.IsVendor, ct);
+        var vendorClass = await db.ResourcingClasses.FirstAsync(c => c.IsVendor, ct);
         var mid = levels.First(s => s.Name == "Mid");
         var senior = levels.First(s => s.Name == "Senior");
 
@@ -78,12 +93,12 @@ public static class DbSeeder
                 card.Entries.Add(new RateCardEntry
                 {
                     ResourceType = t, Seniority = s, Location = "Onshore",
-                    ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 60 + 20 * s.SortOrder
+                    ResourcingClass = internalClass, HourlyRate = 60 + 20 * s.SortOrder
                 });
                 card.Entries.Add(new RateCardEntry
                 {
                     ResourceType = t, Seniority = s, Location = "Onshore",
-                    ResourcingClass = ResourcingClass.Vendor, HourlyRate = 90 + 25 * s.SortOrder
+                    ResourcingClass = vendorClass, HourlyRate = 90 + 25 * s.SortOrder
                 });
             }
         }

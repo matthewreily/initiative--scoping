@@ -96,7 +96,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "2",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "5"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "5"
         });
         Assert.Contains("Scope is locked", await client.GetStringAsync(details));
 
@@ -440,7 +440,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
     private static Dictionary<string, string> NewAllocation(int phaseId, int typeId) => new()
     {
         ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-        ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "50"
+        ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "50"
     };
 
     private static async Task<(int PhaseId, int TypeId)> AddPhaseAndAllocationAsync(HttpClient client, WebApplicationFactory<Program> f, int id, string location, int phaseYear = 2026)
@@ -455,7 +455,7 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = location, ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = location, ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);
         return (phaseId, typeId);

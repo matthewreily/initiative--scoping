@@ -261,7 +261,7 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/AddEntry/{id}", new()
         {
             ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = "InternalFte", ["HourlyRate"] = "150"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["HourlyRate"] = "150"
         });
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Publish/{id}", new());
         Assert.Equal(RateCardStatus.Published, await StatusAsync(id));
@@ -300,7 +300,7 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/AddEntry/{id}", new()
         {
             ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = "InternalFte", ["HourlyRate"] = "150"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["HourlyRate"] = "150"
         });
         await PostFormAsync(client, detailsUrl, $"/Admin/RateCards/Publish/{id}", new());
 
@@ -320,7 +320,7 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 
         var pricing = await db2.PricingRateCardsAsync(CancellationToken.None);
         Assert.Contains(pricing, c => c.Id == id);
-        var key = new RateKey(typeId, 3, "Onshore", ResourcingClass.InternalFte);
+        var key = new RateKey(typeId, 3, "Onshore", ResourcingClass.InternalId);
         Assert.Equal(150m, RateResolver.Resolve([card], key, new DateOnly(2027, 3, 1)));
         Assert.Null(RateResolver.Resolve([card], key, new DateOnly(2027, 7, 1)));
 
@@ -388,12 +388,12 @@ public class AdminTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         Assert.Contains("LocVendB", all);
         Assert.Contains($">{vendorName}</option>", all);
 
-        var internalOnly = await client.GetStringAsync($"{detailsUrl}?resourcingClass=InternalFte");
+        var internalOnly = await client.GetStringAsync($"{detailsUrl}?resourcingClassId={ResourcingClass.InternalId}");
         Assert.Contains("LocInt", internalOnly);
         Assert.DoesNotContain("LocVendA", internalOnly);
         Assert.DoesNotContain("LocVendB", internalOnly);
 
-        var vendorOnly = await client.GetStringAsync($"{detailsUrl}?resourcingClass=Vendor&vendorId={vendorId}");
+        var vendorOnly = await client.GetStringAsync($"{detailsUrl}?resourcingClassId={ResourcingClass.VendorId}&vendorId={vendorId}");
         Assert.Contains("LocVendA", vendorOnly);
         Assert.DoesNotContain("LocInt", vendorOnly);
         Assert.DoesNotContain("LocVendB", vendorOnly);

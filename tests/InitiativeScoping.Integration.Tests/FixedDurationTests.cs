@@ -94,7 +94,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         var noPercent = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, noPercent.StatusCode);
         Assert.Contains("Allocation % is required", await client.GetStringAsync(details));
@@ -102,7 +102,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         var half = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["AllocationPercent"] = "50", ["EstimatedHours"] = "999"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["AllocationPercent"] = "50", ["EstimatedHours"] = "999"
         });
         Assert.Equal(HttpStatusCode.Redirect, half.StatusCode);
 
@@ -170,7 +170,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = discoveryId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "2",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["AllocationPercent"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["AllocationPercent"] = "100"
         });
 
         int buildId;
@@ -232,7 +232,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         var response = await PostFormAsync(client, details, $"/Initiatives/ApplySize/{id}", new()
         {
             ["Method"] = nameof(SizingMethod.TShirt), ["SizeKey"] = "L", ["Location"] = "Onshore",
-            ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Replace"] = "true"
+            ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Replace"] = "true"
         });
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
@@ -268,7 +268,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         await PostFormAsync(client, $"/Initiatives/Details/{id}", $"/Initiatives/ApplySize/{id}", new()
         {
             ["Method"] = nameof(SizingMethod.TShirt), ["SizeKey"] = "L", ["Location"] = "Onshore",
-            ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Replace"] = "true"
+            ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Replace"] = "true"
         });
 
         using var scope = factory.Services.CreateScope();
@@ -330,7 +330,7 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "2",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["AllocationPercent"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["AllocationPercent"] = "100"
         });
 
         using var verify = isolated.Services.CreateScope();

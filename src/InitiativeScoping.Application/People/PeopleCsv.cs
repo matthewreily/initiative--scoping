@@ -1,8 +1,8 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using InitiativeScoping.Application.RateCards;
 using InitiativeScoping.Domain.Entities;
-using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Application.People;
 
@@ -29,7 +29,7 @@ public sealed record PeopleCsvResult(IReadOnlyList<PeopleCsvRow> Rows, IReadOnly
 /// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive][,Vendor][,Discipline]
 /// ExternalIds is ';'-separated (may be empty). ResourceType and Seniority are catalog names (unknown names are added to the catalogs on import);
 /// Discipline is only used when a new resource type is created.
-/// ResourcingClass: InternalFte|Vendor. IsActive defaults to true. Vendor names the catalog vendor for Vendor rows and must be blank for InternalFte.
+/// ResourcingClass is a catalog name (e.g. Internal|Vendor; the legacy "InternalFte" is accepted). IsActive defaults to true. Vendor names the catalog vendor for vendor-class rows and must be blank otherwise.
 /// </summary>
 public static class PeopleCsv
 {
@@ -44,7 +44,7 @@ public static class PeopleCsv
         PrepareHeaderForMatch = a => a.Header.Replace(" ", string.Empty).ToLowerInvariant()
     };
 
-    public static PeopleCsvResult Parse(TextReader reader)
+    public static PeopleCsvResult Parse(TextReader reader, IReadOnlyList<ResourcingClass> classes)
     {
         var rows = new List<PeopleCsvRow>();
         var errors = new List<PeopleCsvError>();
@@ -104,7 +104,7 @@ public static class PeopleCsv
                 continue;
             }
 
-            if (!TryParseClass(csv.GetField("ResourcingClass"), out var resourcingClass))
+            if (RateCardCsv.ResolveClass(csv.GetField("ResourcingClass"), classes) is not { } resourcingClass)
             {
                 errors.Add(new PeopleCsvError(line, $"Unknown ResourcingClass '{csv.GetField("ResourcingClass")}'."));
                 continue;
@@ -128,9 +128,9 @@ public static class PeopleCsv
 
             var vendor = hasVendor ? csv.GetField("Vendor") : null;
             vendor = string.IsNullOrWhiteSpace(vendor) ? null : vendor.Trim();
-            if (resourcingClass != ResourcingClass.Vendor && vendor is not null)
+            if (!resourcingClass.IsVendor && vendor is not null)
             {
-                errors.Add(new PeopleCsvError(line, "Vendor must be blank for internal FTE rows."));
+                errors.Add(new PeopleCsvError(line, $"Vendor must be blank for {resourcingClass.Name} rows."));
                 continue;
             }
 
@@ -168,7 +168,7 @@ public static class PeopleCsv
             csv.WriteField(r.BusinessUnit);
             csv.WriteField(r.Seniority);
             csv.WriteField(r.Location);
-            csv.WriteField(r.ResourcingClass.ToString());
+            csv.WriteField(r.ResourcingClass.Name);
             csv.WriteField(r.IsActive ? "true" : "false");
             csv.WriteField(r.Vendor ?? string.Empty);
             csv.WriteField(r.Discipline ?? string.Empty);
@@ -186,22 +186,6 @@ public static class PeopleCsv
                 return true;
             case "false" or "no" or "n" or "0" or "inactive":
                 result = false;
-                return true;
-            default:
-                result = default;
-                return false;
-        }
-    }
-
-    private static bool TryParseClass(string? value, out ResourcingClass result)
-    {
-        switch (value?.Trim().Replace(" ", string.Empty).Replace("/", string.Empty).ToLowerInvariant())
-        {
-            case "internalfte" or "internal" or "fte":
-                result = ResourcingClass.InternalFte;
-                return true;
-            case "vendor" or "contractor" or "vendorcontractor":
-                result = ResourcingClass.Vendor;
                 return true;
             default:
                 result = default;

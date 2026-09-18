@@ -5,11 +5,11 @@
         id = c.CardId,
         effectiveStart = c.EffectiveStart.ToString("yyyy-MM-dd"),
         effectiveEnd = c.EffectiveEnd?.ToString("yyyy-MM-dd"),
-        options = c.Options.Select(o => new { type = o.ResourceTypeId, seniority = o.SeniorityId, location = o.Location, cls = (int)o.ResourcingClass, vendor = o.VendorId, rate = o.Rate })
+        options = c.Options.Select(o => new { type = o.ResourceTypeId, seniority = o.SeniorityId, location = o.Location, cls = o.ResourcingClassId, vendor = o.VendorId, rate = o.Rate })
     });
     var phaseStarts = Model.Data.PhaseStarts.ToDictionary(p => p.Key, p => p.Value.ToString("yyyy-MM-dd"));
-    var vendorClass = (int)InitiativeScoping.Domain.Enums.ResourcingClass.Vendor;
-    var people = Model.Data.People.Select(p => new { id = p.Id, type = p.ResourceTypeId, seniority = p.SeniorityId, bu = p.BusinessUnitId, cls = (int)p.ResourcingClass, vendor = p.VendorId });
+    var people = Model.Data.People.Select(p => new { id = p.Id, type = p.ResourceTypeId, seniority = p.SeniorityId, bu = p.BusinessUnitId, cls = p.ResourcingClassId, vendor = p.VendorId });
+    var classes = Model.Data.Classes.Select(c => new { id = c.Id, isVendor = c.IsVendor, capex = c.DefaultCapexPercent });
 }
 <script>
     (function () {
@@ -21,10 +21,12 @@
         const people = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(people));
         const cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cards));
         const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
-        const VENDOR = '@vendorClass';
+        // Resourcing class catalog: vendor-backed classes show the Vendor picker; each class carries the labor Capex % default.
+        const classes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(classes));
+        const classOf = id => classes.find(c => String(c.id) === String(id));
+        const classIsVendor = id => classOf(id)?.isVendor === true;
         const capex = byId('@Model.CapexInputId');
-        const capexDefaults = { internal: @Model.Data.InternalCapexPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), vendor: @Model.Data.VendorCapexPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) };
-        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)', people: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.PersonIds.Select(p => p.ToString()))) };
+        const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@Model.Current.ResourcingClassId', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)', people: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.PersonIds.Select(p => p.ToString()))) };
         let capexClass = current.cls;
         const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
 
@@ -53,15 +55,15 @@
         const same = (a, b) => String(a) === String(b);
         const sameText = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
         const sameVendor = (a, b) => String(a ?? '') === String(b ?? '');
-        const isVendor = () => same(cls.value, VENDOR);
+        const isVendor = () => classIsVendor(cls.value);
         // Mirrors RateResolver.VendorMatches: a vendor row naming no vendor is a generic rate for any vendor.
-        const vendorRowMatches = (o, vendorId) => !same(o.cls, VENDOR) || o.vendor === null || sameVendor(o.vendor, vendorId);
+        const vendorRowMatches = (o, vendorId) => !classIsVendor(o.cls) || o.vendor === null || sameVendor(o.vendor, vendorId);
         const vendorMatch = (rows, vendorId) => rows.filter(o => vendorRowMatches(o, vendorId)).sort((a, b) => (b.vendor !== null) - (a.vendor !== null))[0];
 
         // A Capex % still sitting on the previous class's default follows the class; a hand-entered (or saved) value stays.
         function syncCapex() {
             if (!capex) { return; }
-            const defaultFor = c => same(c, VENDOR) ? capexDefaults.vendor : capexDefaults.internal;
+            const defaultFor = c => classOf(c)?.capex ?? 0;
             if (capexClass !== null && capexClass !== cls.value && (capex.value === '' || parseFloat(capex.value) === defaultFor(capexClass))) {
                 capex.value = String(defaultFor(cls.value));
             }
@@ -119,7 +121,7 @@
             if (!person) { return; }
             const vendorId = isVendor() && vendor ? vendor.value : '';
             const eligible = people.filter(p => same(p.type, type.value) && same(p.seniority, seniority.value) && (!bu || same(p.bu, bu.value))
-                && same(p.cls, cls.value) && (!same(p.cls, VENDOR) || sameVendor(p.vendor, vendorId)));
+                && same(p.cls, cls.value) && (!classIsVendor(p.cls) || sameVendor(p.vendor, vendorId)));
             const wanted = preferCurrent ? current.people : Array.from(person.selectedOptions).map(o => o.value);
             let kept = 0;
             for (const opt of person.options) {

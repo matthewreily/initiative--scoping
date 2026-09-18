@@ -42,7 +42,7 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             db.RateCardEntries.Add(new RateCardEntry
             {
                 RateCardId = card.Id, ResourceTypeId = type.Id, SeniorityId = 1,
-                Location = "Nearshore", ResourcingClass = ResourcingClass.Vendor, VendorId = vendorId, HourlyRate = 55m
+                Location = "Nearshore", ResourcingClassId = ResourcingClass.VendorId, VendorId = vendorId, HourlyRate = 55m
             });
             await db.SaveChangesAsync();
         }
@@ -89,25 +89,25 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             phaseId = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Phases.FirstAsync(p => p.InitiativeId == id)).Id;
         }
 
-        Dictionary<string, string> Allocation(int bu, ResourcingClass cls, int? vendor) => new()
+        Dictionary<string, string> Allocation(int bu, int cls, int? vendor) => new()
         {
             ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = bu.ToString(), ["ResourceTypeId"] = typeId.ToString(),
-            ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClass"] = cls.ToString(),
+            ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClassId"] = cls.ToString(),
             ["VendorId"] = vendor?.ToString() ?? string.Empty, ["Quantity"] = "1", ["EstimatedHours"] = "10"
         };
 
-        var outsider = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(outsiderId, ResourcingClass.InternalFte, null));
+        var outsider = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(outsiderId, ResourcingClass.InternalId, null));
         Assert.Equal(HttpStatusCode.Redirect, outsider.StatusCode);
         Assert.Contains("participating business units", await client.GetStringAsync(details));
 
-        var noVendor = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.Vendor, null));
+        var noVendor = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.VendorId, null));
         Assert.Equal(HttpStatusCode.Redirect, noVendor.StatusCode);
         Assert.Contains("Select a vendor", await client.GetStringAsync(details));
 
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.InternalFte, acmeId))).StatusCode);
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(partnerId, ResourcingClass.InternalFte, null))).StatusCode);
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.Vendor, acmeId))).StatusCode);
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.Vendor, globexId))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.InternalId, acmeId))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(partnerId, ResourcingClass.InternalId, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.VendorId, acmeId))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(sponsorId, ResourcingClass.VendorId, globexId))).StatusCode);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -122,14 +122,14 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             var cards = await db.RateCards.Include(c => c.Entries).Where(c => c.Status == RateCardStatus.Published).ToListAsync();
 
             Assert.Equal(4, initiative.Allocations.Count);
-            Assert.All(initiative.Allocations.Where(a => a.ResourcingClass == ResourcingClass.InternalFte), a => Assert.Null(a.VendorId));
+            Assert.All(initiative.Allocations.Where(a => a.ResourcingClassId == ResourcingClass.InternalId), a => Assert.Null(a.VendorId));
 
             var forecast = ForecastCalculator.Calculate(initiative, cards);
-            var byKey = forecast.Lines.ToDictionary(l => (l.Allocation.BusinessUnitId, l.Allocation.ResourcingClass, l.Allocation.VendorId), l => l.HourlyRate);
-            Assert.Equal(100m, byKey[(sponsorId, ResourcingClass.InternalFte, null)]);
-            Assert.Equal(100m, byKey[(partnerId, ResourcingClass.InternalFte, null)]);
-            Assert.Equal(120m, byKey[(sponsorId, ResourcingClass.Vendor, acmeId)]);
-            Assert.Equal(150m, byKey[(sponsorId, ResourcingClass.Vendor, globexId)]);
+            var byKey = forecast.Lines.ToDictionary(l => (l.Allocation.BusinessUnitId, l.Allocation.ResourcingClassId, l.Allocation.VendorId), l => l.HourlyRate);
+            Assert.Equal(100m, byKey[(sponsorId, ResourcingClass.InternalId, null)]);
+            Assert.Equal(100m, byKey[(partnerId, ResourcingClass.InternalId, null)]);
+            Assert.Equal(120m, byKey[(sponsorId, ResourcingClass.VendorId, acmeId)]);
+            Assert.Equal(150m, byKey[(sponsorId, ResourcingClass.VendorId, globexId)]);
             Assert.Equal(10m * (100m + 100m + 120m + 150m), forecast.LaborCost);
         }
 
@@ -173,9 +173,9 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
         db.AddRange(sponsor, partner, outsider, acme, globex);
         var type = await db.ResourceTypes.FirstAsync(t => t.Name == "Software Engineer");
 
-        RateCardEntry Entry(ResourcingClass cls, Vendor? vendor, decimal rate) => new()
+        RateCardEntry Entry(int cls, Vendor? vendor, decimal rate) => new()
         {
-            ResourceType = type, SeniorityId = 3, Location = "Onshore", ResourcingClass = cls, Vendor = vendor, HourlyRate = rate
+            ResourceType = type, SeniorityId = 3, Location = "Onshore", ResourcingClassId = cls, Vendor = vendor, HourlyRate = rate
         };
 
         db.RateCards.Add(new RateCard
@@ -183,10 +183,10 @@ public class MultiBusinessUnitVendorTests(WebAppFactory factory) : IClassFixture
             Name = $"Multi {suffix}", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
             Entries =
             [
-                Entry(ResourcingClass.InternalFte, null, 100m),
-                Entry(ResourcingClass.Vendor, null, 110m),
-                Entry(ResourcingClass.Vendor, acme, 120m),
-                Entry(ResourcingClass.Vendor, globex, 150m)
+                Entry(ResourcingClass.InternalId, null, 100m),
+                Entry(ResourcingClass.VendorId, null, 110m),
+                Entry(ResourcingClass.VendorId, acme, 120m),
+                Entry(ResourcingClass.VendorId, globex, 150m)
             ]
         });
         await db.SaveChangesAsync();

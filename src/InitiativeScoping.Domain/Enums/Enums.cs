@@ -2,12 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace InitiativeScoping.Domain.Enums;
 
-public enum ResourcingClass
-{
-    InternalFte = 1,
-    Vendor = 2
-}
-
 public enum RateCardStatus
 {
     Draft = 1,

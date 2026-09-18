@@ -16,7 +16,7 @@ public class ForecastCalculatorTests
             new RateCardEntry
             {
                 ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate
+                ResourcingClassId = ResourcingClass.InternalId, HourlyRate = rate
             }
         ]
     };
@@ -30,7 +30,7 @@ public class ForecastCalculatorTests
             new InitiativeAllocation
             {
                 PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte, Quantity = quantity, EstimatedHours = hours
+                ResourcingClassId = ResourcingClass.InternalId, Quantity = quantity, EstimatedHours = hours
             }
         ]
     };
@@ -93,7 +93,7 @@ public class ForecastEffectiveDateTests
     private static RateCard Card(int id, DateOnly start, DateOnly? end, decimal rate, RateCardStatus status = RateCardStatus.Published) => new()
     {
         Id = id, Name = $"c{id}", EffectiveStart = start, EffectiveEnd = end, Status = status,
-        Entries = [new() { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = rate }]
+        Entries = [new() { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = rate }]
     };
 
     private static Initiative Plan(DateOnly start, DateOnly end) => new()
@@ -105,7 +105,7 @@ public class ForecastEffectiveDateTests
             new InitiativeAllocation
             {
                 PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 100
+                ResourcingClassId = ResourcingClass.InternalId, Quantity = 1, EstimatedHours = 100
             }
         ]
     };

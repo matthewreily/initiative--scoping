@@ -213,7 +213,10 @@ public class InitiativeAllocation
     public int SeniorityId { get; set; }
     public SeniorityLevel? Seniority { get; set; }
     public required string Location { get; set; }
-    public ResourcingClass ResourcingClass { get; set; }
+    public int ResourcingClassId { get; set; }
+    public ResourcingClass? ResourcingClass { get; set; }
+    /// <summary>Vendor-backed class. A vendor is only ever stored for vendor classes, so <see cref="VendorId"/> answers when the class is not loaded.</summary>
+    public bool IsVendor => ResourcingClass?.IsVendor ?? VendorId is not null;
     public int? VendorId { get; set; }
     public Vendor? Vendor { get; set; }
     /// <summary>Named roster people filling seats of this allocation (at most <see cref="Quantity"/>); the rest are generic (type × seniority) seats.</summary>
@@ -327,13 +330,14 @@ public class ForecastBaselineLine
     public int ResourceTypeId { get; set; }
     public int SeniorityId { get; set; }
     public required string Location { get; set; }
-    public ResourcingClass ResourcingClass { get; set; }
+    public int ResourcingClassId { get; set; }
     public int? VendorId { get; set; }
     /// <summary>Dimension names as they were when the baseline was taken; later catalog renames do not relabel history.</summary>
     public required string PhaseName { get; set; }
     public required string BusinessUnitName { get; set; }
     public required string ResourceTypeName { get; set; }
     public required string SeniorityName { get; set; }
+    public required string ResourcingClassName { get; set; }
     public string? VendorName { get; set; }
     public int? PersonId { get; set; }
     public string? PersonName { get; set; }

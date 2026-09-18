@@ -19,7 +19,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Index(string? search, CancellationToken ct)
     {
-        var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.Seniority).AsQueryable();
+        var query = db.People.Include(p => p.ResourceType).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.ResourcingClass).Include(p => p.Seniority).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
@@ -58,8 +58,8 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             BusinessUnitId = model.BusinessUnitId,
             SeniorityId = model.SeniorityId,
             Location = model.Location.Trim(),
-            ResourcingClass = model.ResourcingClass,
-            VendorId = VendorFor(model),
+            ResourcingClassId = model.ResourcingClassId,
+            VendorId = await VendorForAsync(model, ct),
             IsActive = model.IsActive
         };
         db.People.Add(person);
@@ -77,7 +77,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             return NotFound();
         }
 
-        await PopulateLists(ct, person.SeniorityId);
+        await PopulateLists(ct, [person.SeniorityId], [person.ResourcingClassId]);
         return View(new PersonEditModel
         {
             Id = person.Id,
@@ -87,7 +87,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             BusinessUnitId = person.BusinessUnitId,
             SeniorityId = person.SeniorityId,
             Location = person.Location,
-            ResourcingClass = person.ResourcingClass,
+            ResourcingClassId = person.ResourcingClassId,
             VendorId = person.VendorId,
             IsActive = person.IsActive
         });
@@ -106,7 +106,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         await Validate(model, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateLists(ct, person.SeniorityId, model.SeniorityId);
+            await PopulateLists(ct, [person.SeniorityId, model.SeniorityId], [person.ResourcingClassId, model.ResourcingClassId]);
             return View(model);
         }
 
@@ -117,8 +117,8 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         person.BusinessUnitId = model.BusinessUnitId;
         person.SeniorityId = model.SeniorityId;
         person.Location = model.Location.Trim();
-        person.ResourcingClass = model.ResourcingClass;
-        person.VendorId = VendorFor(model);
+        person.ResourcingClassId = model.ResourcingClassId;
+        person.VendorId = await VendorForAsync(model, ct);
         person.IsActive = model.IsActive;
         audit.Record(nameof(Person), person.Id, AuditActions.Update, new { Before = before, After = Snapshot(person) });
         await db.SaveChangesAsync(ct);
@@ -147,20 +147,23 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Export(CancellationToken ct)
     {
-        var people = await db.People.Include(p => p.ResourceType).ThenInclude(t => t!.Discipline).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.Seniority)
+        var people = await db.People.Include(p => p.ResourceType).ThenInclude(t => t!.Discipline).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.ResourcingClass).Include(p => p.Seniority)
             .OrderBy(p => p.DisplayName).ToListAsync(ct);
         var rows = people.Select(p => new PeopleCsvRow(p.DisplayName, SplitIds(p.ExternalIds), p.ResourceType!.Name, p.BusinessUnit!.Name,
-            p.Seniority!.Name, p.Location, p.ResourcingClass, p.IsActive, p.Vendor?.Name, p.ResourceType.Discipline?.Name));
+            p.Seniority!.Name, p.Location, p.ResourcingClass!, p.IsActive, p.Vendor?.Name, p.ResourceType.Discipline?.Name));
         return Csv(rows, "people.csv");
     }
 
-    public IActionResult Template() =>
-        Csv(
+    public async Task<IActionResult> Template(CancellationToken ct)
+    {
+        var (internalClass, vendorClass) = await RateCardsController.TemplateClassesAsync(db, ct);
+        return Csv(
         [
-            new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", "Senior", "Onshore", ResourcingClass.InternalFte, true),
-            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", "Level 2 (3-5 Years)", "Offshore", ResourcingClass.Vendor, true, "Acme Consulting"),
-            new PeopleCsvRow("Sam Analyst", [], "Business Analyst", "Boarding", "Mid", "Onshore", ResourcingClass.InternalFte, true, null, "Product")
+            new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", "Senior", "Onshore", internalClass, true),
+            new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", "Level 2 (3-5 Years)", "Offshore", vendorClass, true, "Acme Consulting"),
+            new PeopleCsvRow("Sam Analyst", [], "Business Analyst", "Boarding", "Mid", "Onshore", internalClass, true, null, "Product")
         ], "people-template.csv");
+    }
 
     /// <summary>
     /// Upserts people from CSV. A row matches an existing person by any shared external ID, otherwise by display name
@@ -183,7 +186,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         PeopleCsvResult parsed;
         using (var reader = new StreamReader(model.File.OpenReadStream()))
         {
-            parsed = PeopleCsv.Parse(reader);
+            parsed = PeopleCsv.Parse(reader, await ResourcingClassCatalog.AllAsync(db, ct));
         }
 
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name, b => b.Id, StringComparer.OrdinalIgnoreCase, ct);
@@ -258,7 +261,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
                 var person = new Person
                 {
                     DisplayName = row.DisplayName, ExternalIds = ids, ResourceTypeId = resourceTypes.Types[row.ResourceType].Id, BusinessUnitId = businessUnits[row.BusinessUnit],
-                    SeniorityId = seniorities[row.Seniority].Id, Location = row.Location, ResourcingClass = row.ResourcingClass, IsActive = row.IsActive,
+                    SeniorityId = seniorities[row.Seniority].Id, Location = row.Location, ResourcingClassId = row.ResourcingClass.Id, IsActive = row.IsActive,
                     VendorId = row.Vendor is null ? null : vendors[row.Vendor]
                 };
                 db.People.Add(person);
@@ -274,7 +277,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             existing.BusinessUnitId = businessUnits[row.BusinessUnit];
             existing.SeniorityId = seniorities[row.Seniority].Id;
             existing.Location = row.Location;
-            existing.ResourcingClass = row.ResourcingClass;
+            existing.ResourcingClassId = row.ResourcingClass.Id;
             existing.VendorId = row.Vendor is null ? null : vendors[row.Vendor];
             existing.IsActive = row.IsActive;
             if (db.Entry(existing).State == EntityState.Modified)
@@ -329,7 +332,16 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             ModelState.AddModelError(nameof(model.SeniorityId), "Choose a seniority level.");
         }
 
-        if (model.ResourcingClass == ResourcingClass.Vendor && model.VendorId is { } vendorId && !await db.Vendors.AnyAsync(v => v.Id == vendorId, ct))
+        var resourcingClass = await db.ResourcingClasses.AsNoTracking().FirstOrDefaultAsync(c => c.Id == model.ResourcingClassId, ct);
+        if (resourcingClass is null)
+        {
+            ModelState.AddModelError(nameof(model.ResourcingClassId), "Choose a resourcing class.");
+        }
+        else if (!resourcingClass.IsActive && !await db.People.AnyAsync(p => p.Id == model.Id && p.ResourcingClassId == model.ResourcingClassId, ct))
+        {
+            ModelState.AddModelError(nameof(model.ResourcingClassId), $"{resourcingClass.Name} is inactive; choose an active resourcing class.");
+        }
+        else if (resourcingClass.IsVendor && model.VendorId is { } vendorId && !await db.Vendors.AnyAsync(v => v.Id == vendorId, ct))
         {
             ModelState.AddModelError(nameof(model.VendorId), "Choose a vendor from the catalog.");
         }
@@ -362,18 +374,21 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         return joined.Length == 0 ? null : joined;
     }
 
-    private async Task PopulateLists(CancellationToken ct, params int[] includeSeniorityIds)
+    private async Task PopulateLists(CancellationToken ct, int[]? includeSeniorityIds = null, int[]? includeClassIds = null)
     {
         ViewBag.ResourceTypes = new SelectList(await db.ResourceTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.BusinessUnits = new SelectList(await db.BusinessUnits.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name");
         ViewBag.Vendors = new SelectList(await db.Vendors.Where(v => v.IsActive).OrderBy(v => v.Name).ToListAsync(ct), "Id", "Name");
-        ViewBag.Seniorities = new SelectList(await SeniorityCatalog.OptionsAsync(db, includeSeniorityIds, ct), "Id", "Name");
+        ViewBag.Seniorities = new SelectList(await SeniorityCatalog.OptionsAsync(db, includeSeniorityIds ?? [], ct), "Id", "Name");
+        ViewBag.ResourcingClasses = new SelectList(await ResourcingClassCatalog.OptionsAsync(db, includeClassIds, ct), "Id", "Name");
+        ViewBag.VendorClassIds = await db.ResourcingClasses.Where(c => c.IsVendor).Select(c => c.Id).ToListAsync(ct);
     }
 
-    private static int? VendorFor(PersonEditModel model) => model.ResourcingClass == ResourcingClass.Vendor ? model.VendorId : null;
+    private async Task<int?> VendorForAsync(PersonEditModel model, CancellationToken ct) =>
+        await db.ResourcingClasses.AnyAsync(c => c.Id == model.ResourcingClassId && c.IsVendor, ct) ? model.VendorId : null;
 
     private static object Snapshot(Person p) =>
-        new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.SeniorityId, p.Location, p.ResourcingClass, p.VendorId, p.IsActive };
+        new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.SeniorityId, p.Location, p.ResourcingClassId, p.VendorId, p.IsActive };
 
     [HttpPost]
     public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(

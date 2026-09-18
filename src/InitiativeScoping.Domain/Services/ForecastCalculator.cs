@@ -56,7 +56,7 @@ public static class ForecastCalculator
             var phase = a.Phase ?? phases.GetValueOrDefault(a.PhaseId);
             var start = phase?.PlannedStart ?? initiative.TargetStart;
             var end = phase?.PlannedEnd ?? start;
-            var key = new RateKey(a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId);
+            var key = new RateKey(a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClassId, a.VendorId);
             var segments = RateResolver.Segments(rateCards, key, start, end);
             return new ForecastLine(a, a.Quantity * a.EstimatedHours, RateResolver.Blend(segments), segments);
         }).ToList();

@@ -2,7 +2,6 @@ using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using InitiativeScoping.Domain.Entities;
-using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Application.RateCards;
 
@@ -26,8 +25,8 @@ public sealed record RateCardCsvResult(IReadOnlyList<RateCardCsvRow> Rows, IRead
 /// CSV format: ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor,Discipline
 /// A legacy BusinessUnit column is accepted and ignored.
 /// ResourceType and Seniority are catalog names; unknown names are added to the catalogs on import. Discipline (optional) is only used
-/// when a new resource type is created; existing types keep their discipline. ResourcingClass: InternalFte|Vendor.
-/// Vendor names a specific vendor for Vendor rows (blank = generic "any vendor" rate) and must be blank for InternalFte rows; the column may be omitted.
+/// when a new resource type is created; existing types keep their discipline. ResourcingClass is a catalog name (e.g. Internal|Vendor; the legacy "InternalFte" is accepted).
+/// Vendor names a specific vendor for vendor-class rows (blank = generic "any vendor" rate) and must be blank for other rows; the column may be omitted.
 /// </summary>
 public static class RateCardCsv
 {
@@ -42,7 +41,7 @@ public static class RateCardCsv
         PrepareHeaderForMatch = a => a.Header.Replace(" ", string.Empty).ToLowerInvariant()
     };
 
-    public static RateCardCsvResult Parse(TextReader reader)
+    public static RateCardCsvResult Parse(TextReader reader, IReadOnlyList<ResourcingClass> classes)
     {
         var rows = new List<RateCardCsvRow>();
         var errors = new List<RateCardCsvError>();
@@ -97,7 +96,7 @@ public static class RateCardCsv
                 continue;
             }
 
-            if (!TryParseClass(csv.GetField("ResourcingClass"), out var resourcingClass))
+            if (ResolveClass(csv.GetField("ResourcingClass"), classes) is not { } resourcingClass)
             {
                 errors.Add(new RateCardCsvError(line, $"Unknown ResourcingClass '{csv.GetField("ResourcingClass")}'."));
                 continue;
@@ -112,9 +111,9 @@ public static class RateCardCsv
 
             var vendor = hasVendorColumn ? csv.GetField("Vendor") : null;
             vendor = string.IsNullOrWhiteSpace(vendor) ? null : vendor.Trim();
-            if (resourcingClass != ResourcingClass.Vendor && vendor is not null)
+            if (!resourcingClass.IsVendor && vendor is not null)
             {
-                errors.Add(new RateCardCsvError(line, "Vendor must be blank for internal FTE rows."));
+                errors.Add(new RateCardCsvError(line, $"Vendor must be blank for {resourcingClass.Name} rows."));
                 continue;
             }
 
@@ -122,12 +121,12 @@ public static class RateCardCsv
         }
 
         var duplicates = rows
-            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.Seniority.ToLowerInvariant(), r.Location.ToLowerInvariant(), r.ResourcingClass, r.Vendor?.ToLowerInvariant()))
+            .GroupBy(r => (r.ResourceType.ToLowerInvariant(), r.Seniority.ToLowerInvariant(), r.Location.ToLowerInvariant(), r.ResourcingClass.Id, r.Vendor?.ToLowerInvariant()))
             .Where(g => g.Count() > 1)
             .Select(g => g.First());
         foreach (var d in duplicates)
         {
-            errors.Add(new RateCardCsvError(0, $"Duplicate entry for {d.ResourceType}/{d.Seniority}/{d.Location}/{d.ResourcingClass}{(d.Vendor is null ? string.Empty : "/" + d.Vendor)}."));
+            errors.Add(new RateCardCsvError(0, $"Duplicate entry for {d.ResourceType}/{d.Seniority}/{d.Location}/{d.ResourcingClass.Name}{(d.Vendor is null ? string.Empty : "/" + d.Vendor)}."));
         }
 
         return new RateCardCsvResult(rows, errors);
@@ -146,7 +145,7 @@ public static class RateCardCsv
             csv.WriteField(r.ResourceType);
             csv.WriteField(r.Seniority);
             csv.WriteField(r.Location);
-            csv.WriteField(r.ResourcingClass.ToString());
+            csv.WriteField(r.ResourcingClass.Name);
             csv.WriteField(r.HourlyRate.ToString("0.00", CultureInfo.InvariantCulture));
             csv.WriteField(r.Vendor ?? string.Empty);
             csv.WriteField(r.Discipline ?? string.Empty);
@@ -155,23 +154,21 @@ public static class RateCardCsv
         csv.Flush();
     }
 
-    private static bool TryParseClass(string? value, out ResourcingClass result)
+    /// <summary>Resolves a class by catalog name; the pre-catalog names "InternalFte"/"FTE" and "Contractor" still map to the seeded Internal and Vendor classes.</summary>
+    internal static ResourcingClass? ResolveClass(string? value, IReadOnlyList<ResourcingClass> classes)
     {
-        switch (value?.Trim().Replace(" ", string.Empty).Replace("/", string.Empty).ToLowerInvariant())
+        var text = value?.Trim() ?? string.Empty;
+        var byName = classes.FirstOrDefault(c => ResourcingClass.NameMatches(c.Name, text));
+        if (byName is not null)
         {
-            case "internalfte":
-            case "internal":
-            case "fte":
-                result = ResourcingClass.InternalFte;
-                return true;
-            case "vendor":
-            case "contractor":
-            case "vendorcontractor":
-                result = ResourcingClass.Vendor;
-                return true;
-            default:
-                result = default;
-                return false;
+            return byName;
         }
+
+        return text.Replace(" ", string.Empty).Replace("/", string.Empty).ToLowerInvariant() switch
+        {
+            "internalfte" or "internal" or "fte" => classes.FirstOrDefault(c => c.Id == ResourcingClass.InternalId),
+            "vendor" or "contractor" or "vendorcontractor" => classes.FirstOrDefault(c => c.Id == ResourcingClass.VendorId),
+            _ => null
+        };
     }
 }

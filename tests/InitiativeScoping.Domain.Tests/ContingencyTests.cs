@@ -9,7 +9,7 @@ public class ContingencyTests
     private static RateCard Card() => new()
     {
         Name = "2026", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,
-        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClass = ResourcingClass.InternalFte, HourlyRate = 100m }]
+        Entries = [new RateCardEntry { ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = 100m }]
     };
 
     private static Initiative Initiative(decimal contingencyPct, EstimateConfidence? confidence = null) => new()
@@ -22,7 +22,7 @@ public class ContingencyTests
             new InitiativeAllocation
             {
                 PhaseId = 10, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore",
-                ResourcingClass = ResourcingClass.InternalFte, Quantity = 1, EstimatedHours = 100
+                ResourcingClassId = ResourcingClass.InternalId, Quantity = 1, EstimatedHours = 100
             }
         ],
         NonLaborCosts =

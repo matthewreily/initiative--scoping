@@ -9,7 +9,7 @@ async function createPerson(page: Page, name: string, resourceType: string, seni
   await page.locator('#BusinessUnitId').selectOption({ index: 1 });
   await page.locator('#SeniorityId').selectOption({ label: seniority });
   await page.locator('#Location').fill('Onshore');
-  await page.locator('#ResourcingClass').selectOption('InternalFte');
+  await page.locator('#ResourcingClassId').selectOption({ label: 'Internal' });
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page).toHaveURL(/\/Admin\/People(\?|$)/);
 }

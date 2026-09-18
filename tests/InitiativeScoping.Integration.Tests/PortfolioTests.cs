@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Net;
 using System.Text.RegularExpressions;
+using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -88,7 +89,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.Contains("# Forecast", initiativeCsv);
         Assert.Contains("# By month", initiativeCsv);
         Assert.Contains("Month,Forecast hours,Forecast labor cost", initiativeCsv);
-        Assert.Contains("Boarding,Software Engineer,Senior,Onshore,InternalFte,,,2,2,100,200,120,24000,0,0,24000", initiativeCsv);
+        Assert.Contains("Boarding,Software Engineer,Senior,Onshore,Internal,,,2,2,100,200,120,24000,0,0,24000", initiativeCsv);
         Assert.Contains("# By fiscal period", initiativeCsv);
         Assert.Contains("# Adjustments", initiativeCsv);
         Assert.Contains(",5,500,Adj", initiativeCsv);
@@ -204,7 +205,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
 
         var html = WebUtility.HtmlDecode(await client.GetStringAsync(details));
@@ -287,7 +288,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
 
         var html = WebUtility.HtmlDecode(await client.GetStringAsync(details));
@@ -329,7 +330,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         var activate = await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new());
         Assert.Equal(HttpStatusCode.Redirect, activate.StatusCode);

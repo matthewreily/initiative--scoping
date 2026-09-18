@@ -98,7 +98,7 @@ public class AllocationEditModel
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
-    public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    public int ResourcingClassId { get; set; } = ResourcingClass.InternalId;
     [Display(Name = "Vendor")]
     public int? VendorId { get; set; }
     /// <summary>Named roster people, one seat each; at most <see cref="Quantity"/>.</summary>
@@ -185,7 +185,7 @@ public class ApplySizeModel
     [Required, StringLength(100)]
     public string Location { get; set; } = "Onshore";
     [Required, Display(Name = "Class")]
-    public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
+    public int ResourcingClassId { get; set; } = ResourcingClass.InternalId;
     [Display(Name = "Vendor")]
     public int? VendorId { get; set; }
     [Display(Name = "Replace existing allocations")]
@@ -197,7 +197,7 @@ public sealed record RollupRow(string Label, decimal Hours, decimal Cost, bool H
 public sealed record GanttBar(Phase Phase, double LeftPct, double WidthPct);
 
 /// <summary>One priced (resource type, seniority, location, class, vendor) combination from a published rate card; rates are global across business units.</summary>
-public sealed record RateOption(int ResourceTypeId, string ResourceType, int SeniorityId, string Location, ResourcingClass ResourcingClass, int? VendorId, decimal Rate);
+public sealed record RateOption(int ResourceTypeId, string ResourceType, int SeniorityId, string Location, int ResourcingClassId, int? VendorId, decimal Rate);
 
 public sealed record RateCardOptions(int CardId, DateOnly EffectiveStart, DateOnly? EffectiveEnd, IReadOnlyList<RateOption> Options);
 
@@ -230,14 +230,16 @@ public sealed record RateOptionsData(
     IReadOnlyList<NamedId> Vendors,
     IReadOnlyList<NamedId> Seniorities,
     IReadOnlyList<PersonOption> People,
-    decimal InternalCapexPercent,
-    decimal VendorCapexPercent)
+    IReadOnlyList<ClassOption> Classes)
 {
     public bool HasAnyPricing => Cards.Any(c => c.Options.Count > 0);
 }
 
 /// <summary>Roster person selectable on an allocation; the form only offers those matching the chosen dimensions.</summary>
-public sealed record PersonOption(int Id, string Name, int ResourceTypeId, int SeniorityId, int BusinessUnitId, ResourcingClass ResourcingClass, int? VendorId);
+public sealed record PersonOption(int Id, string Name, int ResourceTypeId, int SeniorityId, int BusinessUnitId, int ResourcingClassId, int? VendorId);
+
+/// <summary>A configured resourcing class as the allocation forms see it: vendor-backed classes show the Vendor picker and default Capex % comes from the class.</summary>
+public sealed record ClassOption(int Id, string Name, bool IsVendor, decimal DefaultCapexPercent);
 
 public sealed record NamedId(int Id, string Name);
 
@@ -380,7 +382,7 @@ public sealed record BaselineLineRow(
     string ResourceType,
     string Seniority,
     string Location,
-    ResourcingClass ResourcingClass,
+    string ResourcingClass,
     decimal Hours,
     decimal HourlyRate,
     decimal Cost,

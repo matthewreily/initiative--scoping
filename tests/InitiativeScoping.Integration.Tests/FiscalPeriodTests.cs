@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -50,7 +51,7 @@ public class FiscalPeriodTests
         Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100",
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100",
             ["CapexPercent"] = "100"
         })).StatusCode);
         // 4 months x 250 = 1,000 opex (0% Capex is the default when the field is omitted).
@@ -120,19 +121,21 @@ public class FiscalPeriodTests
         var client = factory.CreateClient(NoRedirect);
         var tag = Guid.NewGuid().ToString("N")[..8];
 
-        // Out of the box: internal 70 / vendor 100, editable on the Work calendar page.
-        var admin = await client.GetStringAsync("/Admin/WorkCalendar");
-        Assert.Contains("Internal labor Capex %", admin);
-        Assert.Contains("id=\"InternalCapexPercent\" name=\"InternalCapexPercent\" value=\"70\"", admin);
-        Assert.Contains("id=\"VendorCapexPercent\" name=\"VendorCapexPercent\" value=\"100\"", admin);
+        // Out of the box: Internal 70 / Vendor 100, editable per class under Admin → Resourcing classes.
+        var admin = await client.GetStringAsync("/Admin/ResourcingClasses");
+        Assert.Contains("Default Capex %", admin);
+        Assert.Contains("<td>Internal</td>", admin);
+        Assert.Contains(">70%</td>", admin);
+        Assert.Contains(">100%</td>", admin);
+        Assert.DoesNotContain("InternalCapexPercent", await client.GetStringAsync("/Admin/WorkCalendar"));
 
         var id = await CreateInitiativeAsync(client, factory, $"Capex default {tag}");
         var details = $"/Initiatives/Details/{id}";
         await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-05-01", ["PlannedEnd"] = "2026-08-31" });
         var page = await client.GetStringAsync(details);
         Assert.Matches("id=\"capitalization\"[^>]*value=\"70\"", page);
-        Assert.Contains("internal: 70,", page);
-        Assert.Contains("vendor: 100", page);
+        Assert.Contains("\"capex\":70", page);
+        Assert.Contains("\"capex\":100", page);
 
         // Apply a template as vendor labor: every generated line starts at the vendor default.
         int vendorId;
@@ -146,7 +149,7 @@ public class FiscalPeriodTests
         }
         Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/ApplySize/{id}", new()
         {
-            ["Method"] = nameof(SizingMethod.TShirt), ["SizeKey"] = "L", ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.Vendor),
+            ["Method"] = nameof(SizingMethod.TShirt), ["SizeKey"] = "L", ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.VendorId.ToString(),
             ["VendorId"] = vendorId.ToString(), ["Replace"] = "true"
         })).StatusCode);
         using (var scope = factory.Services.CreateScope())
@@ -157,21 +160,24 @@ public class FiscalPeriodTests
             Assert.All(lines, a => Assert.Equal(100m, a.CapexPercent));
         }
 
-        // Changing the defaults affects new lines only; the existing vendor lines keep 100.
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, "/Admin/WorkCalendar", "/Admin/WorkCalendar/Settings",
-            new() { ["HoursPerDay"] = "8", ["FiscalYearStartMonth"] = "1", ["InternalCapexPercent"] = "55.5", ["VendorCapexPercent"] = "80" })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await PostFormAsync(client, "/Admin/WorkCalendar", "/Admin/WorkCalendar/Settings",
-            new() { ["HoursPerDay"] = "8", ["FiscalYearStartMonth"] = "1", ["InternalCapexPercent"] = "101", ["VendorCapexPercent"] = "80" })).StatusCode);
+        // Changing the class defaults affects new lines only; the existing vendor lines keep 100.
+        var internalEdit = $"/Admin/ResourcingClasses/Edit/{ResourcingClass.InternalId}";
+        var vendorEdit = $"/Admin/ResourcingClasses/Edit/{ResourcingClass.VendorId}";
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, internalEdit, internalEdit,
+            new() { ["Name"] = "Internal", ["IsVendor"] = "false", ["DefaultCapexPercent"] = "55.5", ["SortOrder"] = "1", ["IsActive"] = "true" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, vendorEdit, vendorEdit,
+            new() { ["Name"] = "Vendor", ["IsVendor"] = "true", ["DefaultCapexPercent"] = "80", ["SortOrder"] = "2", ["IsActive"] = "true" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostFormAsync(client, internalEdit, internalEdit,
+            new() { ["Name"] = "Internal", ["IsVendor"] = "false", ["DefaultCapexPercent"] = "101", ["SortOrder"] = "1", ["IsActive"] = "true" })).StatusCode);
         page = await client.GetStringAsync(details);
         Assert.Matches("id=\"capitalization\"[^>]*value=\"55.5\"", page);
-        Assert.Contains("internal: 55.5,", page);
-        Assert.Contains("vendor: 80", page);
+        Assert.Contains("\"capex\":55.5", page);
+        Assert.Contains("\"capex\":80", page);
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var settings = await db.WorkCalendarSettings.SingleAsync();
-            Assert.Equal(55.5m, settings.InternalCapexPercent);
-            Assert.Equal(80m, settings.VendorCapexPercent);
+            Assert.Equal(55.5m, (await db.ResourcingClasses.SingleAsync(c => c.Id == ResourcingClass.InternalId)).DefaultCapexPercent);
+            Assert.Equal(80m, (await db.ResourcingClasses.SingleAsync(c => c.Id == ResourcingClass.VendorId)).DefaultCapexPercent);
             Assert.All(await db.InitiativeAllocations.Where(a => a.InitiativeId == id).ToListAsync(), a => Assert.Equal(100m, a.CapexPercent));
         }
     }

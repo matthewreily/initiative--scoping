@@ -1,4 +1,5 @@
 using InitiativeScoping.Application.RateCards;
+using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 
 namespace InitiativeScoping.Domain.Tests;
@@ -6,18 +7,21 @@ namespace InitiativeScoping.Domain.Tests;
 public class RateCardCsvTests
 {
     private const string Header = "ResourceType,Seniority,Location,ResourcingClass,HourlyRate\n";
+    private static readonly ResourcingClass Internal = TestClasses.Internal;
+    private static readonly ResourcingClass Vendor = TestClasses.Vendor;
+    private static readonly ResourcingClass[] Classes = [Internal, Vendor];
 
     [Fact]
     public void Parses_valid_rows_with_class_aliases_and_trimming()
     {
         var result = RateCardCsv.Parse(new StringReader(Header +
             " Software Engineer , senior , Onshore , Internal , 120.50\n" +
-            "QA Analyst,Mid,Offshore,Contractor,$55\n"));
+            "QA Analyst,Mid,Offshore,Contractor,$55\n"), Classes);
 
         Assert.True(result.IsValid);
         Assert.Equal(2, result.Rows.Count);
-        Assert.Equal(new RateCardCsvRow("Software Engineer", "senior", "Onshore", ResourcingClass.InternalFte, 120.50m), result.Rows[0]);
-        Assert.Equal(ResourcingClass.Vendor, result.Rows[1].ResourcingClass);
+        Assert.Equal(new RateCardCsvRow("Software Engineer", "senior", "Onshore", Internal, 120.50m), result.Rows[0]);
+        Assert.Same(Vendor, result.Rows[1].ResourcingClass);
         Assert.Equal(55m, result.Rows[1].HourlyRate);
     }
 
@@ -26,7 +30,7 @@ public class RateCardCsvTests
     {
         var result = RateCardCsv.Parse(new StringReader("ResourceType,BusinessUnit,Seniority,Location,ResourcingClass,HourlyRate\n" +
             "SE,Boarding,Senior,Onshore,Internal,100\n" +
-            "SE,Lending,Senior,Onshore,Internal,110\n"));
+            "SE,Lending,Senior,Onshore,Internal,110\n"), Classes);
 
         Assert.False(result.IsValid);
         Assert.Contains("Duplicate", Assert.Single(result.Errors).Message);
@@ -39,7 +43,7 @@ public class RateCardCsvTests
         var result = RateCardCsv.Parse(new StringReader("ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor,Discipline\n" +
             "Agile Practitioner,Senior,Onshore,Internal,100,,\n" +
             "AI Engineer,Senior,Onshore,Internal,150,, Data Science \n" +
-            $"Business Analyst,Senior,Onshore,Internal,90,,{new string('x', 101)}\n"));
+            $"Business Analyst,Senior,Onshore,Internal,90,,{new string('x', 101)}\n"), Classes);
 
         Assert.Null(result.Rows[0].Discipline);
         Assert.Equal("Data Science", result.Rows[1].Discipline);
@@ -48,13 +52,13 @@ public class RateCardCsvTests
         var sw = new StringWriter();
         RateCardCsv.Write(sw, result.Rows);
         Assert.StartsWith(string.Join(',', RateCardCsv.Headers), sw.ToString());
-        Assert.Contains("AI Engineer,Senior,Onshore,InternalFte,150.00,,Data Science", sw.ToString());
+        Assert.Contains("AI Engineer,Senior,Onshore,Internal,150.00,,Data Science", sw.ToString());
     }
 
     [Fact]
     public void Reports_missing_columns()
     {
-        var result = RateCardCsv.Parse(new StringReader("ResourceType,Location\nA,B\n"));
+        var result = RateCardCsv.Parse(new StringReader("ResourceType,Location\nA,B\n"), Classes);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Message.Contains("Missing column"));
     }
@@ -66,7 +70,7 @@ public class RateCardCsvTests
             "SE,,Onshore,Internal,100\n" +
             "SE,Senior,Onshore,Freelance,100\n" +
             "SE,Senior,Onshore,Internal,-5\n" +
-            ",Senior,Onshore,Internal,100\n"));
+            ",Senior,Onshore,Internal,100\n"), Classes);
 
         Assert.False(result.IsValid);
         Assert.Empty(result.Rows);
@@ -76,7 +80,7 @@ public class RateCardCsvTests
     [Fact]
     public void Rejects_seniority_names_over_the_catalog_limit()
     {
-        var result = RateCardCsv.Parse(new StringReader(Header + $"SE,{new string('x', 101)},Onshore,Internal,100\n"));
+        var result = RateCardCsv.Parse(new StringReader(Header + $"SE,{new string('x', 101)},Onshore,Internal,100\n"), Classes);
 
         Assert.False(result.IsValid);
         Assert.Contains("at most 100 characters", Assert.Single(result.Errors).Message);
@@ -85,7 +89,7 @@ public class RateCardCsvTests
     [Fact]
     public void Accepts_any_seniority_name()
     {
-        var result = RateCardCsv.Parse(new StringReader(Header + "SE,Level 1 (0-2 Years),Onshore,Internal,100\n"));
+        var result = RateCardCsv.Parse(new StringReader(Header + "SE,Level 1 (0-2 Years),Onshore,Internal,100\n"), Classes);
 
         Assert.True(result.IsValid);
         Assert.Equal("Level 1 (0-2 Years)", Assert.Single(result.Rows).Seniority);
@@ -96,7 +100,7 @@ public class RateCardCsvTests
     {
         var result = RateCardCsv.Parse(new StringReader(Header +
             "SE,Senior,Onshore,Internal,100\n" +
-            "se,SENIOR,onshore,Fte,110\n"));
+            "se,SENIOR,onshore,Fte,110\n"), Classes);
 
         Assert.False(result.IsValid);
         Assert.Single(result.Errors);
@@ -108,13 +112,13 @@ public class RateCardCsvTests
     {
         var rows = new[]
         {
-            new RateCardCsvRow("Software Engineer", "Staff", "Onshore", ResourcingClass.InternalFte, 175m),
-            new RateCardCsvRow("UX Designer", "Level 1 (0-2 Years)", "Nearshore", ResourcingClass.Vendor, 42.25m)
+            new RateCardCsvRow("Software Engineer", "Staff", "Onshore", Internal, 175m),
+            new RateCardCsvRow("UX Designer", "Level 1 (0-2 Years)", "Nearshore", Vendor, 42.25m)
         };
         var sw = new StringWriter();
         RateCardCsv.Write(sw, rows);
 
-        var result = RateCardCsv.Parse(new StringReader(sw.ToString()));
+        var result = RateCardCsv.Parse(new StringReader(sw.ToString()), Classes);
         Assert.True(result.IsValid);
         Assert.Equal(rows, result.Rows);
     }

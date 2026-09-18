@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
 using InitiativeScoping.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -93,7 +94,7 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
             {
                 ["Id"] = alloc.Id.ToString(), ["InitiativeId"] = scenarioId.ToString(), ["PhaseId"] = scenarioPhaseId.ToString(),
                 ["BusinessUnitId"] = alloc.BusinessUnitId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-                ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "1", ["EstimatedHours"] = "100"
+                ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "100"
             });
             Assert.Equal(HttpStatusCode.Redirect, edit.StatusCode);
         }
@@ -105,12 +106,11 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         Assert.Contains("-$12,000", compare);
         Assert.Contains("-100.0", compare);
         // Per-resource-type rows are grouped under the class they belong to: all hours here are internal, so the
-        // type row follows "Internal FTE hours" and nothing is listed under "Vendor hours".
-        var internalIdx = compare.IndexOf("Internal FTE hours", StringComparison.Ordinal);
-        var vendorIdx = compare.IndexOf("Vendor hours", StringComparison.Ordinal);
-        Assert.True(internalIdx > 0 && vendorIdx > internalIdx);
-        Assert.Contains("compare-type-row", compare[internalIdx..vendorIdx]);
-        Assert.DoesNotContain("compare-type-row", compare[vendorIdx..compare.IndexOf("compare-section\">Cost", StringComparison.Ordinal)]);
+        // type row follows "Internal hours" and the unused Vendor class gets no section at all.
+        var internalIdx = compare.IndexOf("Internal hours", StringComparison.Ordinal);
+        Assert.True(internalIdx > 0);
+        Assert.DoesNotContain("Vendor hours", compare);
+        Assert.Contains("compare-type-row", compare[internalIdx..]);
         Assert.Contains($"/Initiatives/{id}/Scenarios/{scenarioId}/Promote", compare);
         Assert.Contains($"/Initiatives/{id}/Scenarios/Print", compare);
         Assert.Contains($"Scenarios (1)", WebUtility.HtmlDecode(await client.GetStringAsync(details)));
@@ -263,7 +263,7 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         var nonLabor = await PostFormAsync(client, details, $"/Initiatives/AddNonLaborCost/{id}", new()
         {

@@ -105,7 +105,7 @@ public class FiscalPeriodTests
         var baseline = new ForecastBaseline
         {
             Version = 1, SnapshotBy = "t", IsCurrent = true,
-            Lines = [new ForecastBaselineLine { PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", PhaseName = "Build", BusinessUnitName = "BU", ResourceTypeName = "RT", SeniorityName = "S", Hours = 60, HourlyRate = 100m, Cost = 6000m, CapexPercent = 100m }],
+            Lines = [new ForecastBaselineLine { PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", PhaseName = "Build", BusinessUnitName = "BU", ResourceTypeName = "RT", SeniorityName = "S", ResourcingClassName = "Internal", Hours = 60, HourlyRate = 100m, Cost = 6000m, CapexPercent = 100m }],
             NonLaborLines = [new ForecastBaselineNonLaborLine { Description = "Tool", BillingModel = BillingModel.OneTime, Quantity = 1, UnitCost = 400m, Periods = 1, StartDate = jan15, EndDate = jan15, Cost = 400m }]
         };
 

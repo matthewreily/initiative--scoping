@@ -97,8 +97,12 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 
         // Export round-trips through the parser.
         var export = await client.GetStringAsync("/Admin/People/Export");
-        Assert.Contains($"Bob {tag},BOB-{tag},Software Engineer,Boarding,Mid,Onshore,InternalFte,true", export);
-        Assert.True(InitiativeScoping.Application.People.PeopleCsv.Parse(new StringReader(export)).IsValid);
+        Assert.Contains($"Bob {tag},BOB-{tag},Software Engineer,Boarding,Mid,Onshore,Internal,true", export);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var classes = await ResourcingClassCatalog.AllAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), CancellationToken.None);
+            Assert.True(InitiativeScoping.Application.People.PeopleCsv.Parse(new StringReader(export), classes).IsValid);
+        }
     }
 
     [Fact]
@@ -330,7 +334,7 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     private static Dictionary<string, string> Person(string name, string ids, int typeId, int buId, int seniorityId = 2, string location = "Onshore", bool active = true) => new()
     {
         ["DisplayName"] = name, ["ExternalIds"] = ids, ["ResourceTypeId"] = typeId.ToString(), ["BusinessUnitId"] = buId.ToString(),
-        ["SeniorityId"] = seniorityId.ToString(), ["Location"] = location, ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["IsActive"] = active ? "true" : "false"
+        ["SeniorityId"] = seniorityId.ToString(), ["Location"] = location, ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["IsActive"] = active ? "true" : "false"
     };
 
     private static async Task<(int TypeId, int BuId)> LookupsAsync(WebAppFactory f)
@@ -406,7 +410,7 @@ public class ActualsTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var add = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {
             ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
-            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "100"
         });
         Assert.Equal(HttpStatusCode.Redirect, add.StatusCode);
     }
