@@ -2,7 +2,7 @@
 @{
     var catalog = Model.Catalog.ToDictionary(
         c => c.Id,
-        c => new { category = (int)c.Category, name = c.Label, billing = (int)c.BillingModel, unitCost = c.UnitCost });
+        c => new { category = (int)c.Category, name = c.Label, billing = (int)c.BillingModel, unitCost = c.UnitCost, capitalization = (int)c.Capitalization });
     var windows = Model.Windows.ToDictionary(
         w => w.Key,
         w => new { start = w.Value.Start.ToString("yyyy-MM-dd"), end = w.Value.End.ToString("yyyy-MM-dd") });
@@ -13,7 +13,7 @@
         const byId = id => document.getElementById(id);
         const catalogSelect = byId('@Id("catalog")'), category = byId('@Id("category")'), description = byId('@Id("description")');
         const phase = byId('@Id("phase")'), billing = byId('@Id("billing")'), quantity = byId('@Id("quantity")'), unitCost = byId('@Id("unitcost")');
-        const start = byId('@Id("start")'), end = byId('@Id("end")'), output = byId('@Id("preview")');
+        const start = byId('@Id("start")'), end = byId('@Id("end")'), output = byId('@Id("preview")'), capitalization = byId('@Id("capitalization")');
         const catalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(catalog));
         const windows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(windows));
         const ONE_TIME = @((int)BillingModel.OneTime), ANNUAL = @((int)BillingModel.Annual);
@@ -50,6 +50,7 @@
             category.value = item.category;
             billing.value = item.billing;
             unitCost.value = item.unitCost;
+            if (capitalization) { capitalization.value = item.capitalization; }
             if (!description.value) { description.value = item.name; }
             sync();
         }

@@ -78,6 +78,11 @@
             <span asp-validation-for="EndDate" class="text-danger"></span>
             <div class="form-text">Leave both blank to bill over the phase/initiative window.</div>
         </div>
+        <div class="col-md-2">
+            <label asp-for="Capitalization" for="@(pfx)capitalization" class="form-label"></label>
+            <select asp-for="Capitalization" id="@(pfx)capitalization" asp-items="Html.GetEnumSelectList<CapitalizationType>()" class="form-select"></select>
+            <span asp-validation-for="Capitalization" class="text-danger"></span>
+        </div>
         <div class="col-md-3">
             <label asp-for="ContractReference" class="form-label"></label>
             <input asp-for="ContractReference" class="form-control" />

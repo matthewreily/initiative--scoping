@@ -13,7 +13,7 @@
 <form asp-action="BulkDelete" method="post" data-bulk>
 <div class="table-responsive">
 <table class="table table-sm align-middle" data-sortable>
-    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Category</th><th>Name</th><th>Vendor</th><th>Billing</th><th class="text-end">Unit cost</th><th>Status</th><th>References</th><th data-nosort></th></tr></thead>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Category</th><th>Name</th><th>Vendor</th><th>Billing</th><th class="text-end">Unit cost</th><th>Capex / Opex</th><th>Status</th><th>References</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var row in Model)
     {
@@ -24,6 +24,7 @@
             <td>@row.Item.Vendor</td>
             <td>@Html.DisplayFor(_ => row.Item.BillingModel)</td>
             <td class="text-end">@row.Item.UnitCost.ToString("N2")</td>
+            <td>@row.Item.Capitalization</td>
             <td>@(row.Item.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
             <td>@row.ReferenceCount</td>
             <td class="text-end">

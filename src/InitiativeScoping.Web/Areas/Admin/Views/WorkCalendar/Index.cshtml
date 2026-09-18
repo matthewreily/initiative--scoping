@@ -1,9 +1,13 @@
+@using System.Globalization
 @model WorkCalendarViewModel
 @{
     ViewData["Title"] = "Work Calendar";
+    var months = Enumerable.Range(1, 12)
+        .Select(m => new SelectListItem(CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(m), m.ToString(), m == Model.FiscalYearStartMonth))
+        .ToList();
 }
 <h2 class="h4">Work Calendar</h2>
-<p class="text-muted">Fixed-duration initiatives compute allocation hours as quantity × allocation % × working days (Mon–Fri excluding holidays) × hours per day.</p>
+<p class="text-muted">Fixed-duration initiatives compute allocation hours as quantity × allocation % × working days (Mon–Fri excluding holidays) × hours per day. The fiscal year start month drives the FY / quarter subtotals on cost phasing, Portfolio and exports; a fiscal year is named after the calendar year it ends in.</p>
 
 <form asp-action="Settings" method="post" class="row g-2 align-items-end mb-4">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -11,6 +15,11 @@
         <label asp-for="HoursPerDay" class="form-label"></label>
         <input asp-for="HoursPerDay" class="form-control" type="number" step="0.25" min="0.5" max="24" style="max-width: 10rem" />
         <span asp-validation-for="HoursPerDay" class="text-danger"></span>
+    </div>
+    <div class="col-auto">
+        <label asp-for="FiscalYearStartMonth" class="form-label"></label>
+        <select asp-for="FiscalYearStartMonth" asp-items="months" class="form-select" style="max-width: 12rem"></select>
+        <span asp-validation-for="FiscalYearStartMonth" class="text-danger"></span>
     </div>
     <div class="col-auto">
         <button type="submit" class="btn btn-primary">Save</button>

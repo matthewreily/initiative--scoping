@@ -13,9 +13,48 @@ public sealed record MonthBucket(
     decimal ActualCost,
     decimal CumulativeForecastCost,
     decimal CumulativeBaselineCost,
-    decimal CumulativeActualCost)
+    decimal CumulativeActualCost,
+    decimal ForecastCapexCost = 0m,
+    decimal BaselineCapexCost = 0m)
 {
     public decimal ForecastCost => ForecastLaborCost + ForecastNonLaborCost;
+    public decimal ForecastOpexCost => ForecastCost - ForecastCapexCost;
+    public decimal BaselineOpexCost => BaselineCost - BaselineCapexCost;
+    public decimal VarianceToBaseline => ForecastCost - BaselineCost;
+}
+
+/// <summary>Fiscal calendar: the month a fiscal year starts in. Fiscal years are named after the calendar year they end in.</summary>
+public sealed record FiscalCalendar(int StartMonth)
+{
+    public static readonly FiscalCalendar Calendar = new(1);
+
+    public int FiscalYearOf(DateOnly date) => StartMonth == 1 || date.Month < StartMonth ? date.Year : date.Year + 1;
+
+    public int QuarterOf(DateOnly date) => ((date.Month - StartMonth + 12) % 12) / 3 + 1;
+
+    public DateOnly StartOf(int fiscalYear) => new(StartMonth == 1 ? fiscalYear : fiscalYear - 1, StartMonth, 1);
+
+    public string Label(int fiscalYear) => StartMonth == 1 ? fiscalYear.ToString() : $"FY{fiscalYear}";
+}
+
+/// <summary>A fiscal year or quarter subtotal of a monthly profile. <see cref="Quarter"/> is null for year rows.</summary>
+public sealed record FiscalPeriodBucket(
+    int FiscalYear,
+    int? Quarter,
+    string Label,
+    DateOnly Start,
+    DateOnly End,
+    decimal ForecastHours,
+    decimal ForecastLaborCost,
+    decimal ForecastNonLaborCost,
+    decimal ForecastCapexCost,
+    decimal BaselineCost,
+    decimal BaselineCapexCost,
+    decimal ActualCost)
+{
+    public decimal ForecastCost => ForecastLaborCost + ForecastNonLaborCost;
+    public decimal ForecastOpexCost => ForecastCost - ForecastCapexCost;
+    public decimal BaselineOpexCost => BaselineCost - BaselineCapexCost;
     public decimal VarianceToBaseline => ForecastCost - BaselineCost;
 }
 
@@ -27,6 +66,9 @@ public sealed record MonthlyPhasing(IReadOnlyList<MonthBucket> Months)
     public decimal ForecastCost => Months.Sum(m => m.ForecastCost);
     public decimal BaselineCost => Months.Sum(m => m.BaselineCost);
     public decimal ActualCost => Months.Sum(m => m.ActualCost);
+    public decimal ForecastCapexCost => Months.Sum(m => m.ForecastCapexCost);
+    public decimal ForecastOpexCost => ForecastCost - ForecastCapexCost;
+    public decimal BaselineCapexCost => Months.Sum(m => m.BaselineCapexCost);
     public decimal PeakMonthCost => Months.Count == 0 ? 0m : Months.Max(m => Math.Max(m.ForecastCost, Math.Max(m.BaselineCost, m.ActualCost)));
 
     /// <summary>Calendar-year subtotals in chronological order.</summary>
@@ -36,14 +78,42 @@ public sealed record MonthlyPhasing(IReadOnlyList<MonthBucket> Months)
             .Select(g => (g.Key, g.Sum(m => m.ForecastCost), g.Sum(m => m.BaselineCost), g.Sum(m => m.ActualCost)))
             .ToList();
 
+    /// <summary>
+    /// Fiscal-year rows, each followed by its quarter rows, in chronological order. Only quarters that touch the profile are
+    /// listed; a fiscal year row covers the whole year window regardless.
+    /// </summary>
+    public IReadOnlyList<FiscalPeriodBucket> ByFiscalPeriod(FiscalCalendar calendar)
+    {
+        var result = new List<FiscalPeriodBucket>();
+        foreach (var year in Months.GroupBy(m => calendar.FiscalYearOf(m.Month)).OrderBy(g => g.Key))
+        {
+            var start = calendar.StartOf(year.Key);
+            result.Add(Sum(year, year.Key, null, calendar.Label(year.Key), start, start.AddYears(1).AddDays(-1)));
+            foreach (var quarter in year.GroupBy(m => calendar.QuarterOf(m.Month)).OrderBy(g => g.Key))
+            {
+                var qStart = start.AddMonths((quarter.Key - 1) * 3);
+                result.Add(Sum(quarter, year.Key, quarter.Key, $"{calendar.Label(year.Key)} Q{quarter.Key}", qStart, qStart.AddMonths(3).AddDays(-1)));
+            }
+        }
+
+        return result;
+
+        static FiscalPeriodBucket Sum(IEnumerable<MonthBucket> months, int fy, int? quarter, string label, DateOnly start, DateOnly end)
+        {
+            var list = months.ToList();
+            return new FiscalPeriodBucket(fy, quarter, label, start, end,
+                list.Sum(m => m.ForecastHours), list.Sum(m => m.ForecastLaborCost), list.Sum(m => m.ForecastNonLaborCost), list.Sum(m => m.ForecastCapexCost),
+                list.Sum(m => m.BaselineCost), list.Sum(m => m.BaselineCapexCost), list.Sum(m => m.ActualCost));
+        }
+    }
+
     /// <summary>Sums several initiatives' profiles month by month.</summary>
     public static MonthlyPhasing Combine(IEnumerable<MonthlyPhasing> profiles)
     {
-        var buckets = new SortedDictionary<DateOnly, (decimal Labor, decimal NonLabor, decimal Hours, decimal Baseline, decimal Actual)>();
+        var buckets = new SortedDictionary<DateOnly, MonthlyPhasingCalculator.Bucket>();
         foreach (var m in profiles.SelectMany(p => p.Months))
         {
-            var b = buckets.GetValueOrDefault(m.Month);
-            buckets[m.Month] = (b.Labor + m.ForecastLaborCost, b.NonLabor + m.ForecastNonLaborCost, b.Hours + m.ForecastHours, b.Baseline + m.BaselineCost, b.Actual + m.ActualCost);
+            buckets[m.Month] = buckets.GetValueOrDefault(m.Month).Plus(m.ForecastLaborCost, m.ForecastNonLaborCost, m.ForecastHours, m.BaselineCost, m.ActualCost, m.ForecastCapexCost, m.BaselineCapexCost);
         }
 
         return MonthlyPhasingCalculator.Build(buckets);
@@ -60,6 +130,12 @@ public sealed record MonthlyPhasing(IReadOnlyList<MonthBucket> Months)
 /// </summary>
 public static class MonthlyPhasingCalculator
 {
+    internal readonly record struct Bucket(decimal Labor, decimal NonLabor, decimal Hours, decimal Baseline, decimal Actual, decimal ForecastCapex, decimal BaselineCapex)
+    {
+        public Bucket Plus(decimal labor = 0m, decimal nonLabor = 0m, decimal hours = 0m, decimal baseline = 0m, decimal actual = 0m, decimal forecastCapex = 0m, decimal baselineCapex = 0m) =>
+            new(Labor + labor, NonLabor + nonLabor, Hours + hours, Baseline + baseline, Actual + actual, ForecastCapex + forecastCapex, BaselineCapex + baselineCapex);
+    }
+
     public static MonthlyPhasing Calculate(
         Initiative initiative,
         ForecastResult forecast,
@@ -68,13 +144,12 @@ public static class MonthlyPhasingCalculator
         IReadOnlyList<ActualAdjustment> adjustments)
     {
         var phases = initiative.Phases.ToDictionary(p => p.Id);
-        var buckets = new SortedDictionary<DateOnly, (decimal Labor, decimal NonLabor, decimal Hours, decimal Baseline, decimal Actual)>();
+        var buckets = new SortedDictionary<DateOnly, Bucket>();
 
-        void Add(DateOnly month, decimal labor = 0m, decimal nonLabor = 0m, decimal hours = 0m, decimal baselineCost = 0m, decimal actual = 0m)
-        {
-            var b = buckets.GetValueOrDefault(month);
-            buckets[month] = (b.Labor + labor, b.NonLabor + nonLabor, b.Hours + hours, b.Baseline + baselineCost, b.Actual + actual);
-        }
+        void Add(DateOnly month, decimal labor = 0m, decimal nonLabor = 0m, decimal hours = 0m, decimal baselineCost = 0m, decimal actual = 0m, decimal forecastCapex = 0m, decimal baselineCapex = 0m) =>
+            buckets[month] = buckets.GetValueOrDefault(month).Plus(labor, nonLabor, hours, baselineCost, actual, forecastCapex, baselineCapex);
+
+        static decimal CapexPart(CapitalizationType c, decimal amount) => c == CapitalizationType.Capex ? amount : 0m;
 
         foreach (var line in forecast.Lines)
         {
@@ -87,7 +162,7 @@ public static class MonthlyPhasingCalculator
             var hourShares = SpreadByDays(line.Hours, phase.PlannedStart, phase.PlannedEnd);
             for (var k = 0; k < costShares.Count; k++)
             {
-                Add(costShares[k].Month, labor: costShares[k].Amount, hours: hourShares[k].Amount);
+                Add(costShares[k].Month, labor: costShares[k].Amount, hours: hourShares[k].Amount, forecastCapex: CapexPart(line.Allocation.Capitalization, costShares[k].Amount));
             }
         }
 
@@ -95,7 +170,7 @@ public static class MonthlyPhasingCalculator
         {
             foreach (var (month, amount) in SpreadByPeriods(line.Cost, line.Periods, line.Line.BillingModel, line.Start!.Value))
             {
-                Add(month, nonLabor: amount);
+                Add(month, nonLabor: amount, forecastCapex: CapexPart(line.Line.Capitalization, amount));
             }
         }
 
@@ -110,7 +185,7 @@ public static class MonthlyPhasingCalculator
 
                 foreach (var (month, amount) in SpreadByDays(line.Cost, phase.PlannedStart, phase.PlannedEnd))
                 {
-                    Add(month, baselineCost: amount);
+                    Add(month, baselineCost: amount, baselineCapex: CapexPart(line.Capitalization, amount));
                 }
             }
 
@@ -118,7 +193,7 @@ public static class MonthlyPhasingCalculator
             {
                 foreach (var (month, amount) in SpreadByPeriods(line.Cost, line.Periods, line.BillingModel, line.StartDate))
                 {
-                    Add(month, baselineCost: amount);
+                    Add(month, baselineCost: amount, baselineCapex: CapexPart(line.Capitalization, amount));
                 }
             }
         }
@@ -136,7 +211,7 @@ public static class MonthlyPhasingCalculator
         return Build(buckets);
     }
 
-    internal static MonthlyPhasing Build(SortedDictionary<DateOnly, (decimal Labor, decimal NonLabor, decimal Hours, decimal Baseline, decimal Actual)> buckets)
+    internal static MonthlyPhasing Build(SortedDictionary<DateOnly, Bucket> buckets)
     {
         if (buckets.Count == 0)
         {
@@ -151,7 +226,7 @@ public static class MonthlyPhasingCalculator
             cumForecast += b.Labor + b.NonLabor;
             cumBaseline += b.Baseline;
             cumActual += b.Actual;
-            months.Add(new MonthBucket(m, b.Labor, b.NonLabor, b.Hours, b.Baseline, b.Actual, cumForecast, cumBaseline, cumActual));
+            months.Add(new MonthBucket(m, b.Labor, b.NonLabor, b.Hours, b.Baseline, b.Actual, cumForecast, cumBaseline, cumActual, b.ForecastCapex, b.BaselineCapex));
         }
 
         return new MonthlyPhasing(months);

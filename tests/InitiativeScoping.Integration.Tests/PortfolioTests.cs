@@ -75,7 +75,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         var xlsx = await client.GetAsync("/Portfolio/Export?format=XLSX");
         Assert.Equal(HttpStatusCode.OK, xlsx.StatusCode);
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx.Content.Headers.ContentType!.MediaType);
-        Assert.Equal(["By month", "By resourcing business unit", "By sponsor business unit", "By status", "By vendor", "Initiative by month", "Initiatives"], await SheetNamesAsync(xlsx));
+        Assert.Equal(["By fiscal period", "By month", "By resourcing business unit", "By sponsor business unit", "By status", "By vendor", "Initiative by fiscal period", "Initiative by month", "Initiatives"], await SheetNamesAsync(xlsx));
 
         var initiative = await client.GetAsync($"/Initiatives/{id}/Export?format=xlsx");
         Assert.Equal(HttpStatusCode.OK, initiative.StatusCode);
@@ -88,7 +88,8 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.Contains("# Forecast", initiativeCsv);
         Assert.Contains("# By month", initiativeCsv);
         Assert.Contains("Month,Forecast hours,Forecast labor cost", initiativeCsv);
-        Assert.Contains("Boarding,Software Engineer,Senior,Onshore,InternalFte,,,2,100,200,120,24000", initiativeCsv);
+        Assert.Contains("Boarding,Software Engineer,Senior,Onshore,InternalFte,,,2,100,200,120,24000,Opex", initiativeCsv);
+        Assert.Contains("# By fiscal period", initiativeCsv);
         Assert.Contains("# Adjustments", initiativeCsv);
         Assert.Contains(",5,500,Adj", initiativeCsv);
 

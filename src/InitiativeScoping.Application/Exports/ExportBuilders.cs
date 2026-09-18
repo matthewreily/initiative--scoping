@@ -5,8 +5,9 @@ namespace InitiativeScoping.Application.Exports;
 
 public static class PortfolioExport
 {
-    public static IReadOnlyList<ExportTable> Build(PortfolioResult portfolio)
+    public static IReadOnlyList<ExportTable> Build(PortfolioResult portfolio, FiscalCalendar? fiscal = null)
     {
+        fiscal ??= FiscalCalendar.Calendar;
         var initiatives = new ExportTable("Initiatives",
             ["Id", "Initiative", "Business unit", "Status", "Target start", "Baseline version",
              "Forecast hours", "Forecast cost", "Internal forecast cost", "Vendor forecast cost", "Non-labor forecast cost",
@@ -35,9 +36,17 @@ public static class PortfolioExport
             LaborSplit("By resourcing business unit", "Business unit", portfolio.ByResourcingBusinessUnit),
             LaborSplit("By vendor", "Vendor", portfolio.ByVendor),
             MonthlyPhasingExport.Table("By month", portfolio.ByMonth),
-            InitiativeMonths(portfolio.Rows)
+            MonthlyPhasingExport.FiscalTable("By fiscal period", portfolio.ByMonth, fiscal),
+            InitiativeMonths(portfolio.Rows),
+            InitiativeFiscalPeriods(portfolio.Rows, fiscal)
         ];
     }
+
+    private static ExportTable InitiativeFiscalPeriods(IReadOnlyList<PortfolioRow> rows, FiscalCalendar fiscal) =>
+        new("Initiative by fiscal period",
+            ["Id", "Initiative", "Fiscal year", "Quarter", "Period", "Start", "End", "Forecast hours", "Forecast labor cost", "Forecast non-labor cost", "Forecast cost", "Forecast capex", "Forecast opex", "Baseline cost", "Baseline capex", "Baseline opex", "Forecast vs. baseline", "Actual cost"],
+            rows.SelectMany(r => r.Phasing.ByFiscalPeriod(fiscal).Select(p => (IReadOnlyList<object?>)
+                [r.Initiative.Id, r.Initiative.Name, p.FiscalYear, p.Quarter, p.Label, p.Start, p.End, p.ForecastHours, p.ForecastLaborCost, p.ForecastNonLaborCost, p.ForecastCost, p.ForecastCapexCost, p.ForecastOpexCost, p.BaselineCost, p.BaselineCapexCost, p.BaselineOpexCost, p.VarianceToBaseline, p.ActualCost])).ToList());
 
     private static ExportTable InitiativeMonths(IReadOnlyList<PortfolioRow> rows) =>
         new("Initiative by month",
@@ -60,11 +69,21 @@ public static class MonthlyPhasingExport
 {
     public static ExportTable Table(string name, MonthlyPhasing phasing) =>
         new(name,
-            ["Month", "Forecast hours", "Forecast labor cost", "Forecast non-labor cost", "Forecast cost", "Baseline cost", "Forecast vs. baseline", "Actual cost", "Cumulative forecast", "Cumulative baseline", "Cumulative actual"],
+            ["Month", "Forecast hours", "Forecast labor cost", "Forecast non-labor cost", "Forecast cost", "Forecast capex", "Forecast opex", "Baseline cost", "Baseline capex", "Baseline opex", "Forecast vs. baseline", "Actual cost", "Cumulative forecast", "Cumulative baseline", "Cumulative actual"],
             phasing.Months.Select(m => (IReadOnlyList<object?>)
             [
-                m.Month, m.ForecastHours, m.ForecastLaborCost, m.ForecastNonLaborCost, m.ForecastCost, m.BaselineCost, m.VarianceToBaseline, m.ActualCost,
+                m.Month, m.ForecastHours, m.ForecastLaborCost, m.ForecastNonLaborCost, m.ForecastCost, m.ForecastCapexCost, m.ForecastOpexCost,
+                m.BaselineCost, m.BaselineCapexCost, m.BaselineOpexCost, m.VarianceToBaseline, m.ActualCost,
                 m.CumulativeForecastCost, m.CumulativeBaselineCost, m.CumulativeActualCost
+            ]).ToList());
+
+    public static ExportTable FiscalTable(string name, MonthlyPhasing phasing, FiscalCalendar fiscal) =>
+        new(name,
+            ["Fiscal year", "Quarter", "Period", "Start", "End", "Forecast hours", "Forecast labor cost", "Forecast non-labor cost", "Forecast cost", "Forecast capex", "Forecast opex", "Baseline cost", "Baseline capex", "Baseline opex", "Forecast vs. baseline", "Actual cost"],
+            phasing.ByFiscalPeriod(fiscal).Select(p => (IReadOnlyList<object?>)
+            [
+                p.FiscalYear, p.Quarter, p.Label, p.Start, p.End, p.ForecastHours, p.ForecastLaborCost, p.ForecastNonLaborCost, p.ForecastCost, p.ForecastCapexCost, p.ForecastOpexCost,
+                p.BaselineCost, p.BaselineCapexCost, p.BaselineOpexCost, p.VarianceToBaseline, p.ActualCost
             ]).ToList());
 }
 
@@ -80,8 +99,10 @@ public static class InitiativeExport
         IReadOnlyDictionary<int, string> resourceTypeNames,
         IReadOnlyDictionary<int, string> businessUnitNames,
         IReadOnlyDictionary<int, string> vendorNames,
-        IReadOnlyDictionary<int, string> seniorityNames)
+        IReadOnlyDictionary<int, string> seniorityNames,
+        FiscalCalendar? fiscal = null)
     {
+        fiscal ??= FiscalCalendar.Calendar;
         var phases = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
         var baseline = variance.Baseline;
         var budget = BudgetCalculator.Calculate(initiative, forecast, variance);
@@ -103,6 +124,8 @@ public static class InitiativeExport
             ["Contingency %", forecast.ContingencyPct],
             ["Contingency cost", forecast.ContingencyCost],
             ["Forecast cost with contingency", forecast.TotalCostWithContingency],
+            ["Forecast capex", phasing.ForecastCapexCost],
+            ["Forecast opex", phasing.ForecastOpexCost],
             ["Estimate confidence", initiative.EstimateConfidence?.ToString()],
             ["Forecast complete", forecast.IsComplete],
             ["Baseline version", baseline?.Version],
@@ -131,39 +154,39 @@ public static class InitiativeExport
         ]);
 
         var forecastLines = new ExportTable("Forecast",
-            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Contract", "Cost center"],
+            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Capex / Opex", "Contract", "Cost center"],
             forecast.Lines.Select(l => (IReadOnlyList<object?>)
             [
                 phases.GetValueOrDefault(l.Allocation.PhaseId), l.Allocation.BusinessUnit?.Name, resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
                 seniorityNames.GetValueOrDefault(l.Allocation.SeniorityId), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
                 l.Allocation.Person?.DisplayName, l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
-                l.Allocation.ContractReference, l.Allocation.CostCenter
+                l.Allocation.Capitalization.ToString(), l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
 
         var nonLaborLines = new ExportTable("Non-labor forecast",
-            ["Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Contract", "Cost center"],
+            ["Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Capex / Opex", "Contract", "Cost center"],
             forecast.NonLaborLines.Select(l => (IReadOnlyList<object?>)
             [
                 l.Line.PhaseId is { } pid ? phases.GetValueOrDefault(pid) : VarianceCalculator.WholeInitiative,
                 VarianceCalculator.CategoryLabel(l.Line.Category), l.Line.Description, l.Line.BillingModel.ToString(),
-                l.Line.Quantity, l.Line.UnitCost, l.Start, l.End, l.Periods, l.Cost, l.Line.ContractReference, l.Line.CostCenter
+                l.Line.Quantity, l.Line.UnitCost, l.Start, l.End, l.Periods, l.Cost, l.Line.Capitalization.ToString(), l.Line.ContractReference, l.Line.CostCenter
             ]).ToList());
 
         var baselineLines = new ExportTable("Baseline",
-            ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Hours", "Hourly rate", "Cost"],
+            ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Hours", "Hourly rate", "Cost", "Capex / Opex"],
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
                 baseline!.Version, l.PhaseName, l.BusinessUnitName, l.ResourceTypeName,
-                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.PersonName, l.Hours, l.HourlyRate, l.Cost
+                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.PersonName, l.Hours, l.HourlyRate, l.Cost, l.Capitalization.ToString()
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",
-            ["Version", "Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost"],
+            ["Version", "Phase", "Category", "Description", "Billing", "Quantity", "Unit cost", "Start", "End", "Periods", "Cost", "Capex / Opex"],
             (baseline?.NonLaborLines ?? []).Select(l => (IReadOnlyList<object?>)
             [
                 baseline!.Version, l.PhaseId is { } pid ? l.PhaseName ?? $"Phase #{pid}" : VarianceCalculator.WholeInitiative,
                 VarianceCalculator.CategoryLabel(l.Category), l.Description, l.BillingModel.ToString(),
-                l.Quantity, l.UnitCost, l.StartDate, l.EndDate, l.Periods, l.Cost
+                l.Quantity, l.UnitCost, l.StartDate, l.EndDate, l.Periods, l.Cost, l.Capitalization.ToString()
             ]).ToList());
 
         var variancePhase = VarianceTable("Variance by phase", variance.ByPhase);
@@ -183,7 +206,7 @@ public static class InitiativeExport
             ["Created", "Created by", "Category", "Hours", "Cost", "Reason"],
             adjustments.Select(a => (IReadOnlyList<object?>)[a.CreatedAt, a.CreatedBy, VarianceCalculator.CategoryLabel(a.Category), a.Hours, a.Cost, a.Reason]).ToList());
 
-        return [summary, forecastLines, nonLaborLines, MonthlyPhasingExport.Table("By month", phasing), baselineLines, baselineNonLabor, variancePhase, varianceType, variancePerson, varianceCategory, actuals, adjustmentTable];
+        return [summary, forecastLines, nonLaborLines, MonthlyPhasingExport.Table("By month", phasing), MonthlyPhasingExport.FiscalTable("By fiscal period", phasing, fiscal), baselineLines, baselineNonLabor, variancePhase, varianceType, variancePerson, varianceCategory, actuals, adjustmentTable];
     }
 
     private static ExportTable VarianceTable(string name, IReadOnlyList<VarianceRow> rows) =>

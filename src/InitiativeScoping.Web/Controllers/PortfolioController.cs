@@ -16,7 +16,7 @@ namespace InitiativeScoping.Web.Controllers;
 
 /// <summary>Portfolio dashboard (all initiatives, forecast vs. baseline vs. spent) and CSV/XLSX exports.</summary>
 [Authorize(Policy = AppPolicies.CanView)]
-public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<IExportWriter> writers, IConfiguration config) : Controller
+public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<IExportWriter> writers, IConfiguration config, IWorkCalendar workCalendar) : Controller
 {
     [HttpGet("Portfolio")]
     public async Task<IActionResult> Index(InitiativeStatus? status, int? businessUnitId, bool includeClosed, string? sort, string? dir, int page = 1, int? size = null, CancellationToken ct = default)
@@ -40,7 +40,8 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
             IncludeClosed = includeClosed,
             BusinessUnits = new SelectList(await db.BusinessUnits.OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name", businessUnitId),
             CanExport = true,
-            Formats = writers.Select(w => w.Extension).ToList()
+            Formats = writers.Select(w => w.Extension).ToList(),
+            Fiscal = (await workCalendar.GetAsync(ct)).Fiscal
         });
     }
 
@@ -55,7 +56,7 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
         }
 
         var portfolio = await db.LoadPortfolioAsync(new PortfolioFilter(status, businessUnitId, includeClosed), DefaultThreshold, ct);
-        var bytes = writer.Write(PortfolioExport.Build(portfolio));
+        var bytes = writer.Write(PortfolioExport.Build(portfolio, (await workCalendar.GetAsync(ct)).Fiscal));
 
         audit.Record("Portfolio", 0, AuditActions.Export, new { Format = writer.Extension, status, businessUnitId, includeClosed, Initiatives = portfolio.Count });
         await db.SaveChangesAsync(ct);
@@ -87,7 +88,7 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
         var vendorNames = await db.Vendors.AsNoTracking().ToDictionaryAsync(v => v.Id, v => v.Name, ct);
         var seniorityNames = await db.SeniorityLevels.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name, ct);
         var phasing = MonthlyPhasingCalculator.Calculate(initiative, forecast, initiative.CurrentBaseline, actuals.Entries, actuals.Adjustments);
-        var bytes = writer.Write(InitiativeExport.Build(initiative, forecast, actuals.Variance, actuals.Entries, actuals.Adjustments, phasing, typeNames, businessUnitNames, vendorNames, seniorityNames));
+        var bytes = writer.Write(InitiativeExport.Build(initiative, forecast, actuals.Variance, actuals.Entries, actuals.Adjustments, phasing, typeNames, businessUnitNames, vendorNames, seniorityNames, (await workCalendar.GetAsync(ct)).Fiscal));
 
         audit.Record(nameof(Initiative), id, AuditActions.Export, new { Format = writer.Extension, Rows = actuals.Entries.Count });
         await db.SaveChangesAsync(ct);

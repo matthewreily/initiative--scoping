@@ -7,10 +7,10 @@ public sealed class DbWorkCalendar(AppDbContext db) : IWorkCalendar
 {
     public async Task<WorkCalendar> GetAsync(CancellationToken ct = default)
     {
-        var hoursPerDay = await db.WorkCalendarSettings
-            .Select(s => (decimal?)s.HoursPerDay)
-            .FirstOrDefaultAsync(ct) ?? WorkCalendar.DefaultHoursPerDay;
+        var settings = await db.WorkCalendarSettings
+            .Select(s => new { s.HoursPerDay, s.FiscalYearStartMonth })
+            .FirstOrDefaultAsync(ct);
         var holidays = await db.Holidays.Select(h => h.Date).ToListAsync(ct);
-        return new WorkCalendar(hoursPerDay, holidays.ToHashSet());
+        return new WorkCalendar(settings?.HoursPerDay ?? WorkCalendar.DefaultHoursPerDay, holidays.ToHashSet(), settings?.FiscalYearStartMonth ?? 1);
     }
 }

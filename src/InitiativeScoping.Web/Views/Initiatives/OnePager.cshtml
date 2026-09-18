@@ -158,6 +158,28 @@
             </table>
         }
 
+        @{ var fiscalPeriods = Model.Phasing.ByFiscalPeriod(Model.Fiscal).Where(p => p.Quarter is null).ToList(); }
+        @if (fiscalPeriods.Count > 0)
+        {
+            <h2 class="h6 text-uppercase text-muted">Cost by fiscal year</h2>
+            <table class="table table-sm mb-3" id="one-pager-fiscal">
+                <thead><tr><th>Fiscal year</th><th class="text-end">Forecast</th><th class="text-end">Capex</th><th class="text-end">Opex</th>@if (Model.Phasing.BaselineCost != 0) { <th class="text-end">Baseline</th> }@if (Model.Phasing.ActualCost != 0) { <th class="text-end">Actual</th> }</tr></thead>
+                <tbody>
+                @foreach (var fy in fiscalPeriods)
+                {
+                    <tr>
+                        <td>@fy.Label</td>
+                        <td class="text-end">@fy.ForecastCost.ToString("C0")</td>
+                        <td class="text-end">@fy.ForecastCapexCost.ToString("C0")</td>
+                        <td class="text-end">@fy.ForecastOpexCost.ToString("C0")</td>
+                        @if (Model.Phasing.BaselineCost != 0) { <td class="text-end">@fy.BaselineCost.ToString("C0")</td> }
+                        @if (Model.Phasing.ActualCost != 0) { <td class="text-end">@fy.ActualCost.ToString("C0")</td> }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+
         <h2 class="h6 text-uppercase text-muted">Team by resource type</h2>
         <table class="table table-sm mb-3" id="one-pager-types">
             <tbody>

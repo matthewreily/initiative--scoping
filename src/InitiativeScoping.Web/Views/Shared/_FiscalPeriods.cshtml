@@ -1,0 +1,72 @@
+@using System.Globalization
+@using InitiativeScoping.Domain.Services
+@model FiscalPeriodsViewModel
+@{
+    var id = ViewData["Id"] as string ?? "fiscal";
+    var periods = Model.Phasing.ByFiscalPeriod(Model.Calendar);
+    var hasBaseline = Model.Phasing.BaselineCost != 0m;
+    var hasActuals = Model.Phasing.ActualCost != 0m;
+    var startMonth = CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(Model.Calendar.StartMonth);
+    string Signed(decimal v) => (v > 0 ? "+" : "") + v.ToString("C0");
+}
+@if (periods.Count == 0)
+{
+    <p class="text-muted" id="@id-empty">Nothing to phase yet – fiscal subtotals appear once there is cost by month.</p>
+}
+else
+{
+    <p class="text-muted small mb-2">
+        Fiscal year starts in @startMonth@(Model.Calendar.StartMonth == 1 ? " (calendar year)" : $"; FY labels use the calendar year the fiscal year ends in"). Quarters are counted from the fiscal year start. Capex / Opex follow the flag on each allocation and non-labor line.
+    </p>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" id="@id-table">
+        <thead>
+            <tr>
+                <th scope="col">Period</th>
+                <th scope="col" class="text-end">Hours</th>
+                <th scope="col" class="text-end">Labor</th>
+                <th scope="col" class="text-end">Non-labor</th>
+                <th scope="col" class="text-end">Forecast</th>
+                <th scope="col" class="text-end">Capex</th>
+                <th scope="col" class="text-end">Opex</th>
+                @if (hasBaseline) { <th scope="col" class="text-end">Baseline</th><th scope="col" class="text-end">Δ vs. baseline</th> }
+                @if (hasActuals) { <th scope="col" class="text-end">Actual</th> }
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var p in periods)
+        {
+            var isYear = p.Quarter is null;
+            <tr class="@(isYear ? "table-light fw-semibold" : "")" data-fiscal-year="@p.FiscalYear" data-fiscal-quarter="@p.Quarter">
+                <th scope="row" class="text-nowrap @(isYear ? "" : "fw-normal ps-4")" title="@p.Start.ToString("d MMM yyyy") – @p.End.ToString("d MMM yyyy")">@p.Label</th>
+                <td class="text-end">@p.ForecastHours.ToString("N1")</td>
+                <td class="text-end">@p.ForecastLaborCost.ToString("C0")</td>
+                <td class="text-end">@p.ForecastNonLaborCost.ToString("C0")</td>
+                <td class="text-end">@p.ForecastCost.ToString("C0")</td>
+                <td class="text-end">@p.ForecastCapexCost.ToString("C0")</td>
+                <td class="text-end">@p.ForecastOpexCost.ToString("C0")</td>
+                @if (hasBaseline)
+                {
+                    <td class="text-end">@p.BaselineCost.ToString("C0")</td>
+                    <td class="text-end @(p.VarianceToBaseline > 0 ? "text-danger" : p.VarianceToBaseline < 0 ? "text-success" : "text-muted")">@Signed(p.VarianceToBaseline)</td>
+                }
+                @if (hasActuals) { <td class="text-end">@p.ActualCost.ToString("C0")</td> }
+            </tr>
+        }
+        </tbody>
+        <tfoot class="fw-semibold">
+            <tr>
+                <th scope="row">Total</th>
+                <td class="text-end">@Model.Phasing.Months.Sum(m => m.ForecastHours).ToString("N1")</td>
+                <td class="text-end">@Model.Phasing.Months.Sum(m => m.ForecastLaborCost).ToString("C0")</td>
+                <td class="text-end">@Model.Phasing.Months.Sum(m => m.ForecastNonLaborCost).ToString("C0")</td>
+                <td class="text-end">@Model.Phasing.ForecastCost.ToString("C0")</td>
+                <td class="text-end">@Model.Phasing.ForecastCapexCost.ToString("C0")</td>
+                <td class="text-end">@Model.Phasing.ForecastOpexCost.ToString("C0")</td>
+                @if (hasBaseline) { <td class="text-end">@Model.Phasing.BaselineCost.ToString("C0")</td><td class="text-end">@Signed(Model.Phasing.ForecastCost - Model.Phasing.BaselineCost)</td> }
+                @if (hasActuals) { <td class="text-end">@Model.Phasing.ActualCost.ToString("C0")</td> }
+            </tr>
+        </tfoot>
+    </table>
+    </div>
+}
