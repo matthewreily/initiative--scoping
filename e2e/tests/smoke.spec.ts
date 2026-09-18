@@ -30,4 +30,25 @@ test.describe('Smoke', () => {
     await page.keyboard.press('p');
     await expect(page).toHaveURL(/\/Portfolio$/);
   });
+
+  test('appearance follows the OS by default, can be overridden and is remembered', async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme: 'dark' });
+    const page = await context.newPage();
+    const html = page.locator('html');
+
+    await page.goto('/');
+    await expect(html).toHaveAttribute('data-bs-theme', 'dark');
+
+    await page.locator('#theme-toggle').click();
+    await page.getByRole('button', { name: 'Light' }).click();
+    await expect(html).toHaveAttribute('data-bs-theme', 'light');
+
+    await page.goto('/Initiatives');
+    await expect(html).toHaveAttribute('data-bs-theme', 'light');
+
+    await page.locator('#theme-toggle').click();
+    await page.getByRole('button', { name: 'System' }).click();
+    await expect(html).toHaveAttribute('data-bs-theme', 'dark');
+    await context.close();
+  });
 });
