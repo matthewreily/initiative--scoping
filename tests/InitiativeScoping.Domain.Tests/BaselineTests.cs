@@ -141,4 +141,23 @@ public class BaselineTests
     [InlineData(InitiativeStatus.Cancelled, InitiativeStatus.Draft, false)]
     public void Transitions_follow_lifecycle(InitiativeStatus from, InitiativeStatus to, bool allowed) =>
         Assert.Equal(allowed, InitiativeLifecycle.CanTransition(from, to));
+
+    [Fact]
+    public void Snapshot_captures_person_id_and_display_name_for_named_allocations()
+    {
+        var initiative = NewInitiative(allocations: 3);
+        initiative.Allocations[0].PersonId = 4;
+        initiative.Allocations[0].Person = new Person { Id = 4, DisplayName = "Jane Doe", ResourceTypeId = 1, SeniorityId = 2, Location = "Onshore", BusinessUnitId = 1 };
+        initiative.Allocations[1].PersonId = 5;
+
+        var baseline = BaselineSnapshot.Create(initiative, Forecast(initiative, 100m), "alice", Now, "Activation");
+
+        var lines = baseline.Lines.OrderBy(l => l.ResourceTypeId).ToList();
+        Assert.Equal(4, lines[0].PersonId);
+        Assert.Equal("Jane Doe", lines[0].PersonName);
+        Assert.Equal(5, lines[1].PersonId);
+        Assert.Equal("Person #5", lines[1].PersonName);
+        Assert.Null(lines[2].PersonId);
+        Assert.Null(lines[2].PersonName);
+    }
 }

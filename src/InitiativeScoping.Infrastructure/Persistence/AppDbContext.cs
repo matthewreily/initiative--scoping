@@ -204,6 +204,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.Seniority).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.BusinessUnit).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Vendor).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Person).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.PersonId);
         });
 
         b.Entity<InitiativeNonLaborCost>(e =>
@@ -275,6 +277,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.ResourceTypeName).HasMaxLength(200);
             e.Property(x => x.SeniorityName).HasMaxLength(200);
             e.Property(x => x.VendorName).HasMaxLength(200);
+            e.Property(x => x.PersonName).HasMaxLength(200);
             e.Property(x => x.Hours).HasPrecision(18, 2);
             e.Property(x => x.HourlyRate).HasPrecision(18, 2);
             e.Property(x => x.Cost).HasPrecision(18, 2);

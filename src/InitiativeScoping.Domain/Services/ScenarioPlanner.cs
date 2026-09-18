@@ -81,6 +81,7 @@ public static class ScenarioPlanner
             Location = a.Location,
             ResourcingClass = a.ResourcingClass,
             VendorId = a.VendorId,
+            PersonId = a.PersonId,
             Quantity = a.Quantity,
             AllocationPercent = a.AllocationPercent,
             EstimatedHours = a.EstimatedHours,

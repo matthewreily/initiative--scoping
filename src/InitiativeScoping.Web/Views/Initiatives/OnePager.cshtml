@@ -172,6 +172,19 @@
             </tbody>
         </table>
 
+        @if (Model.ByPerson.Count > 0)
+        {
+            <h2 class="h6 text-uppercase text-muted">Named people</h2>
+            <table class="table table-sm mb-3" id="one-pager-people">
+                <tbody>
+                @foreach (var r in Model.ByPerson)
+                {
+                    <tr><td>@r.Label</td><td class="text-end">@r.Hours.ToString("N0") h</td><td class="text-end">@r.Cost.ToString("C0")</td></tr>
+                }
+                </tbody>
+            </table>
+        }
+
         @if (notes.Count > 0)
         {
             <h2 class="h6 text-uppercase text-muted">Latest notes</h2>

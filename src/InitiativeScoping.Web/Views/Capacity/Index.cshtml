@@ -3,10 +3,13 @@
     ViewData["Title"] = "Capacity";
     var h = Model.Heatmap;
     var inv = System.Globalization.CultureInfo.InvariantCulture;
+    var byPerson = Model.View == CapacityView.People;
+    var rowLabel = byPerson ? "Person" : "Resource type";
 
-    string HeatClass(CapacityCell c)
+    string HeatClass(CapacityRow r, CapacityCell c)
     {
         if (c.DemandHours <= 0) { return "heat-0"; }
+        if (r.IsUnassigned) { return "heat-unassigned"; }
         if (c.Utilization is null) { return "heat-none"; }
         var u = c.Utilization.Value;
         return u > 1m ? "heat-over" : u > 0.85m ? "heat-4" : u > 0.6m ? "heat-3" : u > 0.3m ? "heat-2" : "heat-1";
@@ -14,8 +17,12 @@
 
     string Title(CapacityRow r, CapacityCell c)
     {
-        var lines = new List<string> { $"{r.ResourceTypeName} – {c.Month:MMM yyyy}", $"Demand {c.DemandHours:N0} h ({c.DemandFte:N2} FTE)" };
-        lines.Add(c.SupplyHours > 0 ? $"Supply {c.SupplyHours:N0} h ({c.Headcount} people) – {c.Utilization!.Value:P0}" : "No active people with this resource type");
+        var lines = new List<string> { $"{r.Label} – {c.Month:MMM yyyy}", $"Demand {c.DemandHours:N0} h ({c.DemandFte:N2} FTE)" };
+        lines.Add(r.IsUnassigned
+            ? "Not yet assigned to a named person"
+            : c.SupplyHours > 0
+                ? (byPerson ? $"Available {c.SupplyHours:N0} h – {c.Utilization!.Value:P0}" : $"Supply {c.SupplyHours:N0} h ({c.Headcount} people) – {c.Utilization!.Value:P0}")
+                : byPerson ? "Person is inactive on the roster" : "No active people with this resource type");
         lines.AddRange(c.Contributions.Take(6).Select(x => $"• {x.Initiative.Name}: {x.Hours:N0} h"));
         if (c.Contributions.Count > 6) { lines.Add($"• +{c.Contributions.Count - 6} more"); }
         return string.Join("\n", lines);
@@ -31,20 +38,38 @@
             <ul class="dropdown-menu dropdown-menu-end">
                 @foreach (var f in Model.Formats.OrderBy(f => f == "xlsx" ? 0 : 1))
                 {
-                    <li><a class="dropdown-item" asp-action="Export" asp-route-format="@f" asp-route-status="@Model.Status" asp-route-businessUnitId="@Model.BusinessUnitId" asp-route-includeClosed="@Model.IncludeClosed">@(f == "xlsx" ? "Excel (.xlsx)" : "CSV")</a></li>
+                    <li><a class="dropdown-item" asp-action="Export" asp-route-format="@f" asp-route-status="@Model.Status" asp-route-businessUnitId="@Model.BusinessUnitId" asp-route-includeClosed="@Model.IncludeClosed" asp-route-view="@Model.View">@(f == "xlsx" ? "Excel (.xlsx)" : "CSV")</a></li>
                 }
             </ul>
         </div>
     }
 </div>
 
+<div class="btn-group btn-group-sm mb-2" role="group" aria-label="Capacity view" id="capacity-view">
+    <a class="btn @(byPerson ? "btn-outline-primary" : "btn-primary")" asp-action="Index" asp-route-status="@Model.Status" asp-route-businessUnitId="@Model.BusinessUnitId" asp-route-includeClosed="@Model.IncludeClosed" aria-current="@(byPerson ? null : "page")">By resource type</a>
+    <a class="btn @(byPerson ? "btn-primary" : "btn-outline-primary")" asp-action="Index" asp-route-view="@CapacityView.People" asp-route-status="@Model.Status" asp-route-businessUnitId="@Model.BusinessUnitId" asp-route-includeClosed="@Model.IncludeClosed" aria-current="@(byPerson ? "page" : null)">By person</a>
+</div>
+
 <p class="text-muted small">
-    Planned hours per resource type and month across the initiatives shown, compared with the People roster
-    (active people of that type × working hours in the month at @Model.HoursPerDay.ToString("0.#") h/day, Mon–Fri minus holidays).
+    @if (byPerson)
+    {
+        <text>Planned hours per named person and month across the initiatives shown, compared with that person's working hours
+        (@Model.HoursPerDay.ToString("0.#") h/day, Mon–Fri minus holidays). Allocations without a named person appear as
+        <em>Unassigned</em> rows per resource type – open staffing work rather than an over-allocation.</text>
+    }
+    else
+    {
+        <text>Planned hours per resource type and month across the initiatives shown, compared with the People roster
+        (active people of that type × working hours in the month at @Model.HoursPerDay.ToString("0.#") h/day, Mon–Fri minus holidays).</text>
+    }
     Allocation hours are spread over each phase by calendar days. Hover, tap or focus a cell for the initiatives behind it.
 </p>
 
 <form method="get" data-remember-filters class="row g-2 align-items-center mb-3">
+    @if (byPerson)
+    {
+        <input type="hidden" name="view" value="@CapacityView.People" />
+    }
     <div class="col-md-3">
         <select name="status" class="form-select form-select-sm" aria-label="Filter by status" asp-for="Status" asp-items="Html.GetEnumSelectList<InitiativeStatus>()">
             <option value="">All open statuses</option>
@@ -61,7 +86,7 @@
     </div>
     <div class="col-md-2">
         <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
-        <a asp-action="Index" class="btn btn-link btn-sm" data-filter-clear>Clear</a>
+        <a asp-action="Index" asp-route-view="@(byPerson ? CapacityView.People.ToString() : null)" class="btn btn-link btn-sm" data-filter-clear>Clear</a>
     </div>
 </form>
 
@@ -74,22 +99,36 @@
 else
 {
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Resource types</div><div class="fs-3">@h.Rows.Count</div></div></div></div>
+        @if (byPerson)
+        {
+            <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Named people</div><div class="fs-3" id="capacity-people-count">@h.Rows.Count(r => !r.IsUnassigned)</div><div class="small text-muted">@h.Rows.Where(r => r.IsUnassigned).Sum(r => r.DemandHours).ToString("N0") h unassigned</div></div></div></div>
+        }
+        else
+        {
+            <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Resource types</div><div class="fs-3">@h.Rows.Count</div></div></div></div>
+        }
         <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Planned hours<help for="capacity-demand" /></div><div class="fs-3">@h.DemandHours.ToString("N0")</div><div class="small text-muted">@h.Months.Count months</div></div></div></div>
         <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Over-allocated cells<help for="over-allocated" /></div><div class="fs-3 @(h.OverAllocatedCells > 0 ? "text-danger" : "")" id="capacity-over-count">@h.OverAllocatedCells</div><div class="small text-muted">demand above roster supply</div></div></div></div>
         <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Legend</div>
             <div class="d-flex flex-wrap gap-1 small mt-1">
-                <span class="heat-swatch heat-1"></span>&lt;30% <span class="heat-swatch heat-2"></span>&lt;60% <span class="heat-swatch heat-3"></span>&lt;85% <span class="heat-swatch heat-4"></span>≤100% <span class="heat-swatch heat-over"></span>&gt;100% <span class="heat-swatch heat-none"></span>no roster
+                <span class="heat-swatch heat-1"></span>&lt;30% <span class="heat-swatch heat-2"></span>&lt;60% <span class="heat-swatch heat-3"></span>&lt;85% <span class="heat-swatch heat-4"></span>≤100% <span class="heat-swatch heat-over"></span>&gt;100% <span class="heat-swatch heat-none"></span>@(byPerson ? "inactive" : "no roster")@if (byPerson) { <text> <span class="heat-swatch heat-unassigned"></span>unassigned</text> }
             </div></div></div></div>
     </div>
 
     <div class="table-responsive">
         <table class="table table-sm table-bordered align-middle heatmap" id="capacity-heatmap">
-            <caption class="visually-hidden">Planned hours by resource type and month; cell colour shows demand as a share of roster supply</caption>
+            <caption class="visually-hidden">Planned hours by @rowLabel.ToLowerInvariant() and month; cell colour shows demand as a share of roster supply</caption>
             <thead>
                 <tr>
-                    <th scope="col" class="heat-sticky">Resource type</th>
-                    <th scope="col" class="text-end">People<help for="capacity-supply" /></th>
+                    <th scope="col" class="heat-sticky">@rowLabel</th>
+                    @if (byPerson)
+                    {
+                        <th scope="col">Resource type</th>
+                    }
+                    else
+                    {
+                        <th scope="col" class="text-end">People<help for="capacity-supply" /></th>
+                    }
                     @foreach (var m in h.Months)
                     {
                         <th scope="col" class="text-center text-nowrap">@m.ToString("MMM yy")</th>
@@ -101,17 +140,30 @@ else
             <tbody>
                 @foreach (var r in h.Rows)
                 {
-                    <tr>
-                        <th scope="row" class="heat-sticky fw-normal">@r.ResourceTypeName</th>
-                        <td class="text-end">@r.Headcount</td>
+                    <tr class="@(r.IsUnassigned ? "heat-row-unassigned" : null)" data-person-id="@r.PersonId">
+                        <th scope="row" class="heat-sticky fw-normal">
+                            @r.Label
+                            @if (byPerson && r.PersonId is not null && r.Headcount == 0)
+                            {
+                                <span class="badge bg-secondary ms-1" title="Inactive on the roster">inactive</span>
+                            }
+                        </th>
+                        @if (byPerson)
+                        {
+                            <td class="small text-muted">@r.ResourceTypeName</td>
+                        }
+                        else
+                        {
+                            <td class="text-end">@r.Headcount</td>
+                        }
                         @foreach (var c in r.Cells)
                         {
-                            <td class="text-center heat-cell @HeatClass(c)" title="@Title(r, c)" data-utilization="@(c.Utilization?.ToString("0.####", inv))" tabindex="@(c.DemandHours > 0 ? "0" : null)">
+                            <td class="text-center heat-cell @HeatClass(r, c)" title="@Title(r, c)" data-utilization="@(c.Utilization?.ToString("0.####", inv))" tabindex="@(c.DemandHours > 0 ? "0" : null)">
                                 @if (c.DemandHours > 0)
                                 {
                                     <span class="heat-value">@c.DemandHours.ToString("N0")</span>
                                     <span class="heat-fte">@c.DemandFte.ToString("0.#") FTE</span>
-                                    @if (c.IsOverAllocated)
+                                    @if (!r.IsUnassigned && c.IsOverAllocated)
                                     {
                                         <span class="visually-hidden">over-allocated</span>
                                     }
@@ -125,8 +177,8 @@ else
             </tbody>
             <tfoot class="table-light">
                 <tr>
-                    <th scope="row" class="heat-sticky">All types</th>
-                    <td class="text-end">@h.Rows.Sum(r => r.Headcount)</td>
+                    <th scope="row" class="heat-sticky">@(byPerson ? "Everyone" : "All types")</th>
+                    <td class="text-end">@(byPerson ? string.Empty : h.Rows.Sum(r => r.Headcount).ToString())</td>
                     @foreach (var c in h.Totals)
                     {
                         <td class="text-center text-nowrap">@c.DemandHours.ToString("N0")<br /><span class="small text-muted">@c.DemandFte.ToString("0.#") FTE</span></td>

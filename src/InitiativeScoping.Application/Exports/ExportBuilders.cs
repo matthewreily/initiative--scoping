@@ -131,12 +131,12 @@ public static class InitiativeExport
         ]);
 
         var forecastLines = new ExportTable("Forecast",
-            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Contract", "Cost center"],
+            ["Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Quantity", "Hours each", "Hours", "Hourly rate", "Cost", "Contract", "Cost center"],
             forecast.Lines.Select(l => (IReadOnlyList<object?>)
             [
                 phases.GetValueOrDefault(l.Allocation.PhaseId), l.Allocation.BusinessUnit?.Name, resourceTypeNames.GetValueOrDefault(l.Allocation.ResourceTypeId),
                 seniorityNames.GetValueOrDefault(l.Allocation.SeniorityId), l.Allocation.Location, l.Allocation.ResourcingClass.ToString(), l.Allocation.Vendor?.Name,
-                l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
+                l.Allocation.Person?.DisplayName, l.Allocation.Quantity, l.Allocation.EstimatedHours, l.Hours, l.HourlyRate, l.IsUnpriced ? null : l.Cost,
                 l.Allocation.ContractReference, l.Allocation.CostCenter
             ]).ToList());
 
@@ -150,11 +150,11 @@ public static class InitiativeExport
             ]).ToList());
 
         var baselineLines = new ExportTable("Baseline",
-            ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Hours", "Hourly rate", "Cost"],
+            ["Version", "Phase", "Business unit", "Resource type", "Seniority", "Location", "Class", "Vendor", "Person", "Hours", "Hourly rate", "Cost"],
             (baseline?.Lines ?? []).Select(l => (IReadOnlyList<object?>)
             [
                 baseline!.Version, l.PhaseName, l.BusinessUnitName, l.ResourceTypeName,
-                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.Hours, l.HourlyRate, l.Cost
+                l.SeniorityName, l.Location, l.ResourcingClass.ToString(), l.VendorName, l.PersonName, l.Hours, l.HourlyRate, l.Cost
             ]).ToList());
 
         var baselineNonLabor = new ExportTable("Baseline non-labor",
@@ -168,6 +168,7 @@ public static class InitiativeExport
 
         var variancePhase = VarianceTable("Variance by phase", variance.ByPhase);
         var varianceType = VarianceTable("Variance by resource type", variance.ByResourceType);
+        var variancePerson = VarianceTable("Variance by person", variance.ByPerson);
         var varianceCategory = VarianceTable("Variance by category", variance.ByCategory);
 
         var actuals = new ExportTable("Actuals",
@@ -182,7 +183,7 @@ public static class InitiativeExport
             ["Created", "Created by", "Category", "Hours", "Cost", "Reason"],
             adjustments.Select(a => (IReadOnlyList<object?>)[a.CreatedAt, a.CreatedBy, VarianceCalculator.CategoryLabel(a.Category), a.Hours, a.Cost, a.Reason]).ToList());
 
-        return [summary, forecastLines, nonLaborLines, MonthlyPhasingExport.Table("By month", phasing), baselineLines, baselineNonLabor, variancePhase, varianceType, varianceCategory, actuals, adjustmentTable];
+        return [summary, forecastLines, nonLaborLines, MonthlyPhasingExport.Table("By month", phasing), baselineLines, baselineNonLabor, variancePhase, varianceType, variancePerson, varianceCategory, actuals, adjustmentTable];
     }
 
     private static ExportTable VarianceTable(string name, IReadOnlyList<VarianceRow> rows) =>
@@ -193,17 +194,20 @@ public static class InitiativeExport
 
 public static class CapacityExport
 {
-    public static IReadOnlyList<ExportTable> Build(CapacityHeatmap heatmap)
+    public static IReadOnlyList<ExportTable> Build(CapacityHeatmap heatmap, bool byPerson = false)
     {
+        IReadOnlyList<string> head = byPerson ? ["Person", "Resource type"] : ["Resource type"];
+        IReadOnlyList<object?> Lead(CapacityRow r) => byPerson ? [r.IsUnassigned ? "(unassigned)" : r.PersonName, r.ResourceTypeName] : [r.ResourceTypeName];
+
         var cells = new ExportTable("Capacity",
-            ["Resource type", "Month", "Demand hours", "Demand FTE", "Headcount", "Supply hours", "Utilization", "Over-allocated"],
+            [.. head, "Month", "Demand hours", "Demand FTE", "Headcount", "Supply hours", "Utilization", "Over-allocated"],
             heatmap.Rows.SelectMany(r => r.Cells.Select(c => (IReadOnlyList<object?>)
-                [r.ResourceTypeName, c.Month, c.DemandHours, c.DemandFte, c.Headcount, c.SupplyHours, c.Utilization, c.IsOverAllocated])).ToList());
+                [.. Lead(r), c.Month, c.DemandHours, c.DemandFte, c.Headcount, c.SupplyHours, c.Utilization, !r.IsUnassigned && c.IsOverAllocated])).ToList());
 
         var contributions = new ExportTable("Capacity by initiative",
-            ["Resource type", "Month", "Id", "Initiative", "Hours"],
+            [.. head, "Month", "Id", "Initiative", "Hours"],
             heatmap.Rows.SelectMany(r => r.Cells.SelectMany(c => c.Contributions.Select(x => (IReadOnlyList<object?>)
-                [r.ResourceTypeName, c.Month, x.Initiative.Id, x.Initiative.Name, x.Hours]))).ToList());
+                [.. Lead(r), c.Month, x.Initiative.Id, x.Initiative.Name, x.Hours]))).ToList());
 
         return [cells, contributions];
     }

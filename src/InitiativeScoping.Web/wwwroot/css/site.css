@@ -110,6 +110,7 @@ body {
 [data-bs-theme=dark] .heat-4 { background: #6e3f12; }
 [data-bs-theme=dark] .heat-over { background: #7a2626; }
 [data-bs-theme=dark] .heat-none { background: repeating-linear-gradient(45deg, #2a2f36 0 4px, #1f242a 4px 8px); }
+[data-bs-theme=dark] .heat-unassigned { background: repeating-linear-gradient(-45deg, #1f3047 0 4px, #182636 4px 8px); }
 [data-bs-theme=dark] .heat-swatch { border-color: rgba(255, 255, 255, .15); }
 [data-bs-theme=dark] .explain-allocation:target > td, [data-bs-theme=dark] .explain-nonlabor:target > td { background: #3a2f10; }
 [data-bs-theme=dark] .table-responsive > .table > tbody > tr:hover > td { background-color: rgba(127, 176, 255, .07); }
@@ -273,6 +274,8 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 .heat-4 { background: #ffc98a; }
 .heat-over { background: #f4a6a6; font-weight: 600; }
 .heat-none { background: repeating-linear-gradient(45deg, #f0f0f0 0 4px, #e2e2e2 4px 8px); }
+.heat-unassigned { background: repeating-linear-gradient(-45deg, #e7f0fb 0 4px, #d6e4f7 4px 8px); }
+.heat-row-unassigned th { font-style: italic; color: var(--bs-secondary-color); }
 
 /* "Why this number" drill-down */
 .explain-link { color: inherit; text-decoration: underline dotted; text-underline-offset: .2em; }

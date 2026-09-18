@@ -51,6 +51,8 @@ public static class BaselineSnapshot
                 ResourceTypeName = l.Allocation.ResourceType?.Name ?? $"Type #{l.Allocation.ResourceTypeId}",
                 SeniorityName = l.Allocation.Seniority?.Name ?? $"Seniority #{l.Allocation.SeniorityId}",
                 VendorName = l.Allocation.Vendor?.Name ?? (l.Allocation.VendorId is { } vid ? $"Vendor #{vid}" : null),
+                PersonId = l.Allocation.PersonId,
+                PersonName = l.Allocation.Person?.DisplayName ?? (l.Allocation.PersonId is { } pid2 ? $"Person #{pid2}" : null),
                 Hours = l.Hours,
                 HourlyRate = l.HourlyRate!.Value,
                 Cost = l.Cost

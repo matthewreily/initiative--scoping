@@ -35,6 +35,9 @@ public sealed record VarianceResult(
     IReadOnlyList<VarianceRow> ByCategory,
     decimal? ThresholdPct)
 {
+    /// <summary>Baseline labor named to a person vs. that person's actuals; unassigned baseline lines are grouped per resource type.</summary>
+    public IReadOnlyList<VarianceRow> ByPerson { get; init; } = [];
+
     /// <summary>Any mapped actual or adjustment has been recorded, regardless of its hours or cost.</summary>
     public bool HasActuals => ActualRecords > 0;
     public decimal ActualHours => SourcedHours + AdjustmentHours;
@@ -59,6 +62,7 @@ public static class VarianceCalculator
     public const string OutsidePhases = "Outside planned phases";
     public const string WholeInitiative = "Whole initiative";
     private const string Unknown = "Unmapped person";
+    public static string UnassignedLabel(string resourceTypeName) => $"Unassigned – {resourceTypeName}";
 
     private readonly record struct BaselineAmount(decimal Hours, decimal Cost, decimal Remaining);
     private readonly record struct ActualAmount(decimal Hours, decimal Cost);
@@ -101,6 +105,11 @@ public static class VarianceCalculator
             laborLines.Select(l => (resourceTypeNames.GetValueOrDefault(l.ResourceTypeId, "?"), Labor(l))),
             mapped.Select(e => (e.Person is null ? Unknown : resourceTypeNames.GetValueOrDefault(e.Person.ResourceTypeId, "?"), Sourced(e))));
 
+        var byPerson = Rows(
+            [],
+            laborLines.Select(l => (l.PersonName ?? UnassignedLabel(resourceTypeNames.GetValueOrDefault(l.ResourceTypeId, "?")), Labor(l))),
+            mapped.Select(e => (e.Person?.DisplayName ?? Unknown, Sourced(e))));
+
         var byCategory = Rows(
             Enum.GetValues<CostCategory>().Select(CategoryLabel),
             laborLines.Select(l => (CategoryLabel(CostCategory.Labor), Labor(l)))
@@ -120,7 +129,10 @@ public static class VarianceCalculator
             byPhase,
             byType,
             byCategory,
-            initiative.VarianceThresholdPct ?? defaultThresholdPct);
+            initiative.VarianceThresholdPct ?? defaultThresholdPct)
+        {
+            ByPerson = byPerson
+        };
     }
 
     public static string CategoryLabel(CostCategory category) => category switch
