@@ -376,6 +376,35 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         });
     }
 
+    /// <summary>Print-friendly one-page summary (status, schedule, forecast vs. baseline/actuals, budget, cost by month) for steering packs; the browser's Print → Save as PDF produces the PDF.</summary>
+    public async Task<IActionResult> OnePager(int id, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct, includeHistory: true);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        var cards = await LoadRateCardsAsync(ct);
+        var forecast = ForecastCalculator.Calculate(initiative, cards);
+        var typeNames = await db.ResourceTypes.ToDictionaryAsync(t => t.Id, t => t.Name, ct);
+        var phaseNames = initiative.Phases.ToDictionary(p => p.Id, p => p.Name);
+        var phases = initiative.Phases.OrderBy(p => p.Sequence).ThenBy(p => p.PlannedStart).ToList();
+        var actuals = await db.LoadActualsAsync(initiative, config.GetValue<decimal?>(ActualsQueries.DefaultThresholdKey), ct);
+        return View(new InitiativeOnePagerModel
+        {
+            Initiative = initiative,
+            Forecast = forecast,
+            Phases = phases,
+            ByPhase = Rollup(forecast, l => phaseNames.GetValueOrDefault(l.Allocation.PhaseId, "?"), phases.Select(p => p.Name)),
+            ByResourceType = Rollup(forecast, l => typeNames.GetValueOrDefault(l.Allocation.ResourceTypeId, "?")),
+            ByClass = Rollup(forecast, l => l.Allocation.ResourcingClass == ResourcingClass.InternalFte ? "Internal FTE" : "Vendor"),
+            Variance = actuals.Variance,
+            Phasing = MonthlyPhasingCalculator.Calculate(initiative, forecast, initiative.CurrentBaseline, actuals.Entries, actuals.Adjustments),
+            GeneratedAt = DateTimeOffset.UtcNow
+        });
+    }
+
     // ----- Phases -----
 
     [HttpPost]

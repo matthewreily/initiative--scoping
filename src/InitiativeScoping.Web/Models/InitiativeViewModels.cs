@@ -383,3 +383,19 @@ public class ScenarioCompareModel
     public bool CanEdit { get; init; }
     public bool CanPromote { get; init; }
 }
+
+public class InitiativeOnePagerModel
+{
+    public required Initiative Initiative { get; init; }
+    public required ForecastResult Forecast { get; init; }
+    public required IReadOnlyList<Phase> Phases { get; init; }
+    public required IReadOnlyList<RollupRow> ByPhase { get; init; }
+    public required IReadOnlyList<RollupRow> ByResourceType { get; init; }
+    public required IReadOnlyList<RollupRow> ByClass { get; init; }
+    public required VarianceResult Variance { get; init; }
+    public required MonthlyPhasing Phasing { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public BudgetPosition Budget => BudgetCalculator.Calculate(Initiative, Forecast, Variance);
+    public DateOnly? PlanStart => Phases.Count == 0 ? null : Phases.Min(p => p.PlannedStart);
+    public DateOnly? PlanEnd => Phases.Count == 0 ? null : Phases.Max(p => p.PlannedEnd);
+}
