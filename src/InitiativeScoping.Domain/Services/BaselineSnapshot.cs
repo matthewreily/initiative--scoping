@@ -53,6 +53,7 @@ public static class BaselineSnapshot
                 VendorName = l.Allocation.Vendor?.Name ?? (l.Allocation.VendorId is { } vid ? $"Vendor #{vid}" : null),
                 PersonId = l.Allocation.PersonId,
                 PersonName = l.Allocation.Person?.DisplayName ?? (l.Allocation.PersonId is { } pid2 ? $"Person #{pid2}" : null),
+                Capitalization = l.Allocation.Capitalization,
                 Hours = l.Hours,
                 HourlyRate = l.HourlyRate!.Value,
                 Cost = l.Cost
@@ -69,6 +70,7 @@ public static class BaselineSnapshot
                 Periods = l.Periods,
                 StartDate = l.Start!.Value,
                 EndDate = l.End!.Value,
+                Capitalization = l.Line.Capitalization,
                 Cost = l.Cost
             }).ToList()
         };

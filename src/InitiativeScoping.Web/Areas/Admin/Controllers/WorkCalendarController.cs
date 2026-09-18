@@ -1,3 +1,4 @@
+using System.Globalization;
 using InitiativeScoping.Application.Abstractions;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Infrastructure.Persistence;
@@ -16,6 +17,7 @@ public class WorkCalendarController(AppDbContext db, IAuditLog audit) : AdminCon
         return View(new WorkCalendarViewModel
         {
             HoursPerDay = settings?.HoursPerDay ?? WorkCalendar.DefaultHoursPerDay,
+            FiscalYearStartMonth = settings?.FiscalYearStartMonth ?? 1,
             Holidays = holidays
         });
     }
@@ -30,7 +32,7 @@ public class WorkCalendarController(AppDbContext db, IAuditLog audit) : AdminCon
         }
 
         var settings = await db.WorkCalendarSettings.FirstOrDefaultAsync(ct);
-        var before = settings?.HoursPerDay ?? WorkCalendar.DefaultHoursPerDay;
+        var before = new { HoursPerDay = settings?.HoursPerDay ?? WorkCalendar.DefaultHoursPerDay, FiscalYearStartMonth = settings?.FiscalYearStartMonth ?? 1 };
         if (settings is null)
         {
             settings = new WorkCalendarSettings();
@@ -38,10 +40,12 @@ public class WorkCalendarController(AppDbContext db, IAuditLog audit) : AdminCon
         }
 
         settings.HoursPerDay = model.HoursPerDay;
+        settings.FiscalYearStartMonth = model.FiscalYearStartMonth;
         await db.SaveChangesAsync(ct);
-        audit.Record(nameof(WorkCalendarSettings), settings.Id, AuditActions.Update, new { Before = before, After = settings.HoursPerDay });
+        audit.Record(nameof(WorkCalendarSettings), settings.Id, AuditActions.Update, new { Before = before, After = new { settings.HoursPerDay, settings.FiscalYearStartMonth } });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Hours per working day set to {settings.HoursPerDay:0.##}.");
+        var fyStart = CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(settings.FiscalYearStartMonth);
+        return RedirectWithSuccess($"Hours per working day set to {settings.HoursPerDay:0.##}; fiscal year starts in {fyStart}.");
     }
 
     public IActionResult CreateHoliday() => View("EditHoliday", new HolidayEditModel());

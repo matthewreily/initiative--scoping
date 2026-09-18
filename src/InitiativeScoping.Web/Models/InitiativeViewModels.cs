@@ -110,6 +110,8 @@ public class AllocationEditModel
     public decimal EstimatedHours { get; set; }
     [Range(0.01, 100), Display(Name = "Allocation %")]
     public decimal? AllocationPercent { get; set; }
+    [Required, Display(Name = "Capex / Opex")]
+    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
     [StringLength(100), Display(Name = "Contract ref")]
     public string? ContractReference { get; set; }
     [StringLength(100), Display(Name = "Cost center")]
@@ -139,14 +141,19 @@ public class NonLaborCostEditModel
     public DateOnly? StartDate { get; set; }
     [Display(Name = "End")]
     public DateOnly? EndDate { get; set; }
+    [Required, Display(Name = "Capex / Opex")]
+    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
     [StringLength(200), Display(Name = "Contract ref")]
     public string? ContractReference { get; set; }
     [StringLength(100), Display(Name = "Cost center")]
     public string? CostCenter { get; set; }
 }
 
+/// <summary>Inputs for the shared fiscal-year / quarter subtotal table.</summary>
+public sealed record FiscalPeriodsViewModel(MonthlyPhasing Phasing, FiscalCalendar Calendar);
+
 /// <summary>Catalog item as offered to the initiative form; the client prefills description/billing/unit cost from it.</summary>
-public sealed record CatalogOption(int Id, CostCategory Category, string Name, string? Vendor, BillingModel BillingModel, decimal UnitCost)
+public sealed record CatalogOption(int Id, CostCategory Category, string Name, string? Vendor, BillingModel BillingModel, decimal UnitCost, CapitalizationType Capitalization = CapitalizationType.Opex)
 {
     public string Label => Vendor is null ? Name : $"{Name} ({Vendor})";
 }
@@ -269,6 +276,7 @@ public class InitiativeDetailsModel
     public IReadOnlyList<InitiativeStatus> StatusTransitions { get; init; } = [];
     public required VarianceResult Variance { get; init; }
     public required MonthlyPhasing Phasing { get; init; }
+    public FiscalCalendar Fiscal { get; init; } = FiscalCalendar.Calendar;
     public int UnmappedForMappedProjects { get; init; }
     public BudgetPosition Budget => BudgetCalculator.Calculate(Initiative, Forecast, Variance);
 }
@@ -366,6 +374,7 @@ public class PortfolioModel
     public required SelectList BusinessUnits { get; init; }
     public bool CanExport { get; init; }
     public required IReadOnlyList<string> Formats { get; init; }
+    public FiscalCalendar Fiscal { get; init; } = FiscalCalendar.Calendar;
 
     /// <summary>The initiatives on the current page, in the requested order; totals still come from <see cref="Portfolio"/>.</summary>
     public required IReadOnlyList<PortfolioRow> PageRows { get; init; }
@@ -481,6 +490,7 @@ public class InitiativeOnePagerModel
     public required IReadOnlyList<RollupRow> ByPerson { get; init; }
     public required VarianceResult Variance { get; init; }
     public required MonthlyPhasing Phasing { get; init; }
+    public FiscalCalendar Fiscal { get; init; } = FiscalCalendar.Calendar;
     public required DateTimeOffset GeneratedAt { get; init; }
     public BudgetPosition Budget => BudgetCalculator.Calculate(Initiative, Forecast, Variance);
     public DateOnly? PlanStart => Phases.Count == 0 ? null : Phases.Min(p => p.PlannedStart);

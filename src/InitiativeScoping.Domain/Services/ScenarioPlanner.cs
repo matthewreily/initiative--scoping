@@ -85,6 +85,7 @@ public static class ScenarioPlanner
             Quantity = a.Quantity,
             AllocationPercent = a.AllocationPercent,
             EstimatedHours = a.EstimatedHours,
+            Capitalization = a.Capitalization,
             ContractReference = a.ContractReference,
             CostCenter = a.CostCenter
         }).ToList();
@@ -100,6 +101,7 @@ public static class ScenarioPlanner
             UnitCost = c.UnitCost,
             StartDate = c.StartDate,
             EndDate = c.EndDate,
+            Capitalization = c.Capitalization,
             ContractReference = c.ContractReference,
             CostCenter = c.CostCenter
         }).ToList();

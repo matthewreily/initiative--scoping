@@ -7,6 +7,7 @@
     var roles = Html.GetEnumSelectList<InitiativeMemberRole>();
     var nonLaborCategories = Html.GetEnumSelectList<CostCategory>().Where(c => c.Value != ((int)CostCategory.Labor).ToString()).ToList();
     var billingModels = Html.GetEnumSelectList<BillingModel>();
+    var capitalizationTypes = Html.GetEnumSelectList<CapitalizationType>();
     var phaseNames = i.Phases.ToDictionary(p => p.Id, p => p.Name);
     var lineByAllocation = Model.Forecast.Lines.ToDictionary(l => l.Allocation.Id);
     var orderedAllocations = i.Allocations
@@ -407,7 +408,7 @@ else
         <h2 class="h5" data-tour="details:4" data-tour-title="Allocations" data-tour-text="Each row is a resource type × seniority × business unit on a phase. Only combinations priced on a published rate card can be chosen, so every line gets a rate. Apply a T-shirt size to fill this from a template.">Allocations</h2>
         <div class="table-responsive table-scroll" id="allocations-table">
         <table class="table table-sm align-middle" data-sortable>
-            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Person</th><th>Location</th><th>Class</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
+            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Person</th><th>Location</th><th>Class</th><th>Capex / Opex</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
             <tbody>
             @foreach (var a in orderedAllocations)
             {
@@ -421,6 +422,7 @@ else
                     <td>@if (a.Person is not null) { <span class="allocation-person">@a.Person.DisplayName</span> @if (!a.Person.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } } else { <span class="text-muted">—</span> }</td>
                     <td>@a.Location</td>
                     <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}")</td>
+                    <td class="allocation-capitalization">@a.Capitalization</td>
                     <td class="text-end">@a.Quantity</td>
                     @if (fixedDuration) { <td class="text-end">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
                     <td class="text-end" data-sort="@line.Hours">@line.Hours.ToString("N1")</td>
@@ -535,6 +537,10 @@ else
                         <input name="EstimatedHours" id="estimatedhours" type="number" min="0.25" step="0.25" class="form-control form-control-sm" required />
                     </div>
                 }
+                <div class="col-md-2">
+                    <label for="capitalization" class="form-label small mb-0">Capex / Opex</label>
+                    <select name="Capitalization" id="capitalization" asp-items="capitalizationTypes" class="form-select form-select-sm"></select>
+                </div>
                 <div class="col-md-3">
                     <label for="contractreference" class="form-label small mb-0">Contract ref</label>
                     <input name="ContractReference" id="contractreference" class="form-control form-control-sm" />
@@ -642,7 +648,7 @@ else
         <p class="text-muted small mb-2">Software licenses and other non-labor spend. Recurring lines bill whole months/years over the phase or initiative window (any partial period counts as a full one) unless explicit dates are set.</p>
         <div class="table-responsive table-scroll" id="non-labor-table">
         <table class="table table-sm align-middle" data-sortable>
-            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all non-labor costs" /></th> }<th>Scope</th><th>Category</th><th>Description</th><th>Billing</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th>Window</th><th class="text-end">Periods</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
+            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all non-labor costs" /></th> }<th>Scope</th><th>Category</th><th>Description</th><th>Billing</th><th>Capex / Opex</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th>Window</th><th class="text-end">Periods</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
             <tbody>
             @foreach (var nl in Model.Forecast.NonLaborLines.OrderBy(l => l.Line.PhaseId is null ? int.MaxValue : i.Phases.FirstOrDefault(p => p.Id == l.Line.PhaseId)?.Sequence ?? int.MaxValue).ThenBy(l => l.Line.Description))
             {
@@ -653,6 +659,7 @@ else
                     <td>@VarianceCalculator.CategoryLabel(c.Category)</td>
                     <td>@c.Description @if (c.CostCatalogItem is not null) { <span class="badge bg-light text-dark border" title="From catalog">catalog</span> }</td>
                     <td>@Html.DisplayFor(_ => c.BillingModel)</td>
+                    <td class="non-labor-capitalization">@c.Capitalization</td>
                     <td class="text-end">@c.Quantity</td>
                     <td class="text-end" data-sort="@c.UnitCost">@c.UnitCost.ToString("C2")</td>
                     <td class="text-nowrap">@(nl.HasWindow ? $"{nl.Start:yyyy-MM-dd} → {nl.End:yyyy-MM-dd}" : "—")</td>
@@ -732,6 +739,10 @@ else
                     <label for="nl-end" class="form-label small mb-0">End (optional)</label>
                     <input name="EndDate" id="nl-end" type="date" class="form-control form-control-sm" />
                 </div>
+                <div class="col-md-2">
+                    <label for="nl-capitalization" class="form-label small mb-0">Capex / Opex</label>
+                    <select name="Capitalization" id="nl-capitalization" asp-items="capitalizationTypes" class="form-select form-select-sm"></select>
+                </div>
                 <div class="col-md-3">
                     <label for="nl-contract" class="form-label small mb-0">Contract ref</label>
                     <input name="ContractReference" id="nl-contract" class="form-control form-control-sm" />
@@ -800,6 +811,10 @@ else
             <h2 class="h5" id="cost-by-month-heading">Cost by month</h2>
             <p class="text-muted small mb-2">Labor is spread over each phase by calendar days; recurring non-labor lines bill at the start of each period. Baseline months use the phases' current dates. Actuals fall in the month of the work date.</p>
             <partial name="_MonthlyPhasing" model="Model.Phasing" view-data="@(new ViewDataDictionary(ViewData) { { "Id", "initiative-phasing" } })" />
+        </section>
+        <section class="mt-4" id="cost-by-fiscal-period" aria-labelledby="cost-by-fiscal-period-heading">
+            <h2 class="h5" id="cost-by-fiscal-period-heading">Cost by fiscal year and quarter</h2>
+            <partial name="_FiscalPeriods" model="new FiscalPeriodsViewModel(Model.Phasing, Model.Fiscal)" view-data="@(new ViewDataDictionary(ViewData) { { "Id", "initiative-fiscal" } })" />
         </section>
     </div>
     <div class="tab-pane fade" id="pane-team" role="tabpanel" aria-labelledby="tab-team">

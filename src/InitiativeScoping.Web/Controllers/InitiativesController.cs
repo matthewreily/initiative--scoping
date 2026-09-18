@@ -293,8 +293,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         var orderedPhases = initiative.Phases.OrderBy(p => p.Sequence).ThenBy(p => p.PlannedStart).ToList();
         var actuals = await db.LoadActualsAsync(initiative, config.GetValue<decimal?>(ActualsQueries.DefaultThresholdKey), ct);
         var unmappedForProjects = await db.ActualEntries.CountAsync(e => e.InitiativeId == id && e.IsUnmapped, ct);
+        var calendar = await workCalendar.GetAsync(ct);
         var fixedDuration = initiative.PlanningMode == PlanningMode.FixedDuration && initiative.TargetEnd is not null
-            ? BuildFixedDurationSummary(initiative, orderedPhases, forecast, await workCalendar.GetAsync(ct))
+            ? BuildFixedDurationSummary(initiative, orderedPhases, forecast, calendar)
             : null;
         var nextPhaseStart = orderedPhases.LastOrDefault()?.PlannedEnd.AddDays(1) ?? initiative.TargetStart;
         var nextPhaseEnd = initiative.PlanningMode == PlanningMode.FixedDuration && initiative.TargetEnd is not null && initiative.TargetEnd.Value >= nextPhaseStart
@@ -346,6 +347,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 .Where(s => !(initiative.Status == InitiativeStatus.Draft && s == InitiativeStatus.Active)).ToList(),
             Variance = actuals.Variance,
             Phasing = MonthlyPhasingCalculator.Calculate(initiative, forecast, initiative.CurrentBaseline, actuals.Entries, actuals.Adjustments),
+            Fiscal = calendar.Fiscal,
             UnmappedForMappedProjects = unmappedForProjects
         };
         return View(model);
@@ -402,6 +404,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ByPerson = Rollup(new ForecastResult(forecast.Lines.Where(l => l.Allocation.Person is not null).ToList(), []), l => l.Allocation.Person!.DisplayName),
             Variance = actuals.Variance,
             Phasing = MonthlyPhasingCalculator.Calculate(initiative, forecast, initiative.CurrentBaseline, actuals.Entries, actuals.Adjustments),
+            Fiscal = (await workCalendar.GetAsync(ct)).Fiscal,
             GeneratedAt = DateTimeOffset.UtcNow
         });
     }
@@ -597,7 +600,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             PhaseId = model.PhaseId, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = model.ResourceTypeId, SeniorityId = model.SeniorityId,
             Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, VendorId = VendorFor(model), PersonId = model.PersonId, Quantity = model.Quantity,
-            EstimatedHours = model.EstimatedHours, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
+            EstimatedHours = model.EstimatedHours, Capitalization = model.Capitalization, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
         };
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
         initiative.Allocations.Add(allocation);
@@ -628,7 +631,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, BusinessUnitId = allocation.BusinessUnitId, ResourceTypeId = allocation.ResourceTypeId,
             SeniorityId = allocation.SeniorityId, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass, VendorId = allocation.VendorId,
             PersonId = allocation.PersonId, Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
-            ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
+            Capitalization = allocation.Capitalization, ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
         });
     }
 
@@ -676,6 +679,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         allocation.Quantity = model.Quantity;
         allocation.EstimatedHours = model.EstimatedHours;
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
+        allocation.Capitalization = model.Capitalization;
         allocation.ContractReference = model.ContractReference?.Trim();
         allocation.CostCenter = model.CostCenter?.Trim();
         audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Update, new { Before = before, After = AllocationSnapshot(allocation) });
@@ -810,7 +814,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             Id = line.Id, InitiativeId = line.InitiativeId, PhaseId = line.PhaseId, CostCatalogItemId = line.CostCatalogItemId,
             Category = line.Category, Description = line.Description, BillingModel = line.BillingModel, Quantity = line.Quantity,
-            UnitCost = line.UnitCost, StartDate = line.StartDate, EndDate = line.EndDate,
+            UnitCost = line.UnitCost, StartDate = line.StartDate, EndDate = line.EndDate, Capitalization = line.Capitalization,
             ContractReference = line.ContractReference, CostCenter = line.CostCenter
         });
     }
@@ -1636,7 +1640,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     private Task<List<CatalogOption>> CatalogOptionsAsync(CancellationToken ct) =>
         db.CostCatalogItems.Where(i => i.IsActive).OrderBy(i => i.Category).ThenBy(i => i.Name)
-            .Select(i => new CatalogOption(i.Id, i.Category, i.Name, i.Vendor, i.BillingModel, i.UnitCost))
+            .Select(i => new CatalogOption(i.Id, i.Category, i.Name, i.Vendor, i.BillingModel, i.UnitCost, i.Capitalization))
             .ToListAsync(ct);
 
     private static Dictionary<int, (DateOnly Start, DateOnly End)> CostPreviewWindows(Initiative initiative)
@@ -1692,12 +1696,13 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         line.UnitCost = model.UnitCost!.Value;
         line.StartDate = model.StartDate;
         line.EndDate = model.EndDate;
+        line.Capitalization = model.Capitalization;
         line.ContractReference = string.IsNullOrWhiteSpace(model.ContractReference) ? null : model.ContractReference.Trim();
         line.CostCenter = string.IsNullOrWhiteSpace(model.CostCenter) ? null : model.CostCenter.Trim();
     }
 
     private static object NonLaborSnapshot(InitiativeNonLaborCost c) =>
-        new { c.InitiativeId, c.PhaseId, c.CostCatalogItemId, c.Category, c.Description, c.BillingModel, c.Quantity, c.UnitCost, c.StartDate, c.EndDate, c.ContractReference, c.CostCenter };
+        new { c.InitiativeId, c.PhaseId, c.CostCatalogItemId, c.Category, c.Description, c.BillingModel, c.Quantity, c.UnitCost, c.StartDate, c.EndDate, c.Capitalization, c.ContractReference, c.CostCenter };
 
     private string FirstError() =>
         ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault(m => !string.IsNullOrEmpty(m)) ?? "Invalid input.";
@@ -1729,7 +1734,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
-        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, a.PersonId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.ContractReference, a.CostCenter };
+        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, a.PersonId, a.Quantity, a.AllocationPercent, a.EstimatedHours, a.Capitalization, a.ContractReference, a.CostCenter };
 
     private static List<RollupRow> Rollup(ForecastResult forecast, Func<ForecastLine, string> key, IEnumerable<string>? order = null)
     {

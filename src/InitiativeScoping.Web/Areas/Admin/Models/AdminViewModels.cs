@@ -218,6 +218,9 @@ public class WorkCalendarViewModel
     [Display(Name = "Hours per working day")]
     [Range(0.5, 24)]
     public decimal HoursPerDay { get; set; } = 8;
+    [Display(Name = "Fiscal year starts in")]
+    [Range(1, 12)]
+    public int FiscalYearStartMonth { get; set; } = 1;
     public IReadOnlyList<Holiday> Holidays { get; set; } = [];
 }
 
@@ -243,6 +246,8 @@ public class CostCatalogItemEditModel
     public BillingModel? BillingModel { get; set; } = Domain.Enums.BillingModel.Monthly;
     [Required, Range(0, 999_999_999), Display(Name = "Unit cost")]
     public decimal? UnitCost { get; set; }
+    [Required, Display(Name = "Capex / Opex")]
+    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
     public bool IsActive { get; set; } = true;
 }
 

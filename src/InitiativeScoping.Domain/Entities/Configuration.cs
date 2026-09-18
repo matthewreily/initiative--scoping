@@ -92,6 +92,8 @@ public class WorkCalendarSettings
 {
     public int Id { get; set; }
     public decimal HoursPerDay { get; set; } = 8;
+    /// <summary>Calendar month (1–12) in which the fiscal year starts; 1 = fiscal year equals calendar year.</summary>
+    public int FiscalYearStartMonth { get; set; } = 1;
 }
 
 /// <summary>Admin-managed non-labor cost item (software license, hardware SKU, ...) initiatives can pick to prefill a cost line.</summary>
@@ -103,6 +105,7 @@ public class CostCatalogItem
     public string? Vendor { get; set; }
     public BillingModel BillingModel { get; set; } = BillingModel.Monthly;
     public decimal UnitCost { get; set; }
+    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
     public bool IsActive { get; set; } = true;
 }
 

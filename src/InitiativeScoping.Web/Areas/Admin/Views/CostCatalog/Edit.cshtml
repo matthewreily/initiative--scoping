@@ -35,6 +35,12 @@
             <div class="form-text">Per unit, per billing period (e.g. per seat per month).</div>
             <span asp-validation-for="UnitCost" class="text-danger"></span>
         </div>
+        <div class="col-sm-6">
+            <label asp-for="Capitalization" class="form-label"></label>
+            <select asp-for="Capitalization" asp-items="Html.GetEnumSelectList<CapitalizationType>()" class="form-select"></select>
+            <div class="form-text">Default accounting treatment prefilled when this item is added to an initiative.</div>
+            <span asp-validation-for="Capitalization" class="text-danger"></span>
+        </div>
     </div>
     <div class="form-check mb-3">
         <input asp-for="IsActive" class="form-check-input" />
