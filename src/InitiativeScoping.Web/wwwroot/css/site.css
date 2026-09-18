@@ -244,3 +244,25 @@ th .help-hint { font-weight: 600; }
   transition: top .15s, left .15s, width .15s, height .15s;
 }
 .tour-card { position: fixed; width: 320px; max-width: calc(100vw - 24px); }
+
+/* One-pager (print layout) */
+.print-toolbar { position: sticky; top: 0; z-index: 10; }
+.print-page { max-width: 60rem; }
+.one-pager-description { white-space: pre-line; }
+@media print {
+  @page { size: auto; margin: 12mm; }
+  html, body.print-body { background: #fff; font-size: 10.5pt; }
+  .print-page { max-width: none; padding: 0 !important; }
+  .print-page h1 { font-size: 16pt; }
+  .print-page h2 { font-size: 9pt; margin-top: .25rem; }
+  .print-page .table { font-size: 9pt; margin-bottom: .5rem !important; }
+  .print-page .table > :not(caption) > * > * { padding: .15rem .3rem; }
+  .print-page .fs-5 { font-size: 13pt !important; }
+  .print-page .row > [class*="col-md-"] { flex: 0 0 auto; }
+  .print-page .col-md-6 { width: 50%; }
+  .print-page .col-md-3 { width: 25%; }
+  .print-page table, .print-page .border { break-inside: avoid; }
+  .print-page a { color: inherit; text-decoration: none; }
+  .print-page .badge { border: 1px solid #999; color: #000 !important; background: #fff !important; }
+  .print-page .text-danger, .print-page .text-success, .print-page .text-warning-emphasis { color: #000 !important; font-weight: 600; }
+}

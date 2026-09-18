@@ -236,6 +236,39 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
+    public async Task OnePager_summarises_schedule_forecast_and_budget_without_the_app_chrome()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "One-pager test");
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
+        await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
+            ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte), ["Quantity"] = "2", ["EstimatedHours"] = "100"
+        });
+
+        Assert.Contains($"/Initiatives/OnePager/{id}", await client.GetStringAsync(details));
+
+        var html = await client.GetStringAsync($"/Initiatives/OnePager/{id}");
+        Assert.Contains("Initiative one-pager", html);
+        Assert.Contains("One-pager test", html);
+        Assert.Contains("id=\"print-button\"", html);
+        Assert.Contains("id=\"one-pager-phases\"", html);
+        Assert.Contains("2026-03-01", html);
+        Assert.Contains("$24,000", html);
+        Assert.Contains("No baseline yet", html);
+        Assert.Contains("No approved budget", html);
+        Assert.Contains("Software Engineer", html);
+        Assert.Contains("id=\"one-pager-months\"", html);
+        Assert.DoesNotContain("class=\"navbar", html);
+        Assert.DoesNotContain("skip-link", html);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/Initiatives/OnePager/999999")).StatusCode);
+    }
+
+    [Fact]
     public async Task Explain_says_why_a_line_is_unpriced()
     {
         var client = factory.CreateClient(NoRedirect);
