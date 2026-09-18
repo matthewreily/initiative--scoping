@@ -425,3 +425,29 @@ document.addEventListener('keydown', e => {
         if (hit.matches('a[href]')) location.assign(hit.href); else hit.click();
     });
 })();
+
+// Appearance: light / dark / system. The <head> applies the stored choice before first paint; this keeps the
+// dropdown in sync, persists changes and follows the OS when "System" is selected.
+(function () {
+    const key = 'is-theme';
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const stored = () => { try { return localStorage.getItem(key); } catch { return null; } };
+    const choice = () => { const s = stored(); return s === 'light' || s === 'dark' ? s : 'auto'; };
+    const apply = () => {
+        const c = choice();
+        document.documentElement.setAttribute('data-bs-theme', c === 'auto' ? (media.matches ? 'dark' : 'light') : c);
+        document.querySelectorAll('.theme-toggle [data-theme]').forEach(b => {
+            const on = b.dataset.theme === c;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    };
+    document.addEventListener('click', e => {
+        const b = e.target.closest('.theme-toggle [data-theme]');
+        if (!b) return;
+        try { if (b.dataset.theme === 'auto') localStorage.removeItem(key); else localStorage.setItem(key, b.dataset.theme); } catch { /* storage unavailable */ }
+        apply();
+    });
+    media.addEventListener('change', apply);
+    apply();
+})();
