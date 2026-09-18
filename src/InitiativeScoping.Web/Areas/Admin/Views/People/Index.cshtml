@@ -1,7 +1,7 @@
-@model IReadOnlyList<PersonListItem>
+@model PeopleIndexModel
 @{
     ViewData["Title"] = "People";
-    var search = ViewBag.Search as string;
+    var search = Model.Search;
 }
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h2 class="h4 mb-0">People roster</h2>
@@ -27,17 +27,17 @@
     </div>
 </div>
 <form asp-action="BulkDelete" method="post" data-bulk>
-<div class="table-responsive">
+<div class="table-responsive table-scroll">
 <table class="table table-sm align-middle" data-sortable>
     <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th>Status</th><th>Actuals</th><th data-nosort></th></tr></thead>
     <tbody>
-    @foreach (var item in Model)
+    @foreach (var item in Model.Items)
     {
         var p = item.Person;
         <tr>
             <td><input type="checkbox" class="form-check-input" name="ids" value="@p.Id" data-bulk-item aria-label="Select row" /></td>
             <td>@p.DisplayName</td>
-            <td class="small text-muted">@p.ExternalIds</td>
+            <td class="small text-muted text-wrap" style="max-width: 16rem">@p.ExternalIds</td>
             <td>@p.ResourceType?.Name</td>
             <td>@p.BusinessUnit?.Name</td>
             <td data-sort="@p.Seniority!.SortOrder">@p.Seniority.Name</td>
@@ -59,12 +59,13 @@
             </td>
         </tr>
     }
-    @if (Model.Count == 0)
+    @if (Model.Items.Count == 0)
     {
-        <tr data-nosort><td colspan="12" class="text-muted">No people yet.</td></tr>
+        <tr data-nosort><td colspan="12" class="text-muted">@(string.IsNullOrWhiteSpace(search) ? "No people yet." : "No people match your search.")</td></tr>
     }
     </tbody>
 </table>
 </div>
+<partial name="_Pager" model="Model.Pager(Url)" />
 <partial name="_BulkBar" model='new BulkBarOptions("people")' />
 </form>
