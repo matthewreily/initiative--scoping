@@ -104,6 +104,13 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         Assert.Contains("$12,000", compare);
         Assert.Contains("-$12,000", compare);
         Assert.Contains("-100.0", compare);
+        // Per-resource-type rows are grouped under the class they belong to: all hours here are internal, so the
+        // type row follows "Internal FTE hours" and nothing is listed under "Vendor hours".
+        var internalIdx = compare.IndexOf("Internal FTE hours", StringComparison.Ordinal);
+        var vendorIdx = compare.IndexOf("Vendor hours", StringComparison.Ordinal);
+        Assert.True(internalIdx > 0 && vendorIdx > internalIdx);
+        Assert.Contains("compare-type-row", compare[internalIdx..vendorIdx]);
+        Assert.DoesNotContain("compare-type-row", compare[vendorIdx..compare.IndexOf("compare-section\">Cost", StringComparison.Ordinal)]);
         Assert.Contains($"/Initiatives/{id}/Scenarios/{scenarioId}/Promote", compare);
         Assert.Contains($"/Initiatives/{id}/Scenarios/Print", compare);
         Assert.Contains($"Scenarios (1)", WebUtility.HtmlDecode(await client.GetStringAsync(details)));

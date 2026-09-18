@@ -185,6 +185,11 @@ public class ScenarioPlannerTests
         Assert.Equal(2, col.HeadCount);
         Assert.Equal([1, 2], cmp.ResourceTypeIds);
         Assert.Equal(100m, col.HoursByResourceType(1));
+        Assert.Equal(100m, col.HoursByClass(ResourcingClass.InternalFte));
+        Assert.Equal(80m, col.HoursByClass(ResourcingClass.Vendor));
+        Assert.Equal(100m, col.HoursByResourceType(1, ResourcingClass.InternalFte));
+        Assert.Equal(0m, col.HoursByResourceType(1, ResourcingClass.Vendor));
+        Assert.Equal(80m, col.HoursByResourceType(2, ResourcingClass.Vendor));
         Assert.Equal(new DateOnly(2026, 3, 1), col.PlanStart);
         Assert.Equal(new DateOnly(2026, 4, 30), col.PlanEnd);
         Assert.Equal(0, col.UnpricedLines);

@@ -141,6 +141,12 @@ public sealed record ScenarioColumn(Initiative Initiative, ForecastResult Foreca
     public DateOnly? PlanStart => Initiative.Phases.Count == 0 ? null : Initiative.Phases.Min(p => p.PlannedStart);
     public DateOnly? PlanEnd => Initiative.Phases.Count == 0 ? null : Initiative.Phases.Max(p => p.PlannedEnd);
 
+    public decimal HoursByClass(ResourcingClass resourcingClass) =>
+        Forecast.Lines.Where(l => l.Allocation.ResourcingClass == resourcingClass).Sum(l => l.Hours);
+
+    public decimal HoursByResourceType(int resourceTypeId, ResourcingClass resourcingClass) =>
+        Forecast.Lines.Where(l => l.Allocation.ResourceTypeId == resourceTypeId && l.Allocation.ResourcingClass == resourcingClass).Sum(l => l.Hours);
+
     public decimal HoursByResourceType(int resourceTypeId) =>
         Forecast.Lines.Where(l => l.Allocation.ResourceTypeId == resourceTypeId).Sum(l => l.Hours);
 }
