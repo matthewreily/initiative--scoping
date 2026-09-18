@@ -551,7 +551,7 @@ else
                 </div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
             </form>
-            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { VendorSelectId = "vendorid", BusinessUnitSelectId = "businessunitid", PersonSelectId = "personid", QuantityInputId = "quantity" })" />
+            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { VendorSelectId = "vendorid", BusinessUnitSelectId = "businessunitid", PersonSelectId = "personid", QuantityInputId = "quantity", CapexInputId = "capitalization" })" />
             @if (fd is not null)
             {
                 <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />

@@ -22,7 +22,10 @@
         const cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cards));
         const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
         const VENDOR = '@vendorClass';
+        const capex = byId('@Model.CapexInputId');
+        const capexDefaults = { internal: @Model.Data.InternalCapexPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), vendor: @Model.Data.VendorCapexPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) };
         const current = { type: '@Model.Current.ResourceTypeId', seniority: '@Model.Current.SeniorityId', location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.Location)), cls: '@((int)Model.Current.ResourcingClass)', vendor: '@(Model.Current.VendorId?.ToString() ?? string.Empty)', people: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Current.PersonIds.Select(p => p.ToString()))) };
+        let capexClass = current.cls;
         const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
 
         function pricedFor(phaseId) {
@@ -54,6 +57,16 @@
         // Mirrors RateResolver.VendorMatches: a vendor row naming no vendor is a generic rate for any vendor.
         const vendorRowMatches = (o, vendorId) => !same(o.cls, VENDOR) || o.vendor === null || sameVendor(o.vendor, vendorId);
         const vendorMatch = (rows, vendorId) => rows.filter(o => vendorRowMatches(o, vendorId)).sort((a, b) => (b.vendor !== null) - (a.vendor !== null))[0];
+
+        // A Capex % still sitting on the previous class's default follows the class; a hand-entered (or saved) value stays.
+        function syncCapex() {
+            if (!capex) { return; }
+            const defaultFor = c => same(c, VENDOR) ? capexDefaults.vendor : capexDefaults.internal;
+            if (capexClass !== null && capexClass !== cls.value && (capex.value === '' || parseFloat(capex.value) === defaultFor(capexClass))) {
+                capex.value = String(defaultFor(cls.value));
+            }
+            capexClass = cls.value;
+        }
 
         function sync(preferCurrent) {
             const allPriced = pricedFor(phase.value);
@@ -87,6 +100,7 @@
                 match = byCls[0];
             }
             syncPeople(preferCurrent);
+            syncCapex();
             if (match) {
                 output.value = money.format(match.rate) + ' /h';
                 output.classList.remove('is-invalid');

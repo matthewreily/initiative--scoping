@@ -123,7 +123,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => new { x.Method, x.Key }).IsUnique();
         });
 
-        b.Entity<WorkCalendarSettings>(e => e.Property(x => x.HoursPerDay).HasPrecision(4, 2));
+        b.Entity<WorkCalendarSettings>(e =>
+        {
+            e.Property(x => x.HoursPerDay).HasPrecision(4, 2);
+            e.Property(x => x.InternalCapexPercent).HasPrecision(5, 2);
+            e.Property(x => x.VendorCapexPercent).HasPrecision(5, 2);
+        });
 
         b.Entity<CostCatalogItem>(e =>
         {
