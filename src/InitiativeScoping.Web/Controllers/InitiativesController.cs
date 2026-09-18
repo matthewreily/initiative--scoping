@@ -688,6 +688,43 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return RedirectWithSuccess("Allocation updated.", initiative.Id);
     }
 
+    /// <summary>Frees one named seat: the person is removed from the allocation, the quantity is unchanged so the seat becomes unassigned.</summary>
+    [HttpPost]
+    public async Task<IActionResult> UnassignPerson(int id, int personId, CancellationToken ct)
+    {
+        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
+            .Include(a => a.People).ThenInclude(p => p.Person).FirstOrDefaultAsync(a => a.Id == id, ct);
+        if (allocation is null)
+        {
+            return NotFound();
+        }
+
+        var initiative = allocation.Initiative!;
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsScopeEditable(initiative))
+        {
+            return RedirectWithError(ScopeLockedMessage, initiative.Id);
+        }
+
+        var seat = allocation.People.FirstOrDefault(p => p.PersonId == personId);
+        if (seat is null)
+        {
+            return RedirectWithError("That person is not assigned to this allocation.", initiative.Id);
+        }
+
+        var before = AllocationSnapshot(allocation);
+        var name = seat.Person?.DisplayName ?? $"Person #{personId}";
+        allocation.People.Remove(seat);
+        db.InitiativeAllocationPeople.Remove(seat);
+        audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Update, new { Before = before, After = AllocationSnapshot(allocation) });
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"{name} unassigned; the seat is now unassigned.", initiative.Id);
+    }
+
     [HttpPost]
     public async Task<IActionResult> DeleteAllocation(int id, CancellationToken ct)
     {

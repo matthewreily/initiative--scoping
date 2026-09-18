@@ -85,7 +85,7 @@
             <label asp-for="PersonIds" class="form-label">People <span class="text-muted fw-normal small">(one seat each, ≤ Qty)</span></label>
             <select asp-for="PersonIds" asp-items="@(new MultiSelectList(rateOptions.People, "Id", "Name", Model.PersonIds))" class="form-select" size="4" aria-describedby="person-help"></select>
             <span asp-validation-for="PersonIds" class="text-danger"></span>
-            <span class="visually-hidden" id="person-help">Optional roster people; only people matching the resource type, seniority, business unit and class are offered. Ctrl/Cmd-click to select several.</span>
+            <span class="visually-hidden" id="person-help">Optional roster people; only people matching the resource type, seniority, business unit and class are offered. Search by name and tick each person; remove one with the × on their chip.</span>
         </div>
         <div class="col-md-3">
             <label asp-for="Quantity" class="form-label"></label>

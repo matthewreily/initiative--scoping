@@ -30,11 +30,15 @@ test.describe('Named people on allocations', () => {
     await row.getByRole('link', { name: 'Edit' }).click();
     const panel = page.locator('#side-panel');
     await expect(panel.getByRole('heading', { name: 'Edit allocation' })).toBeVisible();
-    const person = panel.locator('#PersonIds');
-    await expect(person.locator('option', { hasText: jane })).toHaveCount(1);
-    await expect(person.locator('option', { hasText: jane })).toBeEnabled();
-    await expect(person.locator('option', { hasText: quinn })).toBeDisabled();
-    await person.selectOption({ label: jane });
+    const picker = panel.locator('.people-picker');
+    const list = picker.locator('.people-picker-list');
+    await expect(list.getByRole('checkbox', { name: jane })).toBeVisible();
+    await expect(list.getByRole('checkbox', { name: quinn })).toHaveCount(0);
+    await picker.getByRole('searchbox').fill('zzz-nobody');
+    await expect(list).toContainText('No people match');
+    await picker.getByRole('searchbox').fill(jane.split(' ')[0]);
+    await list.getByRole('checkbox', { name: jane }).check();
+    await expect(panel.locator('#PersonIds option:checked')).toHaveCount(1);
     await panel.getByLabel('Quantity').fill('2');
     await expect(panel.getByLabel('Quantity')).toHaveJSProperty('readOnly', false);
     await panel.getByRole('button', { name: 'Save' }).click();
@@ -45,8 +49,26 @@ test.describe('Named people on allocations', () => {
     await page.getByRole('tab', { name: /Team/ }).click();
     await expect(page.locator('#pane-team')).toContainText(jane);
 
+    const detailsUrl = page.url();
     await page.goto('/Capacity?view=People');
     await expect(page.locator('main')).toContainText(jane);
     await expect(page.locator('main')).toContainText('Unassigned');
+
+    // Unassign: the chip's × in the side panel clears the selection; the × on the Details row frees the seat server-side
+    await page.goto(detailsUrl);
+    await page.getByRole('tab', { name: /Plan/ }).click();
+    await row.getByRole('link', { name: 'Edit' }).click();
+    await expect(panel.getByRole('heading', { name: 'Edit allocation' })).toBeVisible();
+    const chip = panel.locator('.assigned-people').getByRole('button', { name: `Unassign ${jane}` });
+    await expect(chip).toBeVisible();
+    await chip.click();
+    await expect(chip).toHaveCount(0);
+    await expect(panel.locator('#PersonIds option:checked')).toHaveCount(0);
+    await panel.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.locator('#allocations-table').getByRole('button', { name: `Unassign ${jane}` }).click();
+    await expect(page.locator('#allocations-table .allocation-person', { hasText: jane })).toHaveCount(0);
+    await expect(row).toContainText('—');
+    await expect(row.locator('td').nth(9)).toHaveText('2');
   });
 });

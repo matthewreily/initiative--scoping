@@ -106,6 +106,26 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
             Assert.Equal(1, named.UnassignedSeats);
         }
 
+        // Unassigning Sam frees his seat without deleting it; unknown people are refused.
+        Assert.Contains($"aria-label=\"Unassign Sam {tag}\"", await client.GetStringAsync(details));
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/UnassignPerson/{namedId}", new() { ["personId"] = second.ToString() })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/UnassignPerson/{namedId}", new() { ["personId"] = second.ToString() })).StatusCode);
+        var afterUnassign = await client.GetStringAsync(details);
+        Assert.Contains("is not assigned to this allocation", afterUnassign);
+        Assert.Contains("+ 2 unassigned", afterUnassign);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var named = await db.InitiativeAllocations.Include(a => a.People).SingleAsync(a => a.Id == namedId);
+            Assert.Equal([jane], named.PersonIds);
+            Assert.Equal(3, named.Quantity);
+        }
+
+        editForm = Allocation(qty: "3", people: [jane, second]);
+        editForm["Id"] = namedId.ToString();
+        editForm["InitiativeId"] = id.ToString();
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, $"/Initiatives/EditAllocation/{namedId}", $"/Initiatives/EditAllocation/{namedId}", editForm)).StatusCode);
+
         var page = await client.GetStringAsync(details);
         Assert.Contains($"Jane {tag}", page);
         Assert.Contains($"Sam {tag}", page);
