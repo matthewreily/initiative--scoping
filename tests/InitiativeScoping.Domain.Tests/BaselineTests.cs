@@ -146,18 +146,39 @@ public class BaselineTests
     public void Snapshot_captures_person_id_and_display_name_for_named_allocations()
     {
         var initiative = NewInitiative(allocations: 3);
-        initiative.Allocations[0].PersonId = 4;
-        initiative.Allocations[0].Person = new Person { Id = 4, DisplayName = "Jane Doe", ResourceTypeId = 1, SeniorityId = 2, Location = "Onshore", BusinessUnitId = 1 };
-        initiative.Allocations[1].PersonId = 5;
+        initiative.Allocations[0].People.Add(new InitiativeAllocationPerson { PersonId = 4, Person = new Person { Id = 4, DisplayName = "Jane Doe", ResourceTypeId = 1, SeniorityId = 2, Location = "Onshore", BusinessUnitId = 1 } });
+        initiative.Allocations[1].People.Add(new InitiativeAllocationPerson { PersonId = 5 });
 
         var baseline = BaselineSnapshot.Create(initiative, Forecast(initiative, 100m), "alice", Now, "Activation");
 
-        var lines = baseline.Lines.OrderBy(l => l.ResourceTypeId).ToList();
-        Assert.Equal(4, lines[0].PersonId);
-        Assert.Equal("Jane Doe", lines[0].PersonName);
-        Assert.Equal(5, lines[1].PersonId);
-        Assert.Equal("Person #5", lines[1].PersonName);
-        Assert.Null(lines[2].PersonId);
-        Assert.Null(lines[2].PersonName);
+        // Quantity is 2, so each named allocation also leaves one unnamed seat line.
+        Assert.Equal(5, baseline.Lines.Count);
+        var named = baseline.Lines.Where(l => l.PersonId != null).OrderBy(l => l.ResourceTypeId).ToList();
+        Assert.Equal(4, named[0].PersonId);
+        Assert.Equal("Jane Doe", named[0].PersonName);
+        Assert.Equal(5, named[1].PersonId);
+        Assert.Equal("Person #5", named[1].PersonName);
+        Assert.Equal([1, 2, 3], baseline.Lines.Where(l => l.PersonId == null).Select(l => l.ResourceTypeId));
+    }
+
+    [Fact]
+    public void Snapshot_splits_a_multi_seat_allocation_into_one_line_per_named_person_plus_the_unnamed_seats()
+    {
+        var initiative = NewInitiative(allocations: 1);
+        var a = initiative.Allocations[0];
+        a.Quantity = 3;
+        a.People.Add(new InitiativeAllocationPerson { PersonId = 4, Person = new Person { Id = 4, DisplayName = "Jane", ResourceTypeId = 1, SeniorityId = 2, Location = "Onshore", BusinessUnitId = 1 } });
+        a.People.Add(new InitiativeAllocationPerson { PersonId = 5, Person = new Person { Id = 5, DisplayName = "Bob", ResourceTypeId = 1, SeniorityId = 2, Location = "Onshore", BusinessUnitId = 1 } });
+        var forecast = Forecast(initiative, 100m);
+        var line = forecast.Lines[0];
+
+        var baseline = BaselineSnapshot.Create(initiative, forecast, "alice", Now, "Activation");
+
+        Assert.Equal(3, baseline.Lines.Count);
+        Assert.Equal(["Jane", "Bob", null], baseline.Lines.Select(l => l.PersonName));
+        Assert.All(baseline.Lines, l => Assert.Equal(Math.Round(line.Hours / 3, 2), l.Hours, 2));
+        Assert.Equal(line.Hours, baseline.Lines.Sum(l => l.Hours));
+        Assert.Equal(line.Cost, baseline.Lines.Sum(l => l.Cost));
+        Assert.Equal(baseline.TotalHours, baseline.Lines.Sum(l => l.Hours));
     }
 }

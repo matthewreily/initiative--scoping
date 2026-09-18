@@ -111,9 +111,9 @@ public class CapacityCalculatorTests
     {
         var a = Make(1, "A", new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), (1, 1, 100m), (2, 1, 30m));
         var b = Make(2, "B", new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), (1, 1, 120m), (1, 3, 40m));
-        a.Allocations.First(x => x.ResourceTypeId == 1).PersonId = 10;
-        b.Allocations.First(x => x.Quantity == 1).PersonId = 10;
-        a.Allocations.First(x => x.ResourceTypeId == 2).PersonId = 11;
+        a.Allocations.First(x => x.ResourceTypeId == 1).People.Add(new InitiativeAllocationPerson { PersonId = 10 });
+        b.Allocations.First(x => x.Quantity == 1).People.Add(new InitiativeAllocationPerson { PersonId = 10 });
+        a.Allocations.First(x => x.ResourceTypeId == 2).People.Add(new InitiativeAllocationPerson { PersonId = 11 });
         var jane = new Person { Id = 10, DisplayName = "Jane", ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", BusinessUnitId = 1 };
         var gone = new Person { Id = 11, DisplayName = "Former", ResourceTypeId = 2, SeniorityId = 1, Location = "Onshore", BusinessUnitId = 1, IsActive = false };
 
@@ -148,11 +148,28 @@ public class CapacityCalculatorTests
     public void Person_view_labels_people_missing_from_the_roster_by_id()
     {
         var a = Make(1, "A", new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), (1, 1, 10m));
-        a.Allocations[0].PersonId = 99;
+        a.Allocations[0].People.Add(new InitiativeAllocationPerson { PersonId = 99 });
 
         var map = CapacityCalculator.CalculateByPerson([a], [], TypeNames, NoHolidays, 8m);
 
         Assert.Equal("Person #99", Assert.Single(map.Rows).Label);
         Assert.Equal(0, map.Rows[0].Headcount);
+    }
+
+    [Fact]
+    public void Person_view_gives_each_named_person_one_seat_and_leaves_the_rest_unassigned()
+    {
+        // 3 seats × 100 h: Jane and Bob take one seat each, the third stays unassigned under the resource type.
+        var a = Make(1, "A", new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), (1, 3, 100m));
+        a.Allocations[0].People.Add(new InitiativeAllocationPerson { PersonId = 10 });
+        a.Allocations[0].People.Add(new InitiativeAllocationPerson { PersonId = 12 });
+        var jane = new Person { Id = 10, DisplayName = "Jane", ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", BusinessUnitId = 1 };
+        var bob = new Person { Id = 12, DisplayName = "Bob", ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", BusinessUnitId = 1 };
+
+        var map = CapacityCalculator.CalculateByPerson([a], [jane, bob], TypeNames, NoHolidays, 8m);
+
+        Assert.Equal(["Bob", "Jane", "Unassigned Developer"], map.Rows.Select(r => r.Label));
+        Assert.All(map.Rows, r => Assert.Equal(100m, r.Cells[0].DemandHours));
+        Assert.Equal(300m, CapacityCalculator.Calculate([a], [jane, bob], TypeNames, NoHolidays, 8m).Rows[0].Cells[0].DemandHours);
     }
 }

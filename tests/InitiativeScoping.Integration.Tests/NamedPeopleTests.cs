@@ -45,42 +45,72 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
         Assert.DoesNotContain($"Out {tag}", form);
         Assert.DoesNotContain($"Gone {tag}", form);
 
-        Dictionary<string, string> Allocation(int? person, string qty = "1", int? typeId = null) => new()
+        Dictionary<string, string> Allocation(string qty = "1", int? typeId = null, params int[] people)
         {
-            ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = buId.ToString(), ["ResourceTypeId"] = (typeId ?? engineerId).ToString(),
-            ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte),
-            ["PersonId"] = person?.ToString() ?? string.Empty, ["Quantity"] = qty, ["EstimatedHours"] = "40"
-        };
+            var form = new Dictionary<string, string>
+            {
+                ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = buId.ToString(), ["ResourceTypeId"] = (typeId ?? engineerId).ToString(),
+                ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte),
+                ["Quantity"] = qty, ["EstimatedHours"] = "40"
+            };
+            for (var i = 0; i < people.Length; i++)
+            {
+                form[$"PersonIds[{i}]"] = people[i].ToString();
+            }
 
-        var wrongType = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(quinn));
+            return form;
+        }
+
+        var wrongType = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(people: quinn));
         Assert.Equal(HttpStatusCode.Redirect, wrongType.StatusCode);
         Assert.Contains("do not match this allocation", await client.GetStringAsync(details));
 
-        var inactive = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(gone));
+        var inactive = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(people: gone));
         Assert.Equal(HttpStatusCode.Redirect, inactive.StatusCode);
         Assert.Contains("is inactive on the roster", await client.GetStringAsync(details));
 
-        var tooMany = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(jane, qty: "2"));
+        var tooMany = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(qty: "1", people: [jane, gone]));
         Assert.Equal(HttpStatusCode.Redirect, tooMany.StatusCode);
-        Assert.Contains("Quantity must be 1 when a named person is assigned", await client.GetStringAsync(details));
+        Assert.Contains("2 people are named but the quantity is 1", await client.GetStringAsync(details));
 
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(jane))).StatusCode);
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(null, qty: "2"))).StatusCode);
-        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(quinn, typeId: qaId))).StatusCode);
+        // Jane fills one of three engineer seats; the other two stay unassigned.
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(qty: "3", people: jane))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(qty: "2"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", Allocation(typeId: qaId, people: quinn))).StatusCode);
         _ = outsider;
 
+        int namedId;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var allocations = await db.InitiativeAllocations.Where(a => a.InitiativeId == id).ToListAsync();
+            var allocations = await db.InitiativeAllocations.Include(a => a.People).Where(a => a.InitiativeId == id).ToListAsync();
             Assert.Equal(3, allocations.Count);
-            Assert.Equal([jane, quinn], allocations.Where(a => a.PersonId != null).Select(a => a.PersonId!.Value).OrderBy(x => x));
-            Assert.Single(allocations, a => a.PersonId == null && a.Quantity == 2);
+            Assert.Equal([jane, quinn], allocations.SelectMany(a => a.PersonIds).OrderBy(x => x));
+            Assert.Single(allocations, a => !a.HasNamedPeople && a.Quantity == 2);
+            var named = Assert.Single(allocations, a => a.Quantity == 3);
+            Assert.Equal(2, named.UnassignedSeats);
+            namedId = named.Id;
+        }
+
+        // Editing keeps Jane and adds a second engineer seat holder; the quantity floor is enforced.
+        var second = await CreatePersonAsync(client, $"Sam {tag}", engineerId, buId, seniorityId: 3);
+        var editForm = Allocation(qty: "3", people: [jane, second]);
+        editForm["Id"] = namedId.ToString();
+        editForm["InitiativeId"] = id.ToString();
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, $"/Initiatives/EditAllocation/{namedId}", $"/Initiatives/EditAllocation/{namedId}", editForm)).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var named = await db.InitiativeAllocations.Include(a => a.People).SingleAsync(a => a.Id == namedId);
+            Assert.Equal([jane, second], named.PersonIds.OrderBy(x => x));
+            Assert.Equal(1, named.UnassignedSeats);
         }
 
         var page = await client.GetStringAsync(details);
-        Assert.Contains($"<span class=\"allocation-person\">Jane {tag}</span>", page);
-        Assert.Contains($"<span class=\"allocation-person\">Quinn {tag}</span>", page);
+        Assert.Contains($"Jane {tag}", page);
+        Assert.Contains($"Sam {tag}", page);
+        Assert.Contains($"Quinn {tag}", page);
+        Assert.Contains("+ 1 unassigned", page);
         Assert.DoesNotContain("No named people yet", page);
 
         var capacity = await client.GetStringAsync($"/Capacity?view=People&businessUnitId={buId}");
@@ -116,7 +146,7 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
         {
             ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = buId.ToString(), ["ResourceTypeId"] = engineerId.ToString(),
             ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClass"] = nameof(ResourcingClass.InternalFte),
-            ["PersonId"] = jane.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "40"
+            ["PersonIds[0]"] = jane.ToString(), ["Quantity"] = "1", ["EstimatedHours"] = "40"
         })).StatusCode);
 
         var other = await CreateInitiativeAsync(client, $"Other {tag}", buId);

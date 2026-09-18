@@ -135,9 +135,9 @@ public class ActualsImporter(AppDbContext db, ICurrentUser currentUser, IAuditLo
     /// <summary>Active roster people named on each initiative's allocations, for name-based matching of imported time.</summary>
     public static async Task<Dictionary<int, IReadOnlyList<Person>>> NamedPeopleByInitiativeAsync(AppDbContext db, CancellationToken ct)
     {
-        var rows = await db.InitiativeAllocations
-            .Where(a => a.PersonId != null && a.Person!.IsActive)
-            .Select(a => new { a.InitiativeId, a.Person })
+        var rows = await db.InitiativeAllocationPeople
+            .Where(s => s.Person!.IsActive)
+            .Select(s => new { s.Allocation!.InitiativeId, s.Person })
             .AsNoTracking()
             .ToListAsync(ct);
         return rows.GroupBy(r => r.InitiativeId)

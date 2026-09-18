@@ -10,7 +10,7 @@
     string Resource(InitiativeAllocation a) =>
         $"{a.Quantity} × {Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId, "?")} / {a.Seniority?.Name} / {a.Location} / " +
         (a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}") +
-        (a.Person is null ? string.Empty : $" — {a.Person.DisplayName}");
+        (a.HasNamedPeople ? $" — {a.PersonNames}" + (a.UnassignedSeats > 0 ? $" + {a.UnassignedSeats} unassigned" : string.Empty) : string.Empty);
 
 }
 <nav aria-label="breadcrumb"><ol class="breadcrumb">

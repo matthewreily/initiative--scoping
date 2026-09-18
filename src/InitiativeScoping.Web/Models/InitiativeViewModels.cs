@@ -101,8 +101,9 @@ public class AllocationEditModel
     public ResourcingClass ResourcingClass { get; set; } = ResourcingClass.InternalFte;
     [Display(Name = "Vendor")]
     public int? VendorId { get; set; }
-    [Display(Name = "Person")]
-    public int? PersonId { get; set; }
+    /// <summary>Named roster people, one seat each; at most <see cref="Quantity"/>.</summary>
+    [Display(Name = "People")]
+    public List<int> PersonIds { get; set; } = [];
     [Required, Range(1, 1000)]
     public int Quantity { get; set; } = 1;
     /// <summary>Entered directly in effort-driven mode; computed from <see cref="AllocationPercent"/> in fixed-duration mode.</summary>
@@ -211,7 +212,7 @@ public sealed record RateOptionsScriptModel(
 {
     public string VendorSelectId { get; init; } = "VendorId";
     public string BusinessUnitSelectId { get; init; } = "BusinessUnitId";
-    public string PersonSelectId { get; init; } = "PersonId";
+    public string PersonSelectId { get; init; } = "PersonIds";
     public string QuantityInputId { get; init; } = "Quantity";
 }
 

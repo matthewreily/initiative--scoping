@@ -420,7 +420,7 @@ else
                     <td>@a.BusinessUnit?.Name</td>
                     <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
                     <td data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
-                    <td>@if (a.Person is not null) { <span class="allocation-person">@a.Person.DisplayName</span> @if (!a.Person.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } } else { <span class="text-muted">—</span> }</td>
+                    <td>@if (a.HasNamedPeople) { foreach (var p in a.NamedPeople) { <span class="allocation-person d-block">@p.DisplayName @if (!p.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> }</span> } if (a.UnassignedSeats > 0) { <span class="text-muted small d-block">+ @a.UnassignedSeats unassigned</span> } } else { <span class="text-muted">—</span> }</td>
                     <td>@a.Location</td>
                     <td>@(a.ResourcingClass == ResourcingClass.InternalFte ? "Internal" : a.Vendor is null ? "Vendor" : $"Vendor: {a.Vendor.Name}")</td>
                     <td class="allocation-capitalization">@a.Capitalization</td>
@@ -505,8 +505,8 @@ else
                     <select name="VendorId" id="vendorid" asp-items="@(new SelectList(Model.RateOptions.Vendors, "Id", "Name"))" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-md-3">
-                    <label for="personid" class="form-label small mb-0">Person</label>
-                    <select name="PersonId" id="personid" asp-items="@(new SelectList(Model.RateOptions.People, "Id", "Name"))" class="form-select form-select-sm" title="Optional roster person matching this resource type, seniority, business unit and class">
+                    <label for="personid" class="form-label small mb-0">People <span class="text-muted fw-normal">(≤ Qty)</span></label>
+                    <select name="PersonIds" id="personid" multiple size="3" asp-items="@(new MultiSelectList(Model.RateOptions.People, "Id", "Name", Model.NewAllocation.PersonIds))" class="form-select form-select-sm" title="Optional roster people matching this resource type, seniority, business unit and class; one seat each, up to the quantity">
                         <option value="">Unassigned</option>
                     </select>
                 </div>
@@ -880,14 +880,14 @@ else
             <div class="col-lg-5" id="assigned-people">
         <h2 class="h5">Assigned people</h2>
         @{
-            var assigned = i.Allocations.Where(a => a.Person is not null)
-                .GroupBy(a => a.Person!)
+            var assigned = i.Allocations.SelectMany(a => a.NamedPeople.Select(p => (Person: p, Allocation: a)))
+                .GroupBy(x => x.Person, x => x.Allocation)
                 .OrderBy(g => g.Key.DisplayName)
                 .ToList();
         }
         @if (assigned.Count == 0)
         {
-            <p class="text-muted small mb-0">No named people yet — pick a Person on an allocation to staff a seat from the roster.</p>
+            <p class="text-muted small mb-0">No named people yet — pick People on an allocation to staff its seats from the roster.</p>
         }
         else
         {
@@ -897,11 +897,11 @@ else
                 <tbody>
                 @foreach (var g in assigned)
                 {
-                    var hours = g.Sum(a => lineByAllocation[a.Id].Hours);
+                    var hours = g.Sum(a => lineByAllocation[a.Id].HoursPerSeat);
                     <tr>
                         <td>@g.Key.DisplayName @if (!g.Key.IsActive) { <span class="badge bg-secondary">inactive</span> }</td>
                         <td>@Model.ResourceTypeNames.GetValueOrDefault(g.Key.ResourceTypeId) · @g.First().Seniority?.Name</td>
-                        <td class="small">@string.Join(", ", g.Select(a => $"{phaseNames.GetValueOrDefault(a.PhaseId)} ({lineByAllocation[a.Id].Hours:N0} h)"))</td>
+                        <td class="small">@string.Join(", ", g.Select(a => $"{phaseNames.GetValueOrDefault(a.PhaseId)} ({lineByAllocation[a.Id].HoursPerSeat:N0} h)"))</td>
                         <td class="text-end">@hours.ToString("N1")</td>
                     </tr>
                 }
