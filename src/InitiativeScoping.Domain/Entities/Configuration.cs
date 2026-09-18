@@ -105,7 +105,8 @@ public class CostCatalogItem
     public string? Vendor { get; set; }
     public BillingModel BillingModel { get; set; } = BillingModel.Monthly;
     public decimal UnitCost { get; set; }
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    public decimal CapexPercent { get; set; }
     public bool IsActive { get; set; } = true;
 }
 

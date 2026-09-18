@@ -88,7 +88,7 @@ public class PortfolioTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         Assert.Contains("# Forecast", initiativeCsv);
         Assert.Contains("# By month", initiativeCsv);
         Assert.Contains("Month,Forecast hours,Forecast labor cost", initiativeCsv);
-        Assert.Contains("Boarding,Software Engineer,Senior,Onshore,InternalFte,,,2,2,100,200,120,24000,Opex", initiativeCsv);
+        Assert.Contains("Boarding,Software Engineer,Senior,Onshore,InternalFte,,,2,2,100,200,120,24000,0,0,24000", initiativeCsv);
         Assert.Contains("# By fiscal period", initiativeCsv);
         Assert.Contains("# Adjustments", initiativeCsv);
         Assert.Contains(",5,500,Adj", initiativeCsv);

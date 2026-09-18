@@ -600,7 +600,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             PhaseId = model.PhaseId, BusinessUnitId = model.BusinessUnitId, ResourceTypeId = model.ResourceTypeId, SeniorityId = model.SeniorityId,
             Location = model.Location.Trim(), ResourcingClass = model.ResourcingClass, VendorId = VendorFor(model), People = SeatsFor(model), Quantity = model.Quantity,
-            EstimatedHours = model.EstimatedHours, Capitalization = model.Capitalization, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
+            EstimatedHours = model.EstimatedHours, CapexPercent = model.CapexPercent, ContractReference = model.ContractReference?.Trim(), CostCenter = model.CostCenter?.Trim()
         };
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
         initiative.Allocations.Add(allocation);
@@ -631,7 +631,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, BusinessUnitId = allocation.BusinessUnitId, ResourceTypeId = allocation.ResourceTypeId,
             SeniorityId = allocation.SeniorityId, Location = allocation.Location, ResourcingClass = allocation.ResourcingClass, VendorId = allocation.VendorId,
             PersonIds = allocation.PersonIds.ToList(), Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
-            Capitalization = allocation.Capitalization, ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
+            CapexPercent = allocation.CapexPercent, ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
         });
     }
 
@@ -680,7 +680,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         allocation.Quantity = model.Quantity;
         allocation.EstimatedHours = model.EstimatedHours;
         await ApplyAllocationEffortAsync(initiative, allocation, model, ct);
-        allocation.Capitalization = model.Capitalization;
+        allocation.CapexPercent = model.CapexPercent;
         allocation.ContractReference = model.ContractReference?.Trim();
         allocation.CostCenter = model.CostCenter?.Trim();
         audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Update, new { Before = before, After = AllocationSnapshot(allocation) });
@@ -815,7 +815,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         {
             Id = line.Id, InitiativeId = line.InitiativeId, PhaseId = line.PhaseId, CostCatalogItemId = line.CostCatalogItemId,
             Category = line.Category, Description = line.Description, BillingModel = line.BillingModel, Quantity = line.Quantity,
-            UnitCost = line.UnitCost, StartDate = line.StartDate, EndDate = line.EndDate, Capitalization = line.Capitalization,
+            UnitCost = line.UnitCost, StartDate = line.StartDate, EndDate = line.EndDate, CapexPercent = line.CapexPercent,
             ContractReference = line.ContractReference, CostCenter = line.CostCenter
         });
     }
@@ -1649,7 +1649,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     private Task<List<CatalogOption>> CatalogOptionsAsync(CancellationToken ct) =>
         db.CostCatalogItems.Where(i => i.IsActive).OrderBy(i => i.Category).ThenBy(i => i.Name)
-            .Select(i => new CatalogOption(i.Id, i.Category, i.Name, i.Vendor, i.BillingModel, i.UnitCost, i.Capitalization))
+            .Select(i => new CatalogOption(i.Id, i.Category, i.Name, i.Vendor, i.BillingModel, i.UnitCost, i.CapexPercent))
             .ToListAsync(ct);
 
     private static Dictionary<int, (DateOnly Start, DateOnly End)> CostPreviewWindows(Initiative initiative)
@@ -1705,13 +1705,13 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         line.UnitCost = model.UnitCost!.Value;
         line.StartDate = model.StartDate;
         line.EndDate = model.EndDate;
-        line.Capitalization = model.Capitalization;
+        line.CapexPercent = model.CapexPercent;
         line.ContractReference = string.IsNullOrWhiteSpace(model.ContractReference) ? null : model.ContractReference.Trim();
         line.CostCenter = string.IsNullOrWhiteSpace(model.CostCenter) ? null : model.CostCenter.Trim();
     }
 
     private static object NonLaborSnapshot(InitiativeNonLaborCost c) =>
-        new { c.InitiativeId, c.PhaseId, c.CostCatalogItemId, c.Category, c.Description, c.BillingModel, c.Quantity, c.UnitCost, c.StartDate, c.EndDate, c.Capitalization, c.ContractReference, c.CostCenter };
+        new { c.InitiativeId, c.PhaseId, c.CostCatalogItemId, c.Category, c.Description, c.BillingModel, c.Quantity, c.UnitCost, c.StartDate, c.EndDate, c.CapexPercent, c.ContractReference, c.CostCenter };
 
     private string FirstError() =>
         ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault(m => !string.IsNullOrEmpty(m)) ?? "Invalid input.";
@@ -1743,7 +1743,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static object AllocationSnapshot(InitiativeAllocation a) =>
-        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, PersonIds = a.PersonIds.ToList(), a.Quantity, a.AllocationPercent, a.EstimatedHours, a.Capitalization, a.ContractReference, a.CostCenter };
+        new { a.InitiativeId, a.PhaseId, a.BusinessUnitId, a.ResourceTypeId, a.SeniorityId, a.Location, a.ResourcingClass, a.VendorId, PersonIds = a.PersonIds.ToList(), a.Quantity, a.AllocationPercent, a.EstimatedHours, a.CapexPercent, a.ContractReference, a.CostCenter };
 
     private static List<RollupRow> Rollup(ForecastResult forecast, Func<ForecastLine, string> key, IEnumerable<string>? order = null)
     {

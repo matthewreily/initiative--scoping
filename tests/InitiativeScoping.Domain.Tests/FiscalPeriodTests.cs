@@ -95,17 +95,17 @@ public class FiscalPeriodTests
         var jan15 = new DateOnly(2026, 1, 15);
         var i = new Initiative { Name = "n", BusinessUnitId = 1, CreatedBy = "t", TargetStart = jan15 };
         i.Phases.Add(new Phase { Id = 1, Name = "Build", Sequence = 1, PlannedStart = jan15, PlannedEnd = new DateOnly(2026, 3, 15) });
-        var capexAlloc = new InitiativeAllocation { Id = 1, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", Quantity = 1, EstimatedHours = 60, Capitalization = CapitalizationType.Capex };
+        var capexAlloc = new InitiativeAllocation { Id = 1, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", Quantity = 1, EstimatedHours = 60, CapexPercent = 100m };
         var opexAlloc = new InitiativeAllocation { Id = 2, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", Quantity = 1, EstimatedHours = 60 };
         i.Allocations.AddRange([capexAlloc, opexAlloc]);
-        var license = new InitiativeNonLaborCost { Id = 5, Description = "Tool", BillingModel = BillingModel.OneTime, Quantity = 1, UnitCost = 500m, Capitalization = CapitalizationType.Capex };
+        var license = new InitiativeNonLaborCost { Id = 5, Description = "Tool", BillingModel = BillingModel.OneTime, Quantity = 1, UnitCost = 500m, CapexPercent = 100m };
         var forecast = new ForecastResult(
             [new ForecastLine(capexAlloc, 60m, 100m), new ForecastLine(opexAlloc, 60m, 50m)],
             [new NonLaborForecastLine(license, jan15, jan15, 1, 500m)]);
         var baseline = new ForecastBaseline
         {
             Version = 1, SnapshotBy = "t", IsCurrent = true,
-            Lines = [new ForecastBaselineLine { PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", PhaseName = "Build", BusinessUnitName = "BU", ResourceTypeName = "RT", SeniorityName = "S", Hours = 60, HourlyRate = 100m, Cost = 6000m, Capitalization = CapitalizationType.Capex }],
+            Lines = [new ForecastBaselineLine { PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", PhaseName = "Build", BusinessUnitName = "BU", ResourceTypeName = "RT", SeniorityName = "S", Hours = 60, HourlyRate = 100m, Cost = 6000m, CapexPercent = 100m }],
             NonLaborLines = [new ForecastBaselineNonLaborLine { Description = "Tool", BillingModel = BillingModel.OneTime, Quantity = 1, UnitCost = 400m, Periods = 1, StartDate = jan15, EndDate = jan15, Cost = 400m }]
         };
 
@@ -122,6 +122,47 @@ public class FiscalPeriodTests
         var fy = phasing.ByFiscalPeriod(FiscalCalendar.Calendar).Single(p => p.Quarter is null);
         Assert.Equal(6500m, fy.ForecastCapexCost);
         Assert.Equal(400m, fy.BaselineOpexCost);
+    }
+
+    [Fact]
+    public void Partial_capex_percent_apportions_cost_and_preserves_totals()
+    {
+        var jan15 = new DateOnly(2026, 1, 15);
+        var i = new Initiative { Name = "n", BusinessUnitId = 1, CreatedBy = "t", TargetStart = jan15 };
+        i.Phases.Add(new Phase { Id = 1, Name = "Build", Sequence = 1, PlannedStart = jan15, PlannedEnd = new DateOnly(2026, 1, 31) });
+        var alloc = new InitiativeAllocation { Id = 1, PhaseId = 1, BusinessUnitId = 1, ResourceTypeId = 1, SeniorityId = 1, Location = "Onshore", Quantity = 1, EstimatedHours = 10, CapexPercent = 60m };
+        i.Allocations.Add(alloc);
+        var license = new InitiativeNonLaborCost { Id = 5, Description = "Tool", BillingModel = BillingModel.OneTime, Quantity = 1, UnitCost = 333.33m, CapexPercent = 33.33m };
+        var forecast = new ForecastResult([new ForecastLine(alloc, 10m, 100m)], [new NonLaborForecastLine(license, jan15, jan15, 1, 333.33m)]);
+
+        var phasing = MonthlyPhasingCalculator.Calculate(i, forecast, null, [], []);
+
+        Assert.Equal(1333.33m, phasing.ForecastCost);
+        Assert.Equal(600m + 111.10m, phasing.ForecastCapexCost);
+        Assert.Equal(phasing.ForecastCost - phasing.ForecastCapexCost, phasing.ForecastOpexCost);
+        Assert.Equal(400m + 222.23m, phasing.ForecastOpexCost);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(100, 1000)]
+    [InlineData(12.5, 125)]
+    [InlineData(150, 1000)]
+    [InlineData(-5, 0)]
+    public void CapexSplit_clamps_percent_and_sums_to_total(decimal percent, decimal expectedCapex)
+    {
+        Assert.Equal(expectedCapex, CapexSplit.Capex(1000m, percent));
+        Assert.Equal(1000m, CapexSplit.Capex(1000m, percent) + CapexSplit.Opex(1000m, percent));
+    }
+
+    [Fact]
+    public void CapexSplit_rounds_capex_to_cents_and_labels_split()
+    {
+        Assert.Equal(0.33m, CapexSplit.Capex(1m, 33.333m));
+        Assert.Equal(0.67m, CapexSplit.Opex(1m, 33.333m));
+        Assert.Equal("Opex", CapexSplit.Label(0m));
+        Assert.Equal("Capex", CapexSplit.Label(100m));
+        Assert.Equal("60% Capex", CapexSplit.Label(60m));
     }
 }
 

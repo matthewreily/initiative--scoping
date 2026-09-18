@@ -149,7 +149,7 @@ public static class MonthlyPhasingCalculator
         void Add(DateOnly month, decimal labor = 0m, decimal nonLabor = 0m, decimal hours = 0m, decimal baselineCost = 0m, decimal actual = 0m, decimal forecastCapex = 0m, decimal baselineCapex = 0m) =>
             buckets[month] = buckets.GetValueOrDefault(month).Plus(labor, nonLabor, hours, baselineCost, actual, forecastCapex, baselineCapex);
 
-        static decimal CapexPart(CapitalizationType c, decimal amount) => c == CapitalizationType.Capex ? amount : 0m;
+        static decimal CapexPart(decimal capexPercent, decimal amount) => CapexSplit.Capex(amount, capexPercent);
 
         foreach (var line in forecast.Lines)
         {
@@ -162,7 +162,7 @@ public static class MonthlyPhasingCalculator
             var hourShares = SpreadByDays(line.Hours, phase.PlannedStart, phase.PlannedEnd);
             for (var k = 0; k < costShares.Count; k++)
             {
-                Add(costShares[k].Month, labor: costShares[k].Amount, hours: hourShares[k].Amount, forecastCapex: CapexPart(line.Allocation.Capitalization, costShares[k].Amount));
+                Add(costShares[k].Month, labor: costShares[k].Amount, hours: hourShares[k].Amount, forecastCapex: CapexPart(line.Allocation.CapexPercent, costShares[k].Amount));
             }
         }
 
@@ -170,7 +170,7 @@ public static class MonthlyPhasingCalculator
         {
             foreach (var (month, amount) in SpreadByPeriods(line.Cost, line.Periods, line.Line.BillingModel, line.Start!.Value))
             {
-                Add(month, nonLabor: amount, forecastCapex: CapexPart(line.Line.Capitalization, amount));
+                Add(month, nonLabor: amount, forecastCapex: CapexPart(line.Line.CapexPercent, amount));
             }
         }
 
@@ -185,7 +185,7 @@ public static class MonthlyPhasingCalculator
 
                 foreach (var (month, amount) in SpreadByDays(line.Cost, phase.PlannedStart, phase.PlannedEnd))
                 {
-                    Add(month, baselineCost: amount, baselineCapex: CapexPart(line.Capitalization, amount));
+                    Add(month, baselineCost: amount, baselineCapex: CapexPart(line.CapexPercent, amount));
                 }
             }
 
@@ -193,7 +193,7 @@ public static class MonthlyPhasingCalculator
             {
                 foreach (var (month, amount) in SpreadByPeriods(line.Cost, line.Periods, line.BillingModel, line.StartDate))
                 {
-                    Add(month, baselineCost: amount, baselineCapex: CapexPart(line.Capitalization, amount));
+                    Add(month, baselineCost: amount, baselineCapex: CapexPart(line.CapexPercent, amount));
                 }
             }
         }

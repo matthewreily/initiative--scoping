@@ -16,7 +16,7 @@
 else
 {
     <p class="text-muted small mb-2">
-        Fiscal year starts in @startMonth@(Model.Calendar.StartMonth == 1 ? " (calendar year)" : $"; FY labels use the calendar year the fiscal year ends in"). Quarters are counted from the fiscal year start. Capex / Opex follow the flag on each allocation and non-labor line.
+        Fiscal year starts in @startMonth@(Model.Calendar.StartMonth == 1 ? " (calendar year)" : $"; FY labels use the calendar year the fiscal year ends in"). Quarters are counted from the fiscal year start. Capex / Opex apportion each allocation and non-labor line by its Capex %.
     </p>
     <div class="table-responsive">
     <table class="table table-sm align-middle mb-0" id="@id-table">

@@ -111,8 +111,9 @@ public class AllocationEditModel
     public decimal EstimatedHours { get; set; }
     [Range(0.01, 100), Display(Name = "Allocation %")]
     public decimal? AllocationPercent { get; set; }
-    [Required, Display(Name = "Capex / Opex")]
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    [Required, Range(0, 100), Display(Name = "Capex %")]
+    public decimal CapexPercent { get; set; }
     [StringLength(100), Display(Name = "Contract ref")]
     public string? ContractReference { get; set; }
     [StringLength(100), Display(Name = "Cost center")]
@@ -142,8 +143,9 @@ public class NonLaborCostEditModel
     public DateOnly? StartDate { get; set; }
     [Display(Name = "End")]
     public DateOnly? EndDate { get; set; }
-    [Required, Display(Name = "Capex / Opex")]
-    public CapitalizationType Capitalization { get; set; } = CapitalizationType.Opex;
+    /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
+    [Required, Range(0, 100), Display(Name = "Capex %")]
+    public decimal CapexPercent { get; set; }
     [StringLength(200), Display(Name = "Contract ref")]
     public string? ContractReference { get; set; }
     [StringLength(100), Display(Name = "Cost center")]
@@ -154,7 +156,7 @@ public class NonLaborCostEditModel
 public sealed record FiscalPeriodsViewModel(MonthlyPhasing Phasing, FiscalCalendar Calendar);
 
 /// <summary>Catalog item as offered to the initiative form; the client prefills description/billing/unit cost from it.</summary>
-public sealed record CatalogOption(int Id, CostCategory Category, string Name, string? Vendor, BillingModel BillingModel, decimal UnitCost, CapitalizationType Capitalization = CapitalizationType.Opex)
+public sealed record CatalogOption(int Id, CostCategory Category, string Name, string? Vendor, BillingModel BillingModel, decimal UnitCost, decimal CapexPercent = 0m)
 {
     public string Label => Vendor is null ? Name : $"{Name} ({Vendor})";
 }

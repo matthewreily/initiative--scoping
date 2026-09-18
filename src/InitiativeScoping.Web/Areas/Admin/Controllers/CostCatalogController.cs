@@ -59,7 +59,7 @@ public class CostCatalogController(AppDbContext db, IAuditLog audit) : AdminCont
             Vendor = item.Vendor,
             BillingModel = item.BillingModel,
             UnitCost = item.UnitCost,
-            Capitalization = item.Capitalization,
+            CapexPercent = item.CapexPercent,
             IsActive = item.IsActive
         });
     }
@@ -114,12 +114,12 @@ public class CostCatalogController(AppDbContext db, IAuditLog audit) : AdminCont
         item.Vendor = string.IsNullOrWhiteSpace(model.Vendor) ? null : model.Vendor.Trim();
         item.BillingModel = model.BillingModel!.Value;
         item.UnitCost = model.UnitCost!.Value;
-        item.Capitalization = model.Capitalization;
+        item.CapexPercent = model.CapexPercent;
         item.IsActive = model.IsActive;
     }
 
     private static object Snapshot(CostCatalogItem item) =>
-        new { item.Category, item.Name, item.Vendor, item.BillingModel, item.UnitCost, item.Capitalization, item.IsActive };
+        new { item.Category, item.Name, item.Vendor, item.BillingModel, item.UnitCost, item.CapexPercent, item.IsActive };
 
     private async Task Validate(CostCatalogItemEditModel model, CancellationToken ct)
     {
