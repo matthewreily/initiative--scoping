@@ -73,18 +73,18 @@
             else
             {
                 <div class="table-responsive">
-                <table class="table table-sm align-middle mb-3">
+                <table class="table table-sm align-middle mb-3 explain-lines">
                     <thead><tr><th>Allocation</th><th>Hours</th><th>Hourly rate</th><th class="text-end">Cost</th></tr></thead>
                     <tbody>
                     @foreach (var l in lines)
                     {
                         var a = l.Allocation;
                         <tr id="allocation-@a.Id" class="explain-allocation @(l.IsUnpriced ? "table-warning" : "")">
-                            <td>
+                            <td data-label="Allocation">
                                 <div>@Resource(a)</div>
                                 <div class="small text-muted">Supplied by @a.BusinessUnit?.Name</div>
                             </td>
-                            <td>
+                            <td data-label="Hours">
                                 <div><strong>@l.Hours.ToString("N1") h</strong></div>
                                 <div class="small text-muted">
                                     @a.Quantity × @a.EstimatedHours.ToString("N2") h each
@@ -94,7 +94,7 @@
                                     }
                                 </div>
                             </td>
-                            <td>
+                            <td data-label="Hourly rate">
                                 @if (l.IsUnpriced)
                                 {
                                     <div class="text-danger"><strong>Unpriced</strong></div>
@@ -127,7 +127,7 @@
                                     </div>
                                 }
                             </td>
-                            <td class="text-end">
+                            <td class="text-end" data-label="Cost">
                                 <div><strong>@l.Cost.ToString("C0")</strong></div>
                                 @if (!l.IsUnpriced) { <div class="small text-muted text-nowrap">@l.Hours.ToString("N1") h × @l.HourlyRate!.Value.ToString("C2")</div> }
                             </td>

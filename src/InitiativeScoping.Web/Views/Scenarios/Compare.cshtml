@@ -69,7 +69,7 @@
         </tr>
     </thead>
     <tbody>
-        <tr class="table-light"><th colspan="@(cols.Count + 1)">Schedule</th></tr>
+        <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Schedule</span></th></tr>
         <tr>
             <th scope="row">Planning mode</th>
             @foreach (var c in cols) { <td class="text-end">@(c.Initiative.PlanningMode == PlanningMode.FixedDuration ? "Fixed duration" : "Effort driven")</td> }
@@ -91,7 +91,7 @@
             @foreach (var c in cols) { <td class="text-end">@(c.PlanEnd?.ToString("yyyy-MM-dd") ?? "—")@Html.Raw(c.IsParent ? "" : DeltaDays(c.PlanEnd, parent.PlanEnd))</td> }
         </tr>
 
-        <tr class="table-light"><th colspan="@(cols.Count + 1)">Effort</th></tr>
+        <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Effort</span></th></tr>
         <tr>
             <th scope="row">Total hours</th>
             @foreach (var c in cols) { <td class="text-end fw-semibold">@c.Hours.ToString("N1")@Html.Raw(c.IsParent ? "" : Delta(c.Hours, parent.Hours, "N1"))</td> }
@@ -116,7 +116,7 @@
             </tr>
         }
 
-        <tr class="table-light"><th colspan="@(cols.Count + 1)">Cost</th></tr>
+        <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Cost</span></th></tr>
         <tr>
             <th scope="row">Labor</th>
             @foreach (var c in cols) { <td class="text-end">@c.LaborCost.ToString("C0")@Html.Raw(c.IsParent ? "" : Delta(c.LaborCost, parent.LaborCost, "C0"))</td> }

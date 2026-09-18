@@ -618,3 +618,32 @@ document.addEventListener('keydown', e => {
     (first ?? form).scrollIntoView({ block: 'center' });
     first?.focus();
 })();
+
+// Capacity heatmap: tap / focus a cell to show its title text in a panel under the table (touch has no hover).
+(function () {
+    const table = document.getElementById('capacity-heatmap');
+    const panel = document.getElementById('capacity-detail');
+    if (!table || !panel) return;
+    const body = panel.querySelector('.heat-detail');
+    let selected = null;
+    function show(cell) {
+        if (selected) selected.classList.remove('is-selected');
+        selected = cell;
+        cell.classList.add('is-selected');
+        body.textContent = cell.getAttribute('title');
+        panel.classList.remove('d-none');
+    }
+    table.addEventListener('click', e => {
+        const cell = e.target.closest('.heat-cell[tabindex]');
+        if (cell) show(cell);
+    });
+    table.addEventListener('focusin', e => {
+        const cell = e.target.closest('.heat-cell[tabindex]');
+        if (cell) show(cell);
+    });
+    table.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const cell = e.target.closest('.heat-cell[tabindex]');
+        if (cell) { e.preventDefault(); show(cell); }
+    });
+})();

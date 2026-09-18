@@ -3,18 +3,18 @@
     string Period(BillingModel m) => m switch { BillingModel.OneTime => "one-time", BillingModel.Monthly => "month", _ => "year" };
 }
 <div class="table-responsive">
-<table class="table table-sm align-middle mb-0">
+<table class="table table-sm align-middle mb-0 explain-lines">
     <thead><tr><th>Non-labor line</th><th>Window</th><th>Periods</th><th class="text-end">Cost</th></tr></thead>
     <tbody>
     @foreach (var nl in Model)
     {
         var line = nl.Line;
         <tr id="nonlabor-@line.Id" class="explain-nonlabor @(nl.HasWindow ? "" : "table-warning")">
-            <td>
+            <td data-label="Line">
                 <div>@line.Description</div>
                 <div class="small text-muted">@VarianceCalculator.CategoryLabel(line.Category)@(line.CostCatalogItem is not null ? $" · {line.CostCatalogItem.Name}" : "")</div>
             </td>
-            <td>
+            <td data-label="Window">
                 @if (nl.HasWindow)
                 {
                     <div>@nl.Start!.Value.ToString("yyyy-MM-dd") → @nl.End!.Value.ToString("yyyy-MM-dd")</div>
@@ -25,11 +25,11 @@
                     <span class="text-danger">Phase no longer exists – not priced</span>
                 }
             </td>
-            <td>
+            <td data-label="Periods">
                 <div>@nl.Periods × @Period(line.BillingModel)</div>
                 @if (line.BillingModel != BillingModel.OneTime) { <div class="small text-muted">counted from the start date's day-of-month anniversary</div> }
             </td>
-            <td class="text-end">
+            <td class="text-end" data-label="Cost">
                 <div><strong>@nl.Cost.ToString("C0")</strong></div>
                 <div class="small text-muted text-nowrap">@line.Quantity × @line.UnitCost.ToString("C2") × @nl.Periods</div>
             </td>
