@@ -1,6 +1,11 @@
 @{
     var success = TempData["Success"] as string;
     var error = TempData["Error"] as string;
+    var formErrors = TempData[InlineFormErrors.Key] as string;
+}
+@if (formErrors is not null)
+{
+    <script type="application/json" data-inline-form-errors>@Html.Raw(formErrors)</script>
 }
 @if (success is not null || error is not null)
 {

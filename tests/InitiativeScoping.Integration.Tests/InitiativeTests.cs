@@ -114,6 +114,30 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
+    public async Task Invalid_inline_add_redisplays_field_errors_and_posted_values()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "Inline validation test");
+        var details = $"/Initiatives/Details/{id}";
+
+        var addPhase = await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new()
+        {
+            ["Name"] = "Backwards", ["PlannedStart"] = "2026-04-30", ["PlannedEnd"] = "2026-03-01"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, addPhase.StatusCode);
+
+        var html = await client.GetStringAsync(details);
+        Assert.Contains("data-inline-form-errors", html);
+        Assert.Contains("\"form\":\"add-phase-form\"", html);
+        Assert.Contains("Planned end must be on or after planned start.", html);
+        Assert.Contains("\"Name\":\"Backwards\"", html);
+        Assert.DoesNotContain("\"__RequestVerificationToken\":", html);
+
+        // State is one-shot: the next load is clean.
+        Assert.DoesNotContain("data-inline-form-errors", await client.GetStringAsync(details));
+    }
+
+    [Fact]
     public async Task Phases_and_allocations_produce_priced_forecast()
     {
         var client = factory.CreateClient(NoRedirect);
