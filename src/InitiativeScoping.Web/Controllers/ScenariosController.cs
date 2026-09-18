@@ -23,30 +23,46 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
     [HttpGet("Initiatives/{id:int}/Scenarios")]
     public async Task<IActionResult> Compare(int id, CancellationToken ct)
     {
+        var model = await BuildCompareAsync(id, printable: false, ct);
+        return model is null ? NotFound() : View(model);
+    }
+
+    /// <summary>Print-friendly scenario comparison (no app chrome, links or actions) plus each plan's phase schedule; the browser's Print → Save as PDF produces the PDF.</summary>
+    [HttpGet("Initiatives/{id:int}/Scenarios/Print")]
+    public async Task<IActionResult> Print(int id, CancellationToken ct)
+    {
+        var model = await BuildCompareAsync(id, printable: true, ct);
+        return model is null ? NotFound() : View(model);
+    }
+
+    private async Task<ScenarioCompareModel?> BuildCompareAsync(int id, bool printable, CancellationToken ct)
+    {
         var initiative = await LoadAsync(id, ct);
         if (initiative is null)
         {
-            return NotFound();
+            return null;
         }
 
         var parentId = initiative.ScenarioOfId ?? initiative.Id;
         var parent = parentId == initiative.Id ? initiative : await LoadAsync(parentId, ct);
         if (parent is null)
         {
-            return NotFound();
+            return null;
         }
 
         var scenarios = await ScenarioQuery().Where(s => s.ScenarioOfId == parent.Id).ToListAsync(ct);
         var cards = await db.PricingRateCardsAsync(ct);
-        return View(new ScenarioCompareModel
+        return new ScenarioCompareModel
         {
             Parent = parent,
             Comparison = ScenarioComparison.Build(parent, scenarios, cards),
             ResourceTypeNames = await db.ResourceTypeNamesAsync(ct),
             CanEdit = InitiativeAccess.CanEdit(currentUser, parent),
             CanPromote = InitiativeAccess.CanManage(currentUser, parent) && InitiativeAccess.IsScopeEditable(parent),
-            NewScenario = new NewScenarioModel { InitiativeId = parent.Id, Name = $"{parent.Name} — Scenario {(char)('A' + Math.Min(scenarios.Count, 25))}" }
-        });
+            NewScenario = new NewScenarioModel { InitiativeId = parent.Id, Name = $"{parent.Name} — Scenario {(char)('A' + Math.Min(scenarios.Count, 25))}" },
+            Printable = printable,
+            GeneratedAt = clock.GetUtcNow()
+        };
     }
 
     [HttpPost("Initiatives/{id:int}/Scenarios")]
