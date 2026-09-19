@@ -3,6 +3,7 @@ using System.Xml.Linq;
 using Google.Cloud.Kms.V1;
 using Google.Protobuf;
 using Microsoft.AspNetCore.DataProtection.XmlEncryption;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InitiativeScoping.Infrastructure.DataProtection;
 
@@ -32,8 +33,17 @@ public sealed class KmsXmlEncryptor(KeyManagementServiceClient kms, CryptoKeyNam
     }
 }
 
+/// <summary>
+/// Data Protection instantiates decryptors itself via <see cref="IServiceProvider"/> (it only looks for a
+/// constructor taking one, or a parameterless one), so that overload must exist alongside the direct one.
+/// </summary>
 public sealed class KmsXmlDecryptor(KeyManagementServiceClient kms) : IXmlDecryptor
 {
+    public KmsXmlDecryptor(IServiceProvider services)
+        : this(services.GetRequiredService<KeyManagementServiceClient>())
+    {
+    }
+
     public XElement Decrypt(XElement encryptedElement)
     {
         ArgumentNullException.ThrowIfNull(encryptedElement);
