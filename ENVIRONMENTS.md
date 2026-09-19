@@ -45,8 +45,8 @@ values marked *Terraform output* can be re-derived with `terraform -chdir=deploy
 
 | What | Where |
 |---|---|
-| Application | <https://initiative-scoping-prod-561297293406.us-central1.run.app> |
-| Health check (no login) | <https://initiative-scoping-prod-561297293406.us-central1.run.app/health> |
+| Application | <https://initiative-scoping-prod-nthhtuct6q-uc.a.run.app> (Entra redirect registered for this URL; alias <https://initiative-scoping-prod-561297293406.us-central1.run.app> needs `register-app.sh prod --add-url`) |
+| Health check (no login) | <https://initiative-scoping-prod-nthhtuct6q-uc.a.run.app/health> |
 | Cloud Run service `initiative-scoping-prod` | <https://console.cloud.google.com/run/detail/us-central1/initiative-scoping-prod/revisions?project=initiative-scoping-prod> |
 | Cloud Run migration job `initiative-scoping-prod-migrate` | <https://console.cloud.google.com/run/jobs?project=initiative-scoping-prod> |
 | Cloud SQL (PostgreSQL 16, regional HA, backups + PITR, deletion protection) `initiative-scoping-prod-pg` | <https://console.cloud.google.com/sql/instances/initiative-scoping-prod-pg/overview?project=initiative-scoping-prod> |
