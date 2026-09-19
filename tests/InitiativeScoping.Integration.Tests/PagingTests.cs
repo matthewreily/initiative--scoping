@@ -118,20 +118,21 @@ public class PagingTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 
         var client = factory.CreateClient(NoRedirect);
         var page1 = await client.GetStringAsync($"/Admin/People?search={tag}");
-        Assert.Equal(50, Regex.Matches(page1, $"<td>{tag} \\d\\d</td>").Count);
-        Assert.Contains($"<td>{tag} 00</td>", page1);
-        Assert.DoesNotContain($"<td>{tag} 50</td>", page1);
+        Assert.Equal(50, Regex.Matches(page1, $"data-sort=\"{tag} \\d\\d\"").Count);
+        Assert.Contains($"data-sort=\"{tag} 00\"", page1);
+        Assert.DoesNotContain($"data-sort=\"{tag} 50\"", page1);
         Assert.Contains("Showing 1&ndash;50 of 60", page1);
         Assert.Contains($"search={tag}&amp;page=2", page1);
-        Assert.Contains("table-responsive table-scroll", page1);
+        Assert.DoesNotContain("table-scroll", page1);
+        Assert.Contains("people-table", page1);
 
         var page2 = await client.GetStringAsync($"/Admin/People?search={tag}&page=2");
-        Assert.Equal(10, Regex.Matches(page2, $"<td>{tag} \\d\\d</td>").Count);
-        Assert.Contains($"<td>{tag} 50</td>", page2);
+        Assert.Equal(10, Regex.Matches(page2, $"data-sort=\"{tag} \\d\\d\"").Count);
+        Assert.Contains($"data-sort=\"{tag} 50\"", page2);
         Assert.Contains("Showing 51&ndash;60 of 60", page2);
 
         var small = await client.GetStringAsync($"/Admin/People?search={tag}&size=25&page=3");
-        Assert.Equal(10, Regex.Matches(small, $"<td>{tag} \\d\\d</td>").Count);
+        Assert.Equal(10, Regex.Matches(small, $"data-sort=\"{tag} \\d\\d\"").Count);
         Assert.Contains($"search={tag}&amp;page=2&amp;size=25", small);
 
         var beyond = await client.GetStringAsync($"/Admin/People?search={tag}&page=42");

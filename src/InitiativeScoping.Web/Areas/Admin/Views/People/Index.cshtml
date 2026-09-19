@@ -27,24 +27,20 @@
     </div>
 </div>
 <form asp-action="BulkDelete" method="post" data-bulk>
-<div class="table-responsive table-scroll">
-<table class="table table-sm align-middle" data-sortable>
-    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>External IDs</th><th>Resource type</th><th>Business unit</th><th>Seniority</th><th>Location</th><th>Class</th><th>Vendor</th><th>Status</th><th>Actuals</th><th data-nosort></th></tr></thead>
+<table class="table table-sm align-middle people-table" data-sortable data-columns>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>External IDs</th><th>Role</th><th>Business unit</th><th>Location</th><th>Class</th><th>Actuals</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var item in Model.Items)
     {
         var p = item.Person;
         <tr>
             <td><input type="checkbox" class="form-check-input" name="ids" value="@p.Id" data-bulk-item aria-label="Select row" /></td>
-            <td>@p.DisplayName</td>
-            <td class="small text-muted text-wrap" style="max-width: 16rem">@p.ExternalIds</td>
-            <td>@p.ResourceType?.Name</td>
+            <td data-sort="@p.DisplayName"><span class="status-dot @(p.IsActive ? "bg-success" : "bg-secondary")" title="@(p.IsActive ? "Active" : "Inactive")" aria-label="@(p.IsActive ? "Active" : "Inactive")"></span>@p.DisplayName</td>
+            <td class="small text-muted"><span class="d-inline-block text-truncate align-bottom" style="max-width: 10rem" title="@p.ExternalIds">@p.ExternalIds</span></td>
+            <td data-sort="@p.ResourceType?.Name @p.Seniority!.SortOrder">@p.ResourceType?.Name<div class="small text-muted">@p.Seniority.Name</div></td>
             <td>@p.BusinessUnit?.Name</td>
-            <td data-sort="@p.Seniority!.SortOrder">@p.Seniority.Name</td>
             <td>@p.Location</td>
-            <td>@(p.ResourcingClass?.Name ?? "—")</td>
-            <td>@(p.ResourcingClass?.IsVendor == true ? p.Vendor?.Name ?? "—" : "—")</td>
-            <td>@(p.IsActive ? Html.Raw("<span class='badge bg-success'>Active</span>") : Html.Raw("<span class='badge bg-secondary'>Inactive</span>"))</td>
+            <td>@(p.ResourcingClass?.Name ?? "—")@if (p.ResourcingClass?.IsVendor == true && p.Vendor is not null) {<div class="small text-muted">@p.Vendor.Name</div>}</td>
             <td>@item.EntryCount</td>
             <td class="text-end text-nowrap">
                 <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@p.Id">Edit</a>
@@ -61,11 +57,10 @@
     }
     @if (Model.Items.Count == 0)
     {
-        <tr data-nosort><td colspan="12" class="text-muted">@(string.IsNullOrWhiteSpace(search) ? "No people yet." : "No people match your search.")</td></tr>
+        <tr data-nosort><td colspan="9" class="text-muted">@(string.IsNullOrWhiteSpace(search) ? "No people yet." : "No people match your search.")</td></tr>
     }
     </tbody>
 </table>
-</div>
 <partial name="_Pager" model="Model.Pager(Url)" />
 <partial name="_BulkBar" model='new BulkBarOptions("people")' />
 </form>
