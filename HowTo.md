@@ -72,6 +72,7 @@ The comparison shows the live plan first and every scenario beside it – schedu
 1. When the forecast is complete, an Administrator clicks **Activate**; an Owner clicks **Request activation** (optional note) instead – administrators are e-mailed and decide on the initiative page or under **Approvals** (nav bar). **Approve & activate** activates on the spot; **Reject** (with a note) leaves the initiative in Draft and e-mails the requester. Guards: at least one phase and one allocation, valid dates, no unpriced lines.
 2. Activation snapshots the forecast as **Baseline v1** and locks scope (phases/allocations become read-only).
 3. Status transitions: Active → On hold → Active, Active → Complete / Cancelled. Complete/Cancelled initiatives drop off the default portfolio view.
+4. Cancelled by mistake? On the initiative page an Owner/Admin can **Reopen** it (back to Draft if it never had a baseline, otherwise On hold keeping its baselines – then Change status → Active) or **Delete** it for good (blocked if actuals were recorded against it).
 
 ### Re-baseline
 

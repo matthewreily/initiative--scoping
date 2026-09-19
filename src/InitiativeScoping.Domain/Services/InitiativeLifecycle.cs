@@ -21,6 +21,13 @@ public static class InitiativeLifecycle
     public static IReadOnlyList<InitiativeStatus> AllowedTransitions(InitiativeStatus from) =>
         Transitions.TryGetValue(from, out var allowed) ? allowed : [];
 
+    public static bool CanDelete(InitiativeStatus status) =>
+        status is InitiativeStatus.Draft or InitiativeStatus.Cancelled;
+
+    /// <summary>Where a Cancelled initiative goes when reopened: back to planning if it was never baselined, otherwise parked On hold so Resume re-enters the baselined lifecycle.</summary>
+    public static InitiativeStatus ReopenTarget(bool hasBaseline) =>
+        hasBaseline ? InitiativeStatus.OnHold : InitiativeStatus.Draft;
+
     /// <summary>Returns the reasons a forecast cannot be baselined; empty when it can.</summary>
     public static IReadOnlyList<string> BaselineBlockers(Initiative initiative, ForecastResult forecast)
     {
