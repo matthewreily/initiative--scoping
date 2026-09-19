@@ -3,6 +3,9 @@ using Google.Api.Gax.Grpc;
 using Google.Cloud.Kms.V1;
 using Google.Protobuf;
 using InitiativeScoping.Infrastructure.DataProtection;
+using Microsoft.AspNetCore.DataProtection.Internal;
+using Microsoft.AspNetCore.DataProtection.XmlEncryption;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InitiativeScoping.Integration.Tests;
 
@@ -34,6 +37,21 @@ public class DataProtectionTests
     {
         var decryptor = new KmsXmlDecryptor(new FakeKms());
         Assert.Throws<InvalidOperationException>(() => decryptor.Decrypt(new XElement("kmsEncryptedKey")));
+    }
+
+    [Fact]
+    public void Kms_decryptor_can_be_activated_by_data_protection_from_the_service_provider()
+    {
+        var kms = new FakeKms();
+        var collection = new ServiceCollection().AddSingleton<KeyManagementServiceClient>(kms);
+        collection.AddDataProtection();
+        var services = collection.BuildServiceProvider();
+        var encrypted = new KmsXmlEncryptor(kms, Key).Encrypt(XElement.Parse("<key id=\"k1\" />"));
+
+        var decryptor = services.GetRequiredService<IActivator>().CreateInstance(typeof(IXmlDecryptor), encrypted.DecryptorType.AssemblyQualifiedName!);
+
+        Assert.IsType<KmsXmlDecryptor>(decryptor);
+        Assert.Equal("k1", ((IXmlDecryptor)decryptor).Decrypt(encrypted.EncryptedElement).Attribute("id")!.Value);
     }
 
     /// <summary>XOR "cipher" standing in for KMS so the wrapping contract can be tested offline.</summary>
