@@ -24,7 +24,7 @@ public class AccessRequestNotifier(AppDbContext db, IEmailSender email, IOptions
         }
 
         var body = $"""
-            {request.DisplayName} ({request.Email}) has requested access to Initiative Scoping.
+            {request.DisplayName} ({request.Email}) has requested access to Scopewell.
 
             {(string.IsNullOrWhiteSpace(request.Note) ? "No note was provided." : "Note: " + request.Note)}
 

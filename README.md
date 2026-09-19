@@ -1,4 +1,4 @@
-# Initiative Scoping & Cost Tracking
+# Scopewell — Initiative Scoping & Cost Tracking
 
 ASP.NET Core 8 MVC application for scoping engineering initiatives, pricing them against BU/seniority/location/vendor rate cards, and tracking forecast vs. actuals (Planview at launch, Jira fast-follow).
 

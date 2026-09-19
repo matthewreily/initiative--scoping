@@ -1,5 +1,7 @@
 # Environments & links
 
+The app is branded **Scopewell**; the code, GCP resources (`initiative-scoping-*`) and Entra app registrations (`Initiative Scoping (dev|prod)`) keep their original names.
+
 Where everything for this app lives. Keep this file current when an environment is added or a resource is renamed;
 values marked *Terraform output* can be re-derived with `terraform -chdir=deploy/gcp output` after `terraform init -backend-config=env/<env>.gcs.tfbackend`.
 
