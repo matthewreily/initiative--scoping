@@ -245,9 +245,14 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return Forbid();
         }
 
-        if (initiative.Status != InitiativeStatus.Draft)
+        if (!InitiativeLifecycle.CanDelete(initiative.Status))
         {
-            return RedirectWithError("Only Draft initiatives can be deleted; cancel it instead.", id);
+            return RedirectWithError("Only Draft or Cancelled initiatives can be deleted; cancel it first.", id);
+        }
+
+        if (await db.ActualEntries.AnyAsync(a => a.InitiativeId == id, ct) || await db.ActualAdjustments.AnyAsync(a => a.InitiativeId == id, ct))
+        {
+            return RedirectWithError("This initiative has recorded actuals and cannot be deleted; keep it Cancelled for the financial record.", id);
         }
 
         var scenarios = await db.Initiatives.Where(s => s.ScenarioOfId == id)
@@ -263,12 +268,17 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             audit.Record(Entity, scenario.Id, AuditActions.Delete, new { scenario.Name, Scenario = true, ParentDeleted = id });
         }
 
+        db.ChangeRequests.RemoveRange(await db.ChangeRequests.Where(c => c.InitiativeId == id).ToListAsync(ct));
+        db.InitiativeNotes.RemoveRange(await db.InitiativeNotes.Where(n => n.InitiativeId == id).ToListAsync(ct));
+        db.RebaselineRequests.RemoveRange(initiative.RebaselineRequests);
+        db.ActivationRequests.RemoveRange(initiative.ActivationRequests);
+        db.ForecastBaselines.RemoveRange(initiative.Baselines);
         db.InitiativeAllocations.RemoveRange(initiative.Allocations);
         db.InitiativeNonLaborCosts.RemoveRange(initiative.NonLaborCosts);
         db.Phases.RemoveRange(initiative.Phases);
         db.InitiativeBusinessUnits.RemoveRange(initiative.ParticipatingBusinessUnits);
         db.Initiatives.Remove(initiative);
-        audit.Record(Entity, initiative.Id, AuditActions.Delete, new { initiative.Name });
+        audit.Record(Entity, initiative.Id, AuditActions.Delete, new { initiative.Name, initiative.Status, Baselines = initiative.Baselines.Count });
         await db.SaveChangesAsync(ct);
         TempData["Success"] = $"Initiative '{initiative.Name}' deleted.";
         return initiative.ScenarioOfId is { } parentId

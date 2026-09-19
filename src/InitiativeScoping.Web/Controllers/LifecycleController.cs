@@ -232,6 +232,35 @@ public class LifecycleController(AppDbContext db, ICurrentUser currentUser, IAud
         return RedirectWithSuccess($"Status changed from {from} to {to}.", id);
     }
 
+    [HttpPost("Initiatives/{id:int}/Reopen")]
+    public async Task<IActionResult> Reopen(int id, string? note, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanManage(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (initiative.Status != InitiativeStatus.Cancelled)
+        {
+            return RedirectWithError("Only Cancelled initiatives can be reopened.", id);
+        }
+
+        var to = InitiativeLifecycle.ReopenTarget(initiative.Baselines.Count > 0);
+        initiative.Status = to;
+        audit.Record(Entity, id, AuditActions.StatusChange, new { From = InitiativeStatus.Cancelled, To = to, Note = note, Reopened = true });
+        await db.SaveChangesAsync(ct);
+        AppTelemetry.StatusChanges.Add(1, new KeyValuePair<string, object?>("to", to.ToString()));
+        return RedirectWithSuccess(to == InitiativeStatus.Draft
+            ? "Initiative reopened as Draft; it can be edited and activated again."
+            : $"Initiative reopened On hold (baseline v{initiative.CurrentBaseline?.Version} kept); use Change status → Active to resume.", id);
+    }
+
     // ----- Baselines -----
 
     [HttpGet("Initiatives/{id:int}/Baselines")]

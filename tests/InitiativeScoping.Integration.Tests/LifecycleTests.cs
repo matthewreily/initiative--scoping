@@ -299,6 +299,96 @@ public class LifecycleTests(WebAppFactory factory) : IClassFixture<WebAppFactory
         (await client.GetAsync("/Audit")).EnsureSuccessStatusCode();
     }
 
+    [Fact]
+    public async Task Cancelled_draft_reopens_as_Draft_and_can_be_deleted()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, factory, "Cancelled draft");
+        var details = $"/Initiatives/Details/{id}";
+
+        // Draft can't be reopened; Cancelled shows Reopen + Delete instead of Change status.
+        await PostFormAsync(client, details, $"/Initiatives/{id}/Reopen", new());
+        Assert.Contains("Only Cancelled initiatives can be reopened", await client.GetStringAsync(details));
+
+        await PostFormAsync(client, details, $"/Initiatives/{id}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Cancelled) });
+        var html = await client.GetStringAsync(details);
+        Assert.Contains($"/Initiatives/{id}/Reopen", html);
+        Assert.Contains("reopen as Draft", html);
+        Assert.Contains($"/Initiatives/Delete/{id}", html);
+        Assert.DoesNotContain($"/Initiatives/{id}/ChangeStatus", html);
+
+        await PostFormAsync(client, details, $"/Initiatives/{id}/Reopen", new() { ["note"] = "Funding restored" });
+        Assert.Equal(InitiativeStatus.Draft, await StatusAsync(factory, id));
+        var audit = (await client.GetStringAsync($"/Audit?entity=Initiative&entityId={id}&act=StatusChange")).Replace("&quot;", "\"");
+        Assert.Contains("Funding restored", audit);
+        Assert.Contains("\"Reopened\":true", audit);
+
+        await PostFormAsync(client, details, $"/Initiatives/{id}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Cancelled) });
+        var delete = await PostFormAsync(client, details, $"/Initiatives/Delete/{id}", new());
+        Assert.Equal(HttpStatusCode.Redirect, delete.StatusCode);
+        Assert.Equal("/Initiatives", delete.Headers.Location!.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(details)).StatusCode);
+        Assert.Contains("\"Status\":\"Cancelled\"", (await client.GetStringAsync($"/Audit?entity=Initiative&entityId={id}&act=Delete")).Replace("&quot;", "\""));
+    }
+
+    [Fact]
+    public async Task Cancelled_baselined_initiative_reopens_On_hold_and_deletes_with_its_history_unless_it_has_actuals()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, factory, "Cancelled after baseline");
+        var details = $"/Initiatives/Details/{id}";
+        await AddPhaseAndAllocationAsync(client, factory, id, location: "Onshore");
+        await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new());
+        Assert.Equal(InitiativeStatus.Active, await StatusAsync(factory, id));
+
+        // Active cannot be deleted, even by a forged POST.
+        await PostFormAsync(client, details, $"/Initiatives/Delete/{id}", new());
+        Assert.Contains("Only Draft or Cancelled initiatives can be deleted", await client.GetStringAsync(details));
+
+        await PostFormAsync(client, details, $"/Initiatives/{id}/RequestRebaseline", new() { ["reason"] = "scope grew" });
+        await PostFormAsync(client, details, $"/Initiatives/{id}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Cancelled) });
+        Assert.Contains("reopen as On hold", await client.GetStringAsync(details));
+
+        await PostFormAsync(client, details, $"/Initiatives/{id}/Reopen", new());
+        Assert.Equal(InitiativeStatus.OnHold, await StatusAsync(factory, id));
+        Assert.Contains("baseline v1 kept", await client.GetStringAsync(details));
+        await PostFormAsync(client, details, $"/Initiatives/{id}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Active) });
+        Assert.Equal(InitiativeStatus.Active, await StatusAsync(factory, id));
+
+        await PostFormAsync(client, details, $"/Initiatives/{id}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Cancelled) });
+        int adjustmentId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var adjustment = new ActualAdjustment { InitiativeId = id, Hours = 1, Cost = 100, Reason = "late invoice", CreatedBy = "dev-user", CreatedAt = DateTimeOffset.UtcNow };
+            db.ActualAdjustments.Add(adjustment);
+            await db.SaveChangesAsync();
+            adjustmentId = adjustment.Id;
+        }
+
+        await PostFormAsync(client, details, $"/Initiatives/Delete/{id}", new());
+        Assert.Contains("has recorded actuals and cannot be deleted", await client.GetStringAsync(details));
+        Assert.Equal(InitiativeStatus.Cancelled, await StatusAsync(factory, id));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.ActualAdjustments.Remove(await db.ActualAdjustments.SingleAsync(a => a.Id == adjustmentId));
+            await db.SaveChangesAsync();
+        }
+
+        var delete = await PostFormAsync(client, details, $"/Initiatives/Delete/{id}", new());
+        Assert.Equal(HttpStatusCode.Redirect, delete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(details)).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.False(await db.ForecastBaselines.AnyAsync(b => b.InitiativeId == id));
+            Assert.False(await db.RebaselineRequests.AnyAsync(r => r.InitiativeId == id));
+            Assert.False(await db.Phases.AnyAsync(p => p.InitiativeId == id));
+        }
+    }
+
     // ----- helpers -----
 
     [Fact]
