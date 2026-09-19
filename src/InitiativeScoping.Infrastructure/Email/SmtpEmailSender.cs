@@ -20,7 +20,7 @@ public class EmailOptions
     public string? Password { get; set; }
     /// <summary>Sender address; defaults to <see cref="Username"/>.</summary>
     public string? From { get; set; }
-    public string FromName { get; set; } = "Initiative Scoping";
+    public string FromName { get; set; } = "Scopewell";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(FromAddress);
 

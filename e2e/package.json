@@ -1,7 +1,7 @@
 {
   "name": "initiative-scoping-e2e",
   "private": true,
-  "description": "Playwright end-to-end tests for Initiative Scoping (runs the web app locally in dev-auth mode on SQLite).",
+  "description": "Playwright end-to-end tests for Scopewell (runs the web app locally in dev-auth mode on SQLite).",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",

@@ -1,4 +1,4 @@
-# How to use Initiative Scoping & Cost Tracking
+# How to use Scopewell
 
 Task-oriented walkthroughs. Architecture, configuration keys and operational notes are in [README.md](README.md).
 
