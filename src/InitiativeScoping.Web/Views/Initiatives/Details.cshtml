@@ -483,6 +483,12 @@ else
                     <a asp-area="Admin" asp-controller="RateCards" asp-action="Index">Manage rate cards</a>
                 }
             </p>
+            @if (i.Phases.Count > 0)
+            {
+                <p class="small mb-2">
+                    <a asp-action="CopyAllocations" asp-route-id="@i.Id" data-panel="Copy allocations" title="Copy every allocation line of an existing phase (this or another initiative) into one of this initiative's phases">Copy allocations from a phase…</a>
+                </p>
+            }
             <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4" aria-describedby="allocation-bu-hint" id="add-allocation-form">
                 <div class="col-md-3">
                     <label for="phaseid" class="form-label small mb-0">Phase</label>

@@ -620,6 +620,152 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return RedirectWithSuccess("Allocation added.", id);
     }
 
+    public async Task<IActionResult> CopyAllocations(int id, int? targetPhaseId, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        await PopulateCopyAllocationLists(initiative, ct);
+        return View(new CopyAllocationsModel
+        {
+            InitiativeId = id,
+            TargetPhaseId = targetPhaseId ?? initiative.Phases.OrderBy(p => p.Sequence).Select(p => p.Id).FirstOrDefault(),
+            SourcePhaseId = initiative.Phases.OrderBy(p => p.Sequence).Where(p => p.Id != targetPhaseId).Select(p => p.Id).FirstOrDefault()
+        });
+    }
+
+    /// <summary>Copies every allocation line of the source phase (any initiative the user can see) onto a phase of this initiative as new lines. Each line goes through the same validation as Add allocation; lines that would not be valid here (business unit not participating, unpriced, inactive class) are skipped and reported rather than failing the whole copy. People are only copied on request and only when they still match.</summary>
+    [HttpPost]
+    public async Task<IActionResult> CopyAllocations(int id, CopyAllocationsModel model, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsScopeEditable(initiative))
+        {
+            return RedirectWithError(ScopeLockedMessage, id);
+        }
+
+        var target = initiative.Phases.FirstOrDefault(p => p.Id == model.TargetPhaseId);
+        if (target is null)
+        {
+            ModelState.AddModelError(nameof(model.TargetPhaseId), "Select a phase of this initiative to copy into.");
+        }
+
+        var source = await db.Phases.AsNoTracking().Include(p => p.Initiative).FirstOrDefaultAsync(p => p.Id == model.SourcePhaseId, ct);
+        var sourceLines = source is null
+            ? []
+            : await db.InitiativeAllocations.AsNoTracking().Include(a => a.People).Include(a => a.ResourceType).Where(a => a.PhaseId == source.Id).OrderBy(a => a.Id).ToListAsync(ct);
+        if (source is null)
+        {
+            ModelState.AddModelError(nameof(model.SourcePhaseId), "Select the phase to copy from.");
+        }
+        else if (source.Id == model.TargetPhaseId)
+        {
+            ModelState.AddModelError(nameof(model.SourcePhaseId), "Source and target are the same phase.");
+        }
+        else if (sourceLines.Count == 0)
+        {
+            ModelState.AddModelError(nameof(model.SourcePhaseId), "That phase has no allocations to copy.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateCopyAllocationLists(initiative, ct);
+            return View(model);
+        }
+
+        var src = source!;
+        var dest = target!;
+        var copied = new List<InitiativeAllocation>();
+        var skipped = new List<string>();
+        var peopleDropped = 0;
+        foreach (var line in sourceLines)
+        {
+            var lineModel = new AllocationEditModel
+            {
+                InitiativeId = id, PhaseId = dest.Id, BusinessUnitId = line.BusinessUnitId, ResourceTypeId = line.ResourceTypeId, SeniorityId = line.SeniorityId,
+                Location = line.Location, ResourcingClassId = line.ResourcingClassId, VendorId = line.VendorId, Quantity = line.Quantity, EstimatedHours = line.EstimatedHours,
+                AllocationPercent = line.AllocationPercent ?? 100m, CapexPercent = line.CapexPercent, ContractReference = line.ContractReference, CostCenter = line.CostCenter,
+                PersonIds = model.IncludePeople ? line.PersonIds.ToList() : []
+            };
+            var label = $"{line.ResourceType?.Name} × {line.Quantity}";
+
+            ModelState.Clear();
+            await ValidateAllocation(lineModel, initiative, ct);
+            if (!ModelState.IsValid && lineModel.PersonIds.Count > 0 && ModelState.Keys.All(k => k == nameof(lineModel.PersonIds)))
+            {
+                peopleDropped += lineModel.PersonIds.Count;
+                lineModel.PersonIds = [];
+                ModelState.Clear();
+                await ValidateAllocation(lineModel, initiative, ct);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                skipped.Add($"{label}: {string.Join(" ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage))}");
+                continue;
+            }
+
+            var allocation = new InitiativeAllocation
+            {
+                PhaseId = dest.Id, BusinessUnitId = lineModel.BusinessUnitId, ResourceTypeId = lineModel.ResourceTypeId, SeniorityId = lineModel.SeniorityId,
+                Location = lineModel.Location.Trim(), ResourcingClassId = lineModel.ResourcingClassId, VendorId = await VendorForAsync(lineModel, ct), People = SeatsFor(lineModel),
+                Quantity = lineModel.Quantity, EstimatedHours = lineModel.EstimatedHours, CapexPercent = lineModel.CapexPercent, ContractReference = lineModel.ContractReference?.Trim(),
+                CostCenter = lineModel.CostCenter?.Trim()
+            };
+            await ApplyAllocationEffortAsync(initiative, allocation, lineModel, ct);
+            initiative.Allocations.Add(allocation);
+            copied.Add(allocation);
+        }
+
+        ModelState.Clear();
+        if (copied.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Nothing could be copied: " + string.Join(" · ", skipped));
+            await PopulateCopyAllocationLists(initiative, ct);
+            return View(model);
+        }
+
+        await db.SaveChangesAsync(ct);
+        var sourceIds = sourceLines.Select(a => a.Id).ToList();
+        foreach (var allocation in copied)
+        {
+            audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Create,
+                new { Snapshot = AllocationSnapshot(allocation), CopiedFromPhase = src.Id, CopiedFromInitiative = src.InitiativeId });
+        }
+
+        audit.Record(Entity, id, AuditActions.Update,
+            new { CopiedAllocations = copied.Count, FromPhase = src.Id, FromInitiative = src.InitiativeId, ToPhase = dest.Id, Skipped = skipped, PeopleDropped = peopleDropped, SourceAllocationIds = sourceIds });
+        await db.SaveChangesAsync(ct);
+
+        var message = $"{copied.Count} allocation(s) copied from {(src.InitiativeId == id ? string.Empty : src.Initiative!.Name + " › ")}{src.Name} into {dest.Name}.";
+        if (peopleDropped > 0)
+        {
+            message += $" {peopleDropped} named person(s) left unassigned (not matching here).";
+        }
+
+        return skipped.Count == 0
+            ? RedirectWithSuccess(message, id)
+            : RedirectWithError($"{message} Skipped {skipped.Count}: {string.Join(" · ", skipped)}", id);
+    }
+
     public async Task<IActionResult> EditAllocation(int id, CancellationToken ct)
     {
         var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
@@ -1417,6 +1563,26 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
     {
         var query = includeInactive ? db.BusinessUnits : db.BusinessUnits.Where(b => b.IsActive);
         return new SelectList(await query.OrderBy(b => b.Name).ToListAsync(ct), "Id", "Name");
+    }
+
+    /// <summary>Source phases grouped by initiative (this one first, then every other non-scenario initiative), plus this initiative's phases as targets.</summary>
+    private async Task PopulateCopyAllocationLists(Initiative initiative, CancellationToken ct)
+    {
+        ViewBag.Initiative = initiative;
+        ViewBag.TargetPhases = new SelectList(initiative.Phases.OrderBy(p => p.Sequence), "Id", "Name");
+
+        var phases = await db.Phases.AsNoTracking()
+            .Where(p => p.Initiative!.ScenarioOfId == null || p.InitiativeId == initiative.Id)
+            .Where(p => db.InitiativeAllocations.Any(a => a.PhaseId == p.Id))
+            .Select(p => new { p.Id, p.Name, p.InitiativeId, InitiativeName = p.Initiative!.Name, p.Initiative.Status, p.Sequence, Lines = db.InitiativeAllocations.Count(a => a.PhaseId == p.Id) })
+            .ToListAsync(ct);
+        var groups = phases.GroupBy(p => p.InitiativeId).ToDictionary(
+            g => g.Key,
+            g => new SelectListGroup { Name = g.Key == initiative.Id ? $"{g.First().InitiativeName} (this initiative)" : $"{g.First().InitiativeName} · {g.First().Status}" });
+        ViewBag.SourcePhases = phases
+            .OrderBy(p => p.InitiativeId == initiative.Id ? 0 : 1).ThenBy(p => p.InitiativeName).ThenBy(p => p.Sequence)
+            .Select(p => new SelectListItem($"{p.Name} ({p.Lines} line{(p.Lines == 1 ? string.Empty : "s")})", p.Id.ToString()) { Group = groups[p.InitiativeId] })
+            .ToList();
     }
 
     private async Task PopulateAllocationLists(Initiative initiative, CancellationToken ct)

@@ -1,0 +1,58 @@
+@model CopyAllocationsModel
+@using InitiativeScoping.Application.Initiatives
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    var initiative = (Initiative)ViewBag.Initiative;
+    var sources = (List<SelectListItem>)ViewBag.SourcePhases;
+    var targets = (SelectList)ViewBag.TargetPhases;
+    ViewData["Title"] = "Copy allocations";
+    var locked = !InitiativeAccess.IsScopeEditable(initiative);
+    var panel = SidePanel.IsPanelRequest(Context.Request);
+    if (panel) { Layout = SidePanel.Layout; }
+    foreach (var s in sources) { s.Selected = s.Value == Model.SourcePhaseId.ToString(); }
+}
+@if (!panel)
+{
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+    <li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>
+    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@initiative.Id">@initiative.Name</a></li>
+    <li class="breadcrumb-item active">Copy allocations</li>
+</ol></nav>
+<h1 class="h3">Copy allocations</h1>
+}
+@if (locked)
+{
+    <div class="alert alert-secondary py-2">Scope is locked while the initiative is @initiative.Status.</div>
+}
+<p class="text-muted small">
+    Every allocation line of the source phase (resource type, seniority, business unit, location, class, vendor, quantity,
+    hours or staffing %, Capex %, contract and cost center) is added to the target phase as a new line. Lines that cannot exist
+    here – business unit not participating, no published rate, inactive class – are skipped and listed. Existing lines on the
+    target phase are kept.
+</p>
+<form asp-action="CopyAllocations" asp-route-id="@initiative.Id" method="post" class="@(panel ? null : "col-lg-6")">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <fieldset disabled="@locked">
+        <div class="mb-3">
+            <label asp-for="SourcePhaseId" class="form-label"></label>
+            <select asp-for="SourcePhaseId" asp-items="sources" class="form-select">
+                @if (sources.Count == 0) { <option value="">No phase with allocations yet</option> }
+            </select>
+            <span asp-validation-for="SourcePhaseId" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="TargetPhaseId" class="form-label"></label>
+            <select asp-for="TargetPhaseId" asp-items="targets" class="form-select"></select>
+            <span asp-validation-for="TargetPhaseId" class="text-danger"></span>
+        </div>
+        <div class="form-check mb-3">
+            <input asp-for="IncludePeople" class="form-check-input" />
+            <label asp-for="IncludePeople" class="form-check-label small"></label>
+        </div>
+        <button type="submit" class="btn btn-primary" disabled="@(sources.Count == 0)">Copy</button>
+    </fieldset>
+    @if (!panel)
+    {
+        <a asp-action="Details" asp-route-id="@initiative.Id" class="btn btn-link">Cancel</a>
+    }
+</form>
