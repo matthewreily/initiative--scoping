@@ -25,6 +25,10 @@ public static class InitiativeAccess
         initiative.Status == InitiativeStatus.Draft ||
         initiative.Status == InitiativeStatus.Active && initiative.OpenRebaseline?.Status == RebaselineStatus.Approved;
 
+    /// <summary>Named people on allocations (who fills a seat, not how many seats or hours) can also change while Active or On hold without a re-baseline.</summary>
+    public static bool IsStaffingEditable(Initiative initiative) =>
+        IsScopeEditable(initiative) || initiative.Status is InitiativeStatus.Active or InitiativeStatus.OnHold;
+
     /// <summary>Only Admins approve or reject re-baseline requests.</summary>
     public static bool CanApproveRebaseline(ICurrentUser user) => user.IsInRole(AppRoles.Admin);
 
