@@ -146,13 +146,16 @@ jobs:
           for s in queued in_progress waiting requested pending; do
             [[ "$(list "$s")" == "0" ]] || { echo "A dev deploy for $IMAGE_TAG is still $s; wait for it to finish." >&2; exit 1; }
           done
-          RUNS=$(list success)
-          if [[ "$RUNS" == "0" ]]; then
-            echo "Commit $IMAGE_TAG has no successful dev deploy on main; only already-built commits can be redeployed." >&2
+          # The *latest* run for the commit must be the success: a later failed rerun may have re-pushed :<sha>
+          # with an image that never passed the smoke test, and an older success must not vouch for it.
+          LATEST=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --event push --branch main \
+                     --commit "$IMAGE_TAG" --limit 1 --json conclusion --jq '.[0].conclusion // "none"')
+          if [[ "$LATEST" != "success" ]]; then
+            echo "Latest dev deploy of $IMAGE_TAG on main is '$LATEST', not success; only already-built, validated commits can be redeployed." >&2
             exit 1
           fi
           [[ "$(crane digest "${IMAGE_REPOSITORY}:${IMAGE_TAG}")" == "$DIGEST" ]] || { echo "Image tag changed while checking; retry." >&2; exit 1; }
-          echo "Commit $IMAGE_TAG was deployed to dev successfully ($RUNS run(s)); digest $DIGEST"
+          echo "Commit $IMAGE_TAG was deployed to dev successfully; digest $DIGEST"
           echo "IMAGE=${IMAGE_REPOSITORY}@${DIGEST}" >> "$GITHUB_ENV"
 
       - name: Run database migrations
@@ -217,13 +220,16 @@ jobs:
           for s in queued in_progress waiting requested pending; do
             [[ "$(list "$s")" == "0" ]] || { echo "A dev deploy for $IMAGE_TAG is still $s; wait for it to finish." >&2; exit 1; }
           done
-          RUNS=$(list success)
-          if [[ "$RUNS" == "0" ]]; then
-            echo "Commit $IMAGE_TAG has no successful dev deploy on main; promote only what dev has run." >&2
+          # The *latest* run for the commit must be the success: a later failed rerun may have re-pushed :<sha>
+          # with an image that never passed the smoke test, and an older success must not vouch for it.
+          LATEST=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --event push --branch main \
+                     --commit "$IMAGE_TAG" --limit 1 --json conclusion --jq '.[0].conclusion // "none"')
+          if [[ "$LATEST" != "success" ]]; then
+            echo "Latest dev deploy of $IMAGE_TAG on main is '$LATEST', not success; promote only what dev has run." >&2
             exit 1
           fi
           [[ "$(crane digest "$SOURCE_IMAGE")" == "$SRC_DIGEST" ]] || { echo "Source tag changed while checking; retry." >&2; exit 1; }
-          echo "Commit $IMAGE_TAG was deployed to dev successfully ($RUNS run(s)); digest $SRC_DIGEST"
+          echo "Commit $IMAGE_TAG was deployed to dev successfully; digest $SRC_DIGEST"
           echo "SRC_DIGEST=$SRC_DIGEST" >> "$GITHUB_ENV"
 
       - name: Promote image (copy by digest, no rebuild)
