@@ -669,7 +669,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             ModelState.AddModelError(nameof(model.TargetPhaseId), "Select a phase of this initiative to copy into.");
         }
 
-        var source = await db.Phases.AsNoTracking().Include(p => p.Initiative).FirstOrDefaultAsync(p => p.Id == model.SourcePhaseId, ct);
+        var source = await db.Phases.AsNoTracking().Include(p => p.Initiative).FirstOrDefaultAsync(p => p.Id == model.SourcePhaseId && (p.Initiative!.ScenarioOfId == null || p.InitiativeId == id), ct);
         var sourceLines = source is null
             ? []
             : await db.InitiativeAllocations.AsNoTracking().Include(a => a.People).Include(a => a.ResourceType).Where(a => a.PhaseId == source.Id).OrderBy(a => a.Id).ToListAsync(ct);
