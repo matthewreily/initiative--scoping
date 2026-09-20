@@ -88,7 +88,7 @@
             if (vendor) {
                 if (isVendor()) {
                     if (vendorWrap) { vendorWrap.hidden = false; }
-                    vendor.disabled = false;
+                    vendor.disabled = vendor.hasAttribute('data-locked');
                     const anyVendor = byCls.length === 0 || byCls.some(o => o.vendor === null);
                     restrict(vendor, anyVendor ? [] : [...new Set(byCls.map(o => o.vendor))], pick(vendor, 'vendor'), sameVendor);
                     match = vendorMatch(byCls, vendor.value);
