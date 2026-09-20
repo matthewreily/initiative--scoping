@@ -349,6 +349,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             CanEdit = InitiativeAccess.CanEdit(currentUser, initiative),
             CanManage = InitiativeAccess.CanManage(currentUser, initiative),
             ScopeEditable = InitiativeAccess.IsScopeEditable(initiative),
+            StaffingEditable = InitiativeAccess.IsStaffingEditable(initiative),
             CanApproveRebaseline = InitiativeAccess.CanApproveRebaseline(currentUser),
             CanApproveActivation = InitiativeAccess.CanApproveActivation(currentUser),
             CanAddNote = InitiativeAccess.CanAddNote(currentUser),
@@ -782,6 +783,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
         await PopulateAllocationLists(allocation.Initiative!, ct);
         ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
+        ViewBag.StaffingOnly = !InitiativeAccess.IsScopeEditable(allocation.Initiative!) && InitiativeAccess.IsStaffingEditable(allocation.Initiative!);
         return View(new AllocationEditModel
         {
             Id = allocation.Id, InitiativeId = allocation.InitiativeId, PhaseId = allocation.PhaseId, BusinessUnitId = allocation.BusinessUnitId, ResourceTypeId = allocation.ResourceTypeId,
@@ -844,6 +846,61 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         return RedirectWithSuccess("Allocation updated.", initiative.Id);
     }
 
+    /// <summary>Changes only who fills the seats of an allocation (people in / out / swapped) while the initiative is Active or On hold. Quantity, hours and cost are untouched, so the current baseline stays valid and no re-baseline is needed.</summary>
+    [HttpPost]
+    public async Task<IActionResult> ReassignPeople(int id, AllocationEditModel model, CancellationToken ct)
+    {
+        var allocation = await db.InitiativeAllocations.Include(a => a.Initiative!).ThenInclude(i => i.Members).Include(a => a.Initiative!).ThenInclude(i => i.RebaselineRequests)
+            .Include(a => a.People).ThenInclude(p => p.Person).Include(a => a.Initiative!).ThenInclude(i => i.Phases).Include(a => a.Initiative!).ThenInclude(i => i.ParticipatingBusinessUnits).FirstOrDefaultAsync(a => a.Id == id, ct);
+        if (allocation is null)
+        {
+            return NotFound();
+        }
+
+        var initiative = allocation.Initiative!;
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsStaffingEditable(initiative))
+        {
+            return RedirectWithError($"People cannot be reassigned while the initiative is {initiative.Status}.", initiative.Id);
+        }
+
+        var staffing = new AllocationEditModel
+        {
+            Id = allocation.Id, InitiativeId = initiative.Id, PhaseId = allocation.PhaseId, BusinessUnitId = allocation.BusinessUnitId, ResourceTypeId = allocation.ResourceTypeId,
+            SeniorityId = allocation.SeniorityId, Location = allocation.Location, ResourcingClassId = allocation.ResourcingClassId, VendorId = allocation.VendorId,
+            PersonIds = model.PersonIds, Quantity = allocation.Quantity, EstimatedHours = allocation.EstimatedHours, AllocationPercent = allocation.AllocationPercent,
+            CapexPercent = allocation.CapexPercent, ContractReference = allocation.ContractReference, CostCenter = allocation.CostCenter
+        };
+        ModelState.Clear();
+        await ValidateAllocationPersonAsync(staffing, initiative, allocation, ct);
+        if (!ModelState.IsValid)
+        {
+            await PopulateAllocationLists(initiative, ct);
+            ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
+            ViewBag.StaffingOnly = true;
+            return View(nameof(EditAllocation), staffing);
+        }
+
+        var before = AllocationSnapshot(allocation);
+        var removed = allocation.People.Where(s => !staffing.PersonIds.Contains(s.PersonId)).ToList();
+        var addedIds = staffing.PersonIds.Where(pid => allocation.People.All(s => s.PersonId != pid)).ToList();
+        if (removed.Count == 0 && addedIds.Count == 0)
+        {
+            return RedirectWithSuccess("No staffing change.", initiative.Id);
+        }
+
+        db.InitiativeAllocationPeople.RemoveRange(removed);
+        allocation.People.RemoveAll(s => removed.Contains(s));
+        allocation.People.AddRange(addedIds.Select(pid => new InitiativeAllocationPerson { PersonId = pid }));
+        audit.Record(nameof(InitiativeAllocation), allocation.Id, AuditActions.Update, new { Before = before, After = AllocationSnapshot(allocation), Reassigned = true, initiative.Status });
+        await db.SaveChangesAsync(ct);
+        return RedirectWithSuccess($"People reassigned ({addedIds.Count} in, {removed.Count} out); seats, hours and baseline unchanged.", initiative.Id);
+    }
+
     /// <summary>Frees one named seat: the person is removed from the allocation, the quantity is unchanged so the seat becomes unassigned.</summary>
     [HttpPost]
     public async Task<IActionResult> UnassignPerson(int id, int personId, CancellationToken ct)
@@ -861,9 +918,9 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return Forbid();
         }
 
-        if (!InitiativeAccess.IsScopeEditable(initiative))
+        if (!InitiativeAccess.IsStaffingEditable(initiative))
         {
-            return RedirectWithError(ScopeLockedMessage, initiative.Id);
+            return RedirectWithError($"People cannot be unassigned while the initiative is {initiative.Status}.", initiative.Id);
         }
 
         var seat = allocation.People.FirstOrDefault(p => p.PersonId == personId);

@@ -8,7 +8,9 @@
         ? rateOptions.Seniorities
         : rateOptions.Seniorities.Append(new NamedId(currentSeniority.Id, currentSeniority.Name + " (inactive)")).ToList();
     var locations = rateOptions.AllLocations.Append(Model.Location).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(l => l, StringComparer.OrdinalIgnoreCase);
-    ViewData["Title"] = "Edit Allocation";
+    // Staffing-only: the initiative is Active / On hold, so only who fills the seats can change; every other field is shown read-only and the form posts to ReassignPeople.
+    var staffing = ViewBag.StaffingOnly is true;
+    ViewData["Title"] = staffing ? "Reassign People" : "Edit Allocation";
     var fixedDuration = initiative.PlanningMode == PlanningMode.FixedDuration;
     var panel = SidePanel.IsPanelRequest(Context.Request);
     if (panel) { Layout = SidePanel.Layout; }
@@ -18,10 +20,18 @@
 <nav aria-label="breadcrumb"><ol class="breadcrumb">
     <li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>
     <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@initiative.Id">@initiative.Name</a></li>
-    <li class="breadcrumb-item active">Edit allocation</li>
+    <li class="breadcrumb-item active">@(staffing ? "Reassign people" : "Edit allocation")</li>
 </ol></nav>
-<h1 class="h3">Edit allocation</h1>
+<h1 class="h3">@(staffing ? "Reassign people" : "Edit allocation")</h1>
 }
+@if (staffing)
+{
+<p class="text-muted small">
+    The initiative is <strong>@initiative.Status</strong>, so the allocation itself is locked: only the people filling its @Model.Quantity seat(s) can change. Quantity, hours, cost and the current baseline stay as they are, and the change is audited. Request a re-baseline to change anything else.
+</p>
+}
+else
+{
 <p class="text-muted small">
     Participating business units: <strong>@string.Join(", ", rateOptions.BusinessUnits.Select(b => b.Name))</strong>. Only combinations with a published rate on the phase start date are selectable; rates are shared by every business unit.
     @if (!rateOptions.HasAnyPricing)
@@ -33,46 +43,47 @@
         <a asp-area="Admin" asp-controller="RateCards" asp-action="Index">Manage rate cards</a>
     }
 </p>
-<form asp-action="EditAllocation" asp-route-id="@Model.Id" method="post" class="@(panel ? null : "col-lg-8")">
+}
+<form asp-action="@(staffing ? "ReassignPeople" : "EditAllocation")" asp-route-id="@Model.Id" method="post" class="@(panel ? null : "col-lg-8")">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <div class="row g-3 mb-3">
         <div class="col-md-6">
             <label asp-for="PhaseId" class="form-label"></label>
-            <select asp-for="PhaseId" asp-items="phases" class="form-select"></select>
+            <select asp-for="PhaseId" asp-items="phases" class="form-select" disabled="@staffing"></select>
             <span asp-validation-for="PhaseId" class="text-danger"></span>
         </div>
         <div class="col-md-6">
             <label asp-for="BusinessUnitId" class="form-label"></label>
-            <select asp-for="BusinessUnitId" asp-items="@(new SelectList(rateOptions.BusinessUnits, "Id", "Name"))" class="form-select"></select>
+            <select asp-for="BusinessUnitId" asp-items="@(new SelectList(rateOptions.BusinessUnits, "Id", "Name"))" class="form-select" disabled="@staffing"></select>
             <span asp-validation-for="BusinessUnitId" class="text-danger"></span>
         </div>
     </div>
     <div class="row g-3 mb-3">
         <div class="col-md-6">
             <label asp-for="ResourceTypeId" class="form-label"></label>
-            <select asp-for="ResourceTypeId" asp-items="@(new SelectList(rateOptions.AllResourceTypes, "Id", "Name"))" class="form-select"></select>
+            <select asp-for="ResourceTypeId" asp-items="@(new SelectList(rateOptions.AllResourceTypes, "Id", "Name"))" class="form-select" disabled="@staffing"></select>
             <span asp-validation-for="ResourceTypeId" class="text-danger"></span>
         </div>
     </div>
     <div class="row g-3 mb-3">
         <div class="col-md-3">
             <label asp-for="SeniorityId" class="form-label"></label>
-            <select asp-for="SeniorityId" asp-items="@(new SelectList(seniorities, "Id", "Name"))" class="form-select"></select>
+            <select asp-for="SeniorityId" asp-items="@(new SelectList(seniorities, "Id", "Name"))" class="form-select" disabled="@staffing"></select>
             <span asp-validation-for="SeniorityId" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="Location" class="form-label"></label>
-            <select asp-for="Location" asp-items="@(new SelectList(locations))" class="form-select"></select>
+            <select asp-for="Location" asp-items="@(new SelectList(locations))" class="form-select" disabled="@staffing"></select>
             <span asp-validation-for="Location" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="ResourcingClassId" class="form-label"></label>
-            <select asp-for="ResourcingClassId" asp-items="@(new SelectList(rateOptions.Classes, "Id", "Name"))" class="form-select"></select>
+            <select asp-for="ResourcingClassId" asp-items="@(new SelectList(rateOptions.Classes, "Id", "Name"))" class="form-select" disabled="@staffing"></select>
             <span asp-validation-for="ResourcingClassId" class="text-danger"></span>
         </div>
         <div class="col-md-3" data-vendor-field hidden>
             <label asp-for="VendorId" class="form-label"></label>
-            <select asp-for="VendorId" asp-items="@(new SelectList(rateOptions.Vendors, "Id", "Name"))" class="form-select"></select>
+            <select asp-for="VendorId" asp-items="@(new SelectList(rateOptions.Vendors, "Id", "Name"))" class="form-select" disabled="@staffing" data-locked="@(staffing ? "true" : null)"></select>
             <span asp-validation-for="VendorId" class="text-danger"></span>
         </div>
         <div class="col-md-3">
@@ -89,14 +100,14 @@
         </div>
         <div class="col-md-3">
             <label asp-for="Quantity" class="form-label"></label>
-            <input asp-for="Quantity" class="form-control" type="number" min="1" />
+            <input asp-for="Quantity" class="form-control" type="number" min="1" readonly="@staffing" />
             <span asp-validation-for="Quantity" class="text-danger"></span>
         </div>
         @if (fixedDuration)
         {
             <div class="col-md-3">
                 <label asp-for="AllocationPercent" class="form-label"></label>
-                <input asp-for="AllocationPercent" class="form-control" type="number" min="0.01" max="100" step="0.01" required />
+                <input asp-for="AllocationPercent" class="form-control" type="number" min="0.01" max="100" step="0.01" required readonly="@staffing" />
                 <span asp-validation-for="AllocationPercent" class="text-danger"></span>
             </div>
             <div class="col-md-3">
@@ -109,27 +120,27 @@
         {
             <div class="col-md-3">
                 <label asp-for="EstimatedHours" class="form-label"></label>
-                <input asp-for="EstimatedHours" class="form-control" type="number" min="0.25" step="0.25" />
+                <input asp-for="EstimatedHours" class="form-control" type="number" min="0.25" step="0.25" readonly="@staffing" />
                 <span asp-validation-for="EstimatedHours" class="text-danger"></span>
             </div>
         }
         <div class="col-md-2">
             <label asp-for="CapexPercent" class="form-label"></label>
-            <input asp-for="CapexPercent" class="form-control" type="number" min="0" max="100" step="0.01" title="Share of this line's cost that is capitalised; the rest is Opex" />
+            <input asp-for="CapexPercent" class="form-control" type="number" min="0" max="100" step="0.01" title="Share of this line's cost that is capitalised; the rest is Opex" readonly="@staffing" />
             <span asp-validation-for="CapexPercent" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="ContractReference" class="form-label"></label>
-            <input asp-for="ContractReference" class="form-control" />
+            <input asp-for="ContractReference" class="form-control" readonly="@staffing" />
             <span asp-validation-for="ContractReference" class="text-danger"></span>
         </div>
         <div class="col-md-3">
             <label asp-for="CostCenter" class="form-label"></label>
-            <input asp-for="CostCenter" class="form-control" />
+            <input asp-for="CostCenter" class="form-control" readonly="@staffing" />
             <span asp-validation-for="CostCenter" class="text-danger"></span>
         </div>
     </div>
-    <button type="submit" class="btn btn-primary">Save</button>
+    <button type="submit" class="btn btn-primary">@(staffing ? "Reassign people" : "Save")</button>
     @if (panel) { <button type="button" class="btn btn-link" data-bs-dismiss="offcanvas">Cancel</button> }
     else { <a asp-action="Details" asp-route-id="@initiative.Id" class="btn btn-link">Cancel</a> }
 </form>

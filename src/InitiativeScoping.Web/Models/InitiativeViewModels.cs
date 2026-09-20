@@ -289,6 +289,9 @@ public class InitiativeDetailsModel
     public bool CanManage { get; init; }
     public bool ScopeEditable { get; init; }
     public bool ScopeWritable => CanEdit && ScopeEditable;
+    public bool StaffingEditable { get; init; }
+    /// <summary>People on allocations can be reassigned (Active / On hold) even though the rest of the scope is locked.</summary>
+    public bool StaffingWritable => CanEdit && StaffingEditable;
     public bool CanApproveRebaseline { get; init; }
     public bool CanApproveActivation { get; init; }
     public bool CanAddNote { get; init; }

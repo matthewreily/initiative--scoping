@@ -320,6 +320,103 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
         }
     }
 
+    [Fact]
+    public async Task People_can_be_reassigned_on_an_active_initiative_without_a_rebaseline()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var (engineerId, qaId, buId, _) = await LookupsAsync();
+        var jane = await CreatePersonAsync(client, $"Jane {tag}", engineerId, buId, seniorityId: 3);
+        var sam = await CreatePersonAsync(client, $"Sam {tag}", engineerId, buId, seniorityId: 3);
+        var quinn = await CreatePersonAsync(client, $"Quinn {tag}", qaId, buId, seniorityId: 3);
+
+        var id = await CreateInitiativeAsync(client, $"Reassign {tag}", buId);
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-02", ["PlannedEnd"] = "2026-03-31" });
+        int phaseId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            phaseId = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Phases.FirstAsync(p => p.InitiativeId == id)).Id;
+        }
+
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
+        {
+            ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = buId.ToString(), ["ResourceTypeId"] = engineerId.ToString(),
+            ["SeniorityId"] = "3", ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(),
+            ["PersonIds[0]"] = jane.ToString(), ["Quantity"] = "2", ["EstimatedHours"] = "40"
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new())).StatusCode);
+
+        int allocationId;
+        decimal baselineCost;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var initiative = await db.Initiatives.Include(i => i.Baselines).SingleAsync(i => i.Id == id);
+            Assert.Equal(InitiativeStatus.Active, initiative.Status);
+            baselineCost = Assert.Single(initiative.Baselines).TotalCost;
+            allocationId = (await db.InitiativeAllocations.SingleAsync(a => a.InitiativeId == id)).Id;
+        }
+
+        // Scope is locked: the full edit still refuses, but the People button and Unassign controls are offered.
+        var page = await client.GetStringAsync(details);
+        Assert.Contains("data-panel=\"Reassign people\"", page);
+        Assert.DoesNotContain("data-panel=\"Edit allocation\"", page);
+        Assert.Contains($"aria-label=\"Unassign Jane {tag}\"", page);
+        Assert.Contains("can still be reassigned", page);
+        var panel = await client.GetStringAsync($"/Initiatives/EditAllocation/{allocationId}");
+        Assert.Contains("Reassign people", panel);
+        Assert.Contains("/Initiatives/ReassignPeople/", panel);
+
+        var fullEdit = new Dictionary<string, string>
+        {
+            ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = buId.ToString(), ["ResourceTypeId"] = engineerId.ToString(), ["SeniorityId"] = "3",
+            ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = "5", ["EstimatedHours"] = "400"
+        };
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/EditAllocation/{allocationId}", fullEdit)).StatusCode);
+        Assert.Contains("Scope is locked", await client.GetStringAsync(details));
+
+        // Swap Jane for Sam and fill the second seat with... a QA person: refused because dimensions must still match.
+        var mismatch = await PostFormAsync(client, details, $"/Initiatives/ReassignPeople/{allocationId}", new() { ["PersonIds[0]"] = sam.ToString(), ["PersonIds[1]"] = quinn.ToString() });
+        Assert.Equal(HttpStatusCode.OK, mismatch.StatusCode);
+        Assert.Contains("do not match this allocation", await mismatch.Content.ReadAsStringAsync());
+
+        // Three people on two seats: refused; quantity cannot be changed through this path.
+        var tooMany = await PostFormAsync(client, details, $"/Initiatives/ReassignPeople/{allocationId}", new() { ["PersonIds[0]"] = sam.ToString(), ["PersonIds[1]"] = jane.ToString(), ["PersonIds[2]"] = quinn.ToString(), ["Quantity"] = "3" });
+        Assert.Equal(HttpStatusCode.OK, tooMany.StatusCode);
+        Assert.Contains("3 people are named but the quantity is 2", await tooMany.Content.ReadAsStringAsync());
+
+        // Swap Jane out for Sam; posted quantity/hours are ignored.
+        var swap = await PostFormAsync(client, details, $"/Initiatives/ReassignPeople/{allocationId}", new() { ["PersonIds[0]"] = sam.ToString(), ["Quantity"] = "9", ["EstimatedHours"] = "999" });
+        Assert.Equal(HttpStatusCode.Redirect, swap.StatusCode);
+        Assert.Contains("People reassigned (1 in, 1 out)", await client.GetStringAsync(details));
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/UnassignPerson/{allocationId}", new() { ["personId"] = sam.ToString() })).StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var allocation = await db.InitiativeAllocations.Include(a => a.People).SingleAsync(a => a.Id == allocationId);
+            Assert.Empty(allocation.PersonIds);
+            Assert.Equal(2, allocation.Quantity);
+            Assert.Equal(40m, allocation.EstimatedHours);
+            var initiative = await db.Initiatives.Include(i => i.Baselines).ThenInclude(b => b.Lines).SingleAsync(i => i.Id == id);
+            Assert.Equal(InitiativeStatus.Active, initiative.Status);
+            var baseline = Assert.Single(initiative.Baselines);
+            Assert.Equal(baselineCost, baseline.TotalCost);
+            Assert.Contains(baseline.Lines, l => l.PersonId == jane);
+            var audits = await db.AuditEvents.Where(a => a.Entity == nameof(InitiativeAllocation) && a.EntityId == allocationId.ToString() && a.Action == "Update").ToListAsync();
+            Assert.Equal(2, audits.Count);
+            Assert.Contains(audits, a => a.DiffJson!.Contains("\"Reassigned\":true"));
+        }
+
+        // Complete initiatives are fully locked, people included.
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/{id}/ChangeStatus", new() { ["to"] = nameof(InitiativeStatus.Complete) })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/ReassignPeople/{allocationId}", new() { ["PersonIds[0]"] = jane.ToString() })).StatusCode);
+        page = await client.GetStringAsync(details);
+        Assert.Contains("People cannot be reassigned while the initiative is Complete", page);
+        Assert.DoesNotContain("data-panel=\"Reassign people\"", page);
+    }
+
     // ----- Helpers -----
 
     private async Task<(int EngineerId, int QaId, int BuId, int OtherBuId)> LookupsAsync()

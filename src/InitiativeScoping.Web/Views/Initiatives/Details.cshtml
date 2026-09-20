@@ -186,7 +186,7 @@ else
         }
         @if (open is null)
         {
-            <div class="small">Scope is locked while the initiative is @i.Status. @if (i.Status == InitiativeStatus.Active) { <text>Request a re-baseline to change it.</text> }</div>
+            <div class="small">Scope is locked while the initiative is @i.Status. @if (i.Status == InitiativeStatus.Active) { <text>Request a re-baseline to change it.</text> } @if (Model.StaffingWritable) { <text>People on allocations can still be reassigned (the <em>People</em> button on each line) without a re-baseline.</text> }</div>
         }
         else if (open.Status == RebaselineStatus.Pending)
         {
@@ -428,7 +428,7 @@ else
                     <td>@a.BusinessUnit?.Name</td>
                     <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
                     <td data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
-                    <td>@if (a.HasNamedPeople) { foreach (var p in a.NamedPeople) { <span class="allocation-person d-block text-nowrap">@p.DisplayName @if (!p.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } @if (Model.ScopeWritable) { <form asp-action="UnassignPerson" asp-route-id="@a.Id" method="post" class="d-inline"><input type="hidden" name="personId" value="@p.Id" /><button type="submit" class="btn btn-link btn-sm p-0 align-baseline text-danger text-decoration-none" title="Unassign @p.DisplayName (the seat stays, unassigned)" aria-label="Unassign @p.DisplayName">&times;</button></form> }</span> } if (a.UnassignedSeats > 0) { <span class="text-muted small d-block">+ @a.UnassignedSeats unassigned</span> } } else { <span class="text-muted">—</span> }</td>
+                    <td>@if (a.HasNamedPeople) { foreach (var p in a.NamedPeople) { <span class="allocation-person d-block text-nowrap">@p.DisplayName @if (!p.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } @if (Model.StaffingWritable) { <form asp-action="UnassignPerson" asp-route-id="@a.Id" method="post" class="d-inline"><input type="hidden" name="personId" value="@p.Id" /><button type="submit" class="btn btn-link btn-sm p-0 align-baseline text-danger text-decoration-none" title="Unassign @p.DisplayName (the seat stays, unassigned)" aria-label="Unassign @p.DisplayName">&times;</button></form> }</span> } if (a.UnassignedSeats > 0) { <span class="text-muted small d-block">+ @a.UnassignedSeats unassigned</span> } } else { <span class="text-muted">—</span> }</td>
                     <td>@a.Location</td>
                     <td>@(a.Vendor is null ? a.ResourcingClass?.Name ?? "—" : $"{a.ResourcingClass?.Name ?? "Vendor"}: {a.Vendor.Name}")</td>
                     <td class="allocation-capitalization" data-sort="@a.CapexPercent" title="@a.CapexPercent.ToString("0.##")% Capex / @((100m - a.CapexPercent).ToString("0.##"))% Opex">@CapexSplit.Label(a.CapexPercent)</td>
@@ -444,6 +444,10 @@ else
                             <form asp-action="DeleteAllocation" asp-route-id="@a.Id" method="post" class="d-inline">
                                 <button type="submit" class="btn btn-outline-danger btn-sm" aria-label="Remove allocation">&times;</button>
                             </form>
+                        }
+                        else if (Model.StaffingWritable)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm" asp-action="EditAllocation" asp-route-id="@a.Id" data-panel="Reassign people" title="Change who fills the seats; quantity, hours and baseline stay as they are">People</a>
                         }
                     </td>
                 </tr>
