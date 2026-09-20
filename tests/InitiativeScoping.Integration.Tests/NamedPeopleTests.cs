@@ -143,6 +143,132 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
     }
 
     [Fact]
+    public async Task Allocations_can_be_copied_from_a_phase_of_this_or_another_initiative()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var (engineerId, qaId, buId, otherBuId) = await LookupsAsync();
+        var jane = await CreatePersonAsync(client, $"Jane {tag}", engineerId, buId, seniorityId: 3);
+
+        // Source initiative: one phase, an engineer line with Jane, a QA line, and a line on a BU the target does not have.
+        var create = await PostFormAsync(client, "/Initiatives/Create", "/Initiatives/Create", new()
+        {
+            ["Name"] = $"Copy source {tag}", ["BusinessUnitId"] = buId.ToString(), ["ParticipatingBusinessUnitIds"] = otherBuId.ToString(),
+            ["SizingMethod"] = nameof(SizingMethod.Direct), ["TargetStart"] = "2026-03-01"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var sourceId = int.Parse(DetailsRegex.Match(create.Headers.Location!.ToString()).Groups[1].Value);
+        var sourceDetails = $"/Initiatives/Details/{sourceId}";
+        await PostFormAsync(client, sourceDetails, $"/Initiatives/AddPhase/{sourceId}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-02", ["PlannedEnd"] = "2026-03-31" });
+        int sourcePhaseId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            sourcePhaseId = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Phases.FirstAsync(p => p.InitiativeId == sourceId)).Id;
+        }
+
+        Dictionary<string, string> Line(int phaseId, int bu, int typeId, string qty, string hours, int? person = null)
+        {
+            var form = new Dictionary<string, string>
+            {
+                ["PhaseId"] = phaseId.ToString(), ["BusinessUnitId"] = bu.ToString(), ["ResourceTypeId"] = typeId.ToString(), ["SeniorityId"] = "3",
+                ["Location"] = "Onshore", ["ResourcingClassId"] = ResourcingClass.InternalId.ToString(), ["Quantity"] = qty, ["EstimatedHours"] = hours, ["CapexPercent"] = "55"
+            };
+            if (person is not null)
+            {
+                form["PersonIds[0]"] = person.Value.ToString();
+            }
+
+            return form;
+        }
+
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, sourceDetails, $"/Initiatives/AddAllocation/{sourceId}", Line(sourcePhaseId, buId, engineerId, "2", "80", jane))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, sourceDetails, $"/Initiatives/AddAllocation/{sourceId}", Line(sourcePhaseId, buId, qaId, "1", "40"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, sourceDetails, $"/Initiatives/AddAllocation/{sourceId}", Line(sourcePhaseId, otherBuId, engineerId, "1", "10"))).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            Assert.Equal(3, await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.CountAsync(a => a.PhaseId == sourcePhaseId));
+        }
+
+        // Target initiative on the same BU only, with two phases.
+        var id = await CreateInitiativeAsync(client, $"Copy target {tag}", buId);
+        var details = $"/Initiatives/Details/{id}";
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Discovery", ["PlannedStart"] = "2026-03-02", ["PlannedEnd"] = "2026-03-31" });
+        await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Delivery", ["PlannedStart"] = "2026-04-01", ["PlannedEnd"] = "2026-04-30" });
+        int discoveryId, deliveryId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var phases = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Phases.Where(p => p.InitiativeId == id).OrderBy(p => p.Sequence).ToListAsync();
+            (discoveryId, deliveryId) = (phases[0].Id, phases[1].Id);
+        }
+
+        var page = await client.GetStringAsync(details);
+        Assert.Contains($"/Initiatives/CopyAllocations/{id}", page);
+        var form = await client.GetStringAsync($"/Initiatives/CopyAllocations/{id}");
+        Assert.Contains($"Copy source {tag} &#xB7; Draft", form);
+        Assert.Contains("Build (3 lines)", form);
+
+        // Cross-initiative copy with people: two lines land, the other-BU line is skipped and reported, Jane comes along.
+        var copy = await PostFormAsync(client, $"/Initiatives/CopyAllocations/{id}", $"/Initiatives/CopyAllocations/{id}", new()
+        {
+            ["InitiativeId"] = id.ToString(), ["SourcePhaseId"] = sourcePhaseId.ToString(), ["TargetPhaseId"] = discoveryId.ToString(), ["IncludePeople"] = "true"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, copy.StatusCode);
+        page = await client.GetStringAsync(details);
+        Assert.Contains("2 allocation(s) copied from Copy source", page);
+        Assert.Contains("Skipped 1", page);
+        Assert.Contains($"Jane {tag}", page);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var copied = await db.InitiativeAllocations.Include(a => a.People).Where(a => a.PhaseId == discoveryId).OrderBy(a => a.Id).ToListAsync();
+            Assert.Equal(2, copied.Count);
+            Assert.Equal([engineerId, qaId], copied.Select(a => a.ResourceTypeId));
+            Assert.Equal([2, 1], copied.Select(a => a.Quantity));
+            Assert.Equal([80m, 40m], copied.Select(a => a.EstimatedHours));
+            Assert.All(copied, a => Assert.Equal(55m, a.CapexPercent));
+            Assert.All(copied, a => Assert.Equal(buId, a.BusinessUnitId));
+            Assert.Equal([jane], copied[0].PersonIds);
+            Assert.Empty(copied[1].PersonIds);
+            Assert.Equal(3, await db.InitiativeAllocations.CountAsync(a => a.PhaseId == sourcePhaseId));
+            Assert.Contains(await db.AuditEvents.Where(e => e.Entity == "Initiative" && e.EntityId == id.ToString()).ToListAsync(), e => e.DiffJson!.Contains("\"CopiedAllocations\":2"));
+        }
+
+        // Same-initiative copy without people: Delivery gets copies of Discovery's lines, seats unassigned.
+        copy = await PostFormAsync(client, $"/Initiatives/CopyAllocations/{id}", $"/Initiatives/CopyAllocations/{id}", new()
+        {
+            ["InitiativeId"] = id.ToString(), ["SourcePhaseId"] = discoveryId.ToString(), ["TargetPhaseId"] = deliveryId.ToString(), ["IncludePeople"] = "false"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, copy.StatusCode);
+        Assert.Contains("2 allocation(s) copied from Discovery into Delivery", await client.GetStringAsync(details));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var delivery = await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.Include(a => a.People).Where(a => a.PhaseId == deliveryId).ToListAsync();
+            Assert.Equal(2, delivery.Count);
+            Assert.All(delivery, a => Assert.Empty(a.PersonIds));
+        }
+
+        // Same phase as source and target is refused; a locked (Active) target refuses the copy entirely.
+        var same = await PostFormAsync(client, $"/Initiatives/CopyAllocations/{id}", $"/Initiatives/CopyAllocations/{id}", new()
+        {
+            ["InitiativeId"] = id.ToString(), ["SourcePhaseId"] = deliveryId.ToString(), ["TargetPhaseId"] = deliveryId.ToString()
+        });
+        Assert.Equal(HttpStatusCode.OK, same.StatusCode);
+        Assert.Contains("Source and target are the same phase", await same.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(client, details, $"/Initiatives/{id}/Activate", new() { ["reason"] = "Go" })).StatusCode);
+        copy = await PostFormAsync(client, details, $"/Initiatives/CopyAllocations/{id}", new()
+        {
+            ["InitiativeId"] = id.ToString(), ["SourcePhaseId"] = sourcePhaseId.ToString(), ["TargetPhaseId"] = deliveryId.ToString()
+        });
+        Assert.Equal(HttpStatusCode.Redirect, copy.StatusCode);
+        Assert.Contains("Scope is locked", await client.GetStringAsync(details));
+        using (var scope = factory.Services.CreateScope())
+        {
+            Assert.Equal(4, await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.CountAsync(a => a.Phase!.InitiativeId == id));
+        }
+    }
+
+    [Fact]
     public async Task Imported_actuals_match_people_named_on_the_initiative_by_display_name()
     {
         var client = factory.CreateClient(NoRedirect);

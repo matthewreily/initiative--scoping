@@ -69,6 +69,18 @@ public class InitiativeEditModel
     public string? BudgetFiscalYear { get; set; }
 }
 
+/// <summary>Copy every allocation line of an existing phase (this or another initiative) onto a phase of this initiative.</summary>
+public class CopyAllocationsModel
+{
+    public int InitiativeId { get; set; }
+    [Display(Name = "Copy from phase")]
+    public int SourcePhaseId { get; set; }
+    [Display(Name = "Into phase")]
+    public int TargetPhaseId { get; set; }
+    [Display(Name = "Also copy the named people (only those who still match the line and a participating business unit)")]
+    public bool IncludePeople { get; set; }
+}
+
 public class PhaseEditModel
 {
     public int Id { get; set; }
