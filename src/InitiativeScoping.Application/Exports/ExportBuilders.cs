@@ -266,3 +266,78 @@ public static class CapacityExport
         return [cells, contributions];
     }
 }
+
+/// <summary>The Scenarios compare table as data: one row per metric with a value column per plan and a delta-vs-live column per scenario, plus each plan's phases.</summary>
+public static class ScenarioCompareExport
+{
+    public static IReadOnlyList<ExportTable> Build(ScenarioComparison comparison, IReadOnlyDictionary<int, string> resourceTypeNames)
+    {
+        var cols = comparison.Columns;
+        var parent = comparison.Parent;
+        var scenarios = comparison.Scenarios.ToList();
+        var headers = new List<string> { "Section", "Metric" };
+        headers.AddRange(cols.Select(Label));
+        headers.AddRange(scenarios.Select(c => $"{Label(c)} vs live"));
+
+        var rows = new List<IReadOnlyList<object?>>();
+        void Text(string section, string metric, Func<ScenarioColumn, object?> value) =>
+            rows.Add([section, metric, .. cols.Select(value), .. scenarios.Select(_ => (object?)null)]);
+        void Number(string section, string metric, Func<ScenarioColumn, decimal> value) =>
+            rows.Add([section, metric, .. cols.Select(c => (object?)value(c)), .. scenarios.Select(c => (object?)(value(c) - value(parent)))]);
+        void Date(string section, string metric, Func<ScenarioColumn, DateOnly?> value) =>
+            rows.Add([section, metric, .. cols.Select(c => (object?)value(c)), .. scenarios.Select(c => (object?)DayDelta(value(c), value(parent)))]);
+
+        Text("Schedule", "Planning mode", c => c.Initiative.PlanningMode.ToString());
+        Text("Schedule", "Sizing", c => c.Initiative.SizingMethod == Domain.Enums.SizingMethod.Direct ? "Direct" : $"{c.Initiative.SizingMethod} {c.Initiative.SizeKey}");
+        Number("Schedule", "Phases", c => c.Initiative.Phases.Count);
+        Date("Schedule", "Plan start", c => c.PlanStart);
+        Date("Schedule", "Plan end", c => c.PlanEnd);
+
+        Number("Effort", "Total hours", c => c.Hours);
+        foreach (var cls in comparison.Classes)
+        {
+            Number("Effort", $"{cls.Name} hours", c => c.HoursByClass(cls.Id));
+            foreach (var typeId in comparison.ResourceTypeIds.Where(t => cols.Any(c => c.HoursByResourceType(t, cls.Id) != 0)))
+            {
+                Number("Effort", $"{cls.Name} hours – {resourceTypeNames.GetValueOrDefault(typeId, "?")}", c => c.HoursByResourceType(typeId, cls.Id));
+            }
+        }
+
+        Number("Headcount", "Seats (sum of allocation quantity)", c => c.HeadCount);
+        foreach (var cls in comparison.Classes)
+        {
+            Number("Headcount", $"Seats – {cls.Name}", c => c.HeadCountByClass(cls.Id));
+        }
+        Number("Headcount", "Peak concurrent people", c => c.PeakHeadCount);
+        foreach (var cls in comparison.Classes)
+        {
+            Number("Headcount", $"Peak concurrent people – {cls.Name}", c => c.PeakHeadCountByClass(cls.Id));
+        }
+
+        Number("Cost", "Labor cost", c => c.LaborCost);
+        Number("Cost", "Vendor labor cost", c => c.VendorCost);
+        Number("Cost", "Non-labor cost", c => c.NonLaborCost);
+        Number("Cost", "Forecast cost", c => c.TotalCost);
+        Number("Cost", "Contingency %", c => c.Initiative.ContingencyPct);
+        Number("Cost", "Contingency cost", c => c.ContingencyCost);
+        Number("Cost", "Forecast cost with contingency", c => c.TotalCostWithContingency);
+        Text("Cost", "Estimate confidence", c => c.Initiative.EstimateConfidence?.ToString());
+        Number("Cost", "Unpriced lines", c => c.UnpricedLines);
+
+        var phases = new ExportTable("Phases",
+            ["Plan", "Kind", "Sequence", "Phase", "Planned start", "Planned end", "Hours", "Cost"],
+            cols.SelectMany(c => c.Initiative.Phases.OrderBy(p => p.Sequence).ThenBy(p => p.PlannedStart).Select(p => (IReadOnlyList<object?>)
+            [
+                c.Initiative.Name, c.IsParent ? "Live plan" : "Scenario", p.Sequence, p.Name, p.PlannedStart, p.PlannedEnd,
+                c.Forecast.Lines.Where(l => l.Allocation.PhaseId == p.Id).Sum(l => l.Hours),
+                c.Forecast.Lines.Where(l => l.Allocation.PhaseId == p.Id).Sum(l => l.Cost)
+            ])).ToList());
+
+        return [new ExportTable("Comparison", headers, rows), phases];
+    }
+
+    private static string Label(ScenarioColumn c) => c.IsParent ? $"{c.Initiative.Name} (live plan)" : c.Initiative.Name;
+
+    private static int? DayDelta(DateOnly? value, DateOnly? baseValue) =>
+        value is null || baseValue is null ? null : value.Value.DayNumber - baseValue.Value.DayNumber;
+}

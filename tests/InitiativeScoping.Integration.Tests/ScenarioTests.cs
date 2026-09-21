@@ -134,6 +134,31 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/Initiatives/999999/Scenarios/Print")).StatusCode);
 
+        // Comparison export: same figures as data, reachable from the live plan or the scenario; the scenario itself exports like an initiative.
+        Assert.Contains($"/Initiatives/{id}/Scenarios/Export?format=csv", compare);
+        foreach (var exportUrl in new[] { $"/Initiatives/{id}/Scenarios/Export?format=csv", $"/Initiatives/{scenarioId}/Scenarios/Export?format=csv" })
+        {
+            var export = await client.GetAsync(exportUrl);
+            Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+            Assert.Equal("text/csv", export.Content.Headers.ContentType?.MediaType);
+            Assert.Contains($"scenarios-{id}-", export.Content.Headers.ContentDisposition?.FileName);
+            var csv = await export.Content.ReadAsStringAsync();
+            Assert.Contains($"Live {tag} (live plan)", csv);
+            Assert.Contains($"Lean {tag} vs live", csv);
+            Assert.Contains("Cost,Forecast cost,24000", csv);
+            Assert.Contains(",-12000", csv);
+            Assert.Contains("# Phases", csv);
+        }
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/Initiatives/{id}/Scenarios/Export?format=xlsx")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/Initiatives/{id}/Scenarios/Export?format=pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/Initiatives/999999/Scenarios/Export?format=csv")).StatusCode);
+
+        var scenarioPage = await client.GetStringAsync($"/Initiatives/Details/{scenarioId}");
+        Assert.Contains($"/Initiatives/{scenarioId}/Export?format=csv", scenarioPage);
+        var scenarioExport = await client.GetAsync($"/Initiatives/{scenarioId}/Export?format=csv");
+        Assert.Equal(HttpStatusCode.OK, scenarioExport.StatusCode);
+        Assert.Contains($"scenario-{scenarioId}-", scenarioExport.Content.Headers.ContentDisposition?.FileName);
+
         // Unrelated initiative cannot be promoted onto this one.
         var otherId = await CreatePlannedInitiativeAsync(client, $"Other {tag}");
         Assert.Equal(HttpStatusCode.NotFound, (await PostFormAsync(client, details, $"/Initiatives/{id}/Scenarios/{otherId}/Promote", new())).StatusCode);

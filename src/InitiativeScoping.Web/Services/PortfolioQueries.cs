@@ -48,9 +48,9 @@ public static class PortfolioQueries
         return query.OrderBy(i => i.BusinessUnit!.Name).ThenBy(i => i.Name);
     }
 
-    public static IQueryable<Initiative> PortfolioInitiatives(this AppDbContext db) =>
+    public static IQueryable<Initiative> PortfolioInitiatives(this AppDbContext db, bool includeScenarios = false) =>
         db.Initiatives
-            .Where(i => i.ScenarioOfId == null)
+            .Where(i => includeScenarios || i.ScenarioOfId == null)
             .Include(i => i.BusinessUnit)
             .Include(i => i.Members)
             .Include(i => i.Phases)
