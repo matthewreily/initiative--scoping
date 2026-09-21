@@ -95,12 +95,13 @@ Shortcut: after step 2 (Entra) and filling the tfvars, `deploy/gcp/bootstrap-pro
 `.github/workflows/deploy.yml`:
 
 - **push to `main`** → test → build image tagged with the commit SHA → push to dev's registry → update + execute the dev migrate job → `gcloud run deploy` → `curl /health`. Only **dev** is touched.
-- **Promote to prod** — either push a tag `v*` on a commit that is on `main`, or *Run workflow* and enter the commit `sha` (defaults to the selected ref's head). The `promote-prod` job runs in the `prod` GitHub environment, so it waits for the required reviewers, then:
+- **Promote to prod** — either push a tag `v*` on a commit that is on `main`, or *Run workflow* with `target = prod` and the commit `sha` (defaults to the selected ref's head). The `promote-prod` job runs in the `prod` GitHub environment, so it waits for the required reviewers, then:
   1. checks via the GitHub API that the same commit has a **successful dev deploy** on `main` (otherwise it fails — nothing reaches prod that dev has not run);
   2. copies the dev image to prod's registry **by digest** with `crane copy` (no rebuild; the digest is verified after the copy), so prod runs byte-for-byte what was tested in dev;
   3. updates + executes the prod migrate job, deploys the Cloud Run service, and curls `/health`.
+- **Redeploy an older (or any already-built) commit to dev** — *Run workflow* with `target = dev` and the `sha`. The `redeploy-dev` job applies the same gate (the commit must have a successful dev deploy on `main`), pins the dev image by digest and runs migrate → deploy → `/health` against dev only; nothing is rebuilt. Useful to reproduce a bug against the build a user saw, or to roll dev back after a bad merge.
 
-A release is therefore: merge → watch dev → `git tag v1.4.0 <sha> && git push origin v1.4.0` → approve the `prod` deployment in the Actions run. Roll back by promoting an earlier SHA (Run workflow → `sha`), or `gcloud run services update-traffic <service> --to-revisions <rev>=100` (migrations are additive, so the previous image keeps working).
+A release is therefore: merge → watch dev → `git tag v1.4.0 <sha> && git push origin v1.4.0` → approve the `prod` deployment in the Actions run. Roll back by deploying an earlier SHA (Run workflow → `sha` + `target`), or `gcloud run services update-traffic <service> --to-revisions <rev>=100` (migrations are additive, so the previous image keeps working).
 
 ## Observability (OpenTelemetry)
 

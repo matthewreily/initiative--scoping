@@ -11,7 +11,7 @@ values marked *Terraform output* can be re-derived with `terraform -chdir=deploy
 |---|---|
 | Repository | <https://github.com/matthewreily/initiative--scoping> |
 | CI (build + test + 80% coverage gate) | <https://github.com/matthewreily/initiative--scoping/actions/workflows/ci.yml> |
-| CD: dev on merge to `main`, prod via `v*` tag / Run workflow (approval-gated) | <https://github.com/matthewreily/initiative--scoping/actions/workflows/deploy.yml> |
+| CD: dev on merge to `main`, prod via `v*` tag / Run workflow `target=prod` (approval-gated); Run workflow `target=dev` redeploys any built SHA to dev | <https://github.com/matthewreily/initiative--scoping/actions/workflows/deploy.yml> |
 | Container images | `us-central1-docker.pkg.dev/initiative-scoping-dev/initiative-scoping/initiative-scoping` (Artifact Registry) |
 | Docs | `README.md` (overview/run locally), `HowTo.md` (using the app), `deploy/gcp/README.md` (infra), `deploy/entra/README.md` (identity) |
 
