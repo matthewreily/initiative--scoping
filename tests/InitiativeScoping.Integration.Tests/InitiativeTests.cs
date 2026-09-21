@@ -404,6 +404,36 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
     }
 
     [Fact]
+    public async Task Edit_allocation_form_posts_the_vendor_select()
+    {
+        var client = factory.CreateClient(NoRedirect);
+        var id = await CreateInitiativeAsync(client, "Vendor select test");
+        await PostFormAsync(client, $"/Initiatives/Details/{id}", $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
+        var (phaseId, typeId) = await FirstPhaseAndTypeAsync(id, "Software Engineer");
+
+        int allocationId;
+        using (var seed = factory.Services.CreateScope())
+        {
+            var db = seed.ServiceProvider.GetRequiredService<AppDbContext>();
+            var allocation = new InitiativeAllocation
+            {
+                InitiativeId = id, PhaseId = phaseId, BusinessUnitId = await SeededBusinessUnitIdAsync(), ResourceTypeId = typeId,
+                SeniorityId = 3, Location = "Onshore", ResourcingClassId = ResourcingClass.VendorId, Quantity = 1, EstimatedHours = 10m
+            };
+            db.InitiativeAllocations.Add(allocation);
+            await db.SaveChangesAsync();
+            allocationId = allocation.Id;
+        }
+
+        var html = await client.GetStringAsync($"/Initiatives/EditAllocation/{allocationId}");
+        var vendorSelect = Regex.Match(html, "<select [^>]*id=\"VendorId\"[^>]*>").Value;
+        Assert.NotEmpty(vendorSelect);
+        Assert.DoesNotContain("disabled", vendorSelect);
+        Assert.DoesNotContain("data-locked", vendorSelect);
+        Assert.DoesNotContain("hasAttribute('data-locked')", html);
+    }
+
+    [Fact]
     public async Task Edit_pages_render_as_bare_fragments_for_side_panel_requests_and_full_pages_otherwise()
     {
         var client = factory.CreateClient(NoRedirect);
