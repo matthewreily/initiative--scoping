@@ -74,7 +74,7 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
             return BadRequest($"Unsupported format '{format}'. Use one of: {string.Join(", ", writers.Select(w => w.Extension))}.");
         }
 
-        var initiative = await db.PortfolioInitiatives().FirstOrDefaultAsync(i => i.Id == id, ct);
+        var initiative = await db.PortfolioInitiatives(includeScenarios: true).FirstOrDefaultAsync(i => i.Id == id, ct);
         if (initiative is null)
         {
             return NotFound();
@@ -93,7 +93,8 @@ public class PortfolioController(AppDbContext db, IAuditLog audit, IEnumerable<I
         audit.Record(nameof(Initiative), id, AuditActions.Export, new { Format = writer.Extension, Rows = actuals.Entries.Count });
         await db.SaveChangesAsync(ct);
 
-        return File(bytes, writer.ContentType, $"initiative-{id}-{ExportFormats.SafeFileName(initiative.Name)}.{writer.Extension}");
+        var prefix = initiative.ScenarioOfId is null ? "initiative" : "scenario";
+        return File(bytes, writer.ContentType, $"{prefix}-{id}-{ExportFormats.SafeFileName(initiative.Name)}.{writer.Extension}");
     }
 
     private IExportWriter? ResolveWriter(string? format) =>

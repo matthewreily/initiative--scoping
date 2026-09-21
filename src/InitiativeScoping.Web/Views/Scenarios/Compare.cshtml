@@ -21,6 +21,13 @@
         </div>
     </div>
     <div class="d-flex flex-wrap gap-2 align-items-start">
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="scenarios-export-menu">Export</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" asp-controller="Scenarios" asp-action="Export" asp-route-id="@p.Id" asp-route-format="xlsx">Excel (.xlsx)</a></li>
+                <li><a class="dropdown-item" asp-controller="Scenarios" asp-action="Export" asp-route-id="@p.Id" asp-route-format="csv">CSV</a></li>
+            </ul>
+        </div>
         <a class="btn btn-outline-secondary btn-sm text-nowrap" asp-controller="Scenarios" asp-action="Print" asp-route-id="@p.Id" id="scenarios-print-link">Print / PDF</a>
         @if (Model.CanEdit)
         {

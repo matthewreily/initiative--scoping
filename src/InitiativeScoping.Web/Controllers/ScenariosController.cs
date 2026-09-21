@@ -1,5 +1,6 @@
 using InitiativeScoping.Application;
 using InitiativeScoping.Application.Abstractions;
+using InitiativeScoping.Application.Exports;
 using InitiativeScoping.Application.Initiatives;
 using InitiativeScoping.Domain.Entities;
 using InitiativeScoping.Domain.Enums;
@@ -16,7 +17,7 @@ namespace InitiativeScoping.Web.Controllers;
 /// <summary>What-if scenarios: clone an initiative's plan, compare alternatives side by side, promote one back onto the initiative.</summary>
 [Authorize(Policy = AppPolicies.CanView)]
 [AutoValidateAntiforgeryToken]
-public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock) : Controller
+public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IEnumerable<IExportWriter> writers) : Controller
 {
     private const string Entity = nameof(Initiative);
 
@@ -33,6 +34,28 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
     {
         var model = await BuildCompareAsync(id, printable: true, ct);
         return model is null ? NotFound() : View(model);
+    }
+
+    /// <summary>The compare table as CSV/XLSX (one value column per plan, a delta-vs-live column per scenario) plus each plan's phases.</summary>
+    [HttpGet("Initiatives/{id:int}/Scenarios/Export")]
+    public async Task<IActionResult> Export(int id, string format, CancellationToken ct)
+    {
+        var writer = writers.FirstOrDefault(w => string.Equals(w.Extension, format?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (writer is null)
+        {
+            return BadRequest($"Unsupported format '{format}'. Use one of: {string.Join(", ", writers.Select(w => w.Extension))}.");
+        }
+
+        var model = await BuildCompareAsync(id, printable: false, ct);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        var bytes = writer.Write(ScenarioCompareExport.Build(model.Comparison, model.ResourceTypeNames));
+        audit.Record(Entity, model.Parent.Id, AuditActions.Export, new { Format = writer.Extension, Scenarios = model.Comparison.Columns.Count - 1 });
+        await db.SaveChangesAsync(ct);
+        return File(bytes, writer.ContentType, $"scenarios-{model.Parent.Id}-{ExportFormats.SafeFileName(model.Parent.Name)}.{writer.Extension}");
     }
 
     private async Task<ScenarioCompareModel?> BuildCompareAsync(int id, bool printable, CancellationToken ct)
