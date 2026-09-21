@@ -195,4 +195,28 @@ public class ScenarioPlannerTests
         Assert.Equal(new DateOnly(2026, 4, 30), col.PlanEnd);
         Assert.Equal(0, col.UnpricedLines);
     }
+
+    [Fact]
+    public void Comparison_splits_headcount_by_class_and_reports_peak_concurrent_seats()
+    {
+        var live = Live();
+        var scenario = ScenarioPlanner.Clone(live, "A", "u", Now);
+        scenario.Id = 50;
+        // Overlap the phases so the internal Build seats and the vendor Test seat are staffed on the same day.
+        scenario.Phases[1].PlannedStart = new DateOnly(2026, 3, 15);
+        scenario.Allocations[1].Quantity = 3;
+        var cmp = ScenarioComparison.Build(live, [scenario], [Card()]);
+        var col = Assert.Single(cmp.Scenarios);
+
+        Assert.Equal(2, cmp.Parent.HeadCountByClass(ResourcingClass.InternalId));
+        Assert.Equal(1, cmp.Parent.HeadCountByClass(ResourcingClass.VendorId));
+        Assert.Equal(2, cmp.Parent.PeakHeadCount); // Build (2) and Test (1) do not overlap
+        Assert.Equal(1, cmp.Parent.PeakHeadCountByClass(ResourcingClass.VendorId));
+
+        Assert.Equal(5, col.HeadCount);
+        Assert.Equal(3, col.HeadCountByClass(ResourcingClass.VendorId));
+        Assert.Equal(5, col.PeakHeadCount);
+        Assert.Equal(2, col.PeakHeadCountByClass(ResourcingClass.InternalId));
+        Assert.Equal(3, col.PeakHeadCountByClass(ResourcingClass.VendorId));
+    }
 }

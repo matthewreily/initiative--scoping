@@ -138,6 +138,27 @@ public sealed record ScenarioColumn(Initiative Initiative, ForecastResult Foreca
     public decimal VendorHours => Forecast.Lines.Where(l => l.Allocation.IsVendor).Sum(l => l.Hours);
     public decimal VendorCost => Forecast.Lines.Where(l => l.Allocation.IsVendor).Sum(l => l.Cost);
     public int HeadCount => Initiative.Allocations.Sum(a => a.Quantity);
+    public int HeadCountByClass(int resourcingClassId) =>
+        Initiative.Allocations.Where(a => a.ResourcingClassId == resourcingClassId).Sum(a => a.Quantity);
+
+    /// <summary>Largest number of seats staffed on any single day (allocations whose phases overlap).</summary>
+    public int PeakHeadCount => PeakSeats(Initiative.Allocations);
+    public int PeakHeadCountByClass(int resourcingClassId) =>
+        PeakSeats(Initiative.Allocations.Where(a => a.ResourcingClassId == resourcingClassId));
+
+    private Phase? PhaseOf(InitiativeAllocation a) => a.Phase ?? Initiative.Phases.FirstOrDefault(p => p.Id == a.PhaseId);
+
+    private int PeakSeats(IEnumerable<InitiativeAllocation> allocations)
+    {
+        var seats = allocations.Select(a => (Phase: PhaseOf(a), a.Quantity)).Where(s => s.Phase is not null).ToList();
+        var peak = 0;
+        foreach (var day in seats.Select(s => s.Phase!.PlannedStart).Distinct())
+        {
+            peak = Math.Max(peak, seats.Where(s => s.Phase!.PlannedStart <= day && day <= s.Phase.PlannedEnd).Sum(s => s.Quantity));
+        }
+        return peak;
+    }
+
     public int UnpricedLines => Forecast.Lines.Count(l => l.IsUnpriced);
     public DateOnly? PlanStart => Initiative.Phases.Count == 0 ? null : Initiative.Phases.Min(p => p.PlannedStart);
     public DateOnly? PlanEnd => Initiative.Phases.Count == 0 ? null : Initiative.Phases.Max(p => p.PlannedEnd);
