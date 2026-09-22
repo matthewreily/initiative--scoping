@@ -83,7 +83,14 @@ else
         </div>
         <div class="col-md-3" data-vendor-field hidden>
             <label asp-for="VendorId" class="form-label"></label>
-            <select asp-for="VendorId" asp-items="@(new SelectList(rateOptions.Vendors, "Id", "Name"))" class="form-select" disabled="@staffing" data-locked="@(staffing ? "true" : null)"></select>
+            @if (staffing)
+            {
+                <select asp-for="VendorId" asp-items="@(new SelectList(rateOptions.Vendors, "Id", "Name"))" class="form-select" disabled data-locked="true"></select>
+            }
+            else
+            {
+                <select asp-for="VendorId" asp-items="@(new SelectList(rateOptions.Vendors, "Id", "Name"))" class="form-select"></select>
+            }
             <span asp-validation-for="VendorId" class="text-danger"></span>
         </div>
         <div class="col-md-3">
