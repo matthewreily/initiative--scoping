@@ -22,6 +22,7 @@ test.describe('Initiative planning', () => {
     await expect(page.getByText('Incomplete – unpriced lines')).toHaveCount(0);
 
     // "Why this number" drill-down lists every phase with its labor cost
+    await page.getByRole('button', { name: 'Actions' }).click();
     await page.getByRole('link', { name: 'Why this number?' }).first().click();
     await expect(page).toHaveURL(new RegExp(`/Initiatives/Explain/${id}`));
     await expect(page.getByRole('heading', { name: /Forecast total \$/ })).toBeVisible();

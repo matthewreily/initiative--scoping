@@ -31,8 +31,9 @@
         <a class="btn btn-outline-secondary btn-sm text-nowrap" asp-controller="Scenarios" asp-action="Print" asp-route-id="@p.Id" id="scenarios-print-link">Print / PDF</a>
         @if (Model.CanEdit)
         {
-            <form asp-controller="Scenarios" asp-action="Create" asp-route-id="@p.Id" method="post" class="d-flex gap-2 inline-form">
-                <input asp-for="NewScenario.Name" name="Name" class="form-control form-control-sm" style="width: 18rem" aria-label="Scenario name" required maxlength="300" />
+            <form asp-controller="Scenarios" asp-action="Create" asp-route-id="@p.Id" method="post" class="d-flex gap-2 align-items-center inline-form">
+                <label for="new-scenario-name" class="small text-muted text-nowrap mb-0">Scenario name</label>
+                <input asp-for="NewScenario.Name" name="Name" id="new-scenario-name" class="form-control form-control-sm" style="width: 18rem" required maxlength="300" />
                 <button type="submit" class="btn btn-primary btn-sm text-nowrap">New scenario from live plan</button>
             </form>
         }

@@ -1,8 +1,10 @@
 ﻿@{
     var area = ViewContext.RouteData.Values["area"]?.ToString() ?? "";
     var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+    var errorPage = area == "" && controller == "Home" && action is "Error" or "Status";
     string NavCls(string a, params string[] controllers) =>
-        a == area && controllers.Contains(controller) ? "nav-link active" : "nav-link";
+        !errorPage && a == area && controllers.Contains(controller) ? "nav-link active" : "nav-link";
 }
 <!DOCTYPE html>
 <html lang="en">
