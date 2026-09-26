@@ -132,7 +132,7 @@ document.addEventListener('keydown', e => {
         const scope = (form.dataset.bulk && document.getElementById(form.dataset.bulk)) || form;
         const all = scope.querySelector('[data-bulk-all]');
         const items = () => Array.from(scope.querySelectorAll('[data-bulk-item]'));
-        const bar = form.querySelector('[data-bulk-bar]') || scope.querySelector('[data-bulk-bar]');
+        const bar = form.matches('[data-bulk-bar]') ? form : (form.querySelector('[data-bulk-bar]') || scope.querySelector('[data-bulk-bar]'));
         const count = form.querySelector('[data-bulk-count]') || scope.querySelector('[data-bulk-count]');
 
         function refresh() {
@@ -143,7 +143,10 @@ document.addEventListener('keydown', e => {
                 all.indeterminate = selected > 0 && selected < list.length;
             }
             if (count) count.textContent = selected === 0 ? 'None selected' : selected + ' selected';
-            if (bar) bar.querySelectorAll('button,input:not([type=hidden]),select').forEach(el => { el.disabled = selected === 0; });
+            if (bar) {
+                bar.querySelectorAll('button,input:not([type=hidden]),select').forEach(el => { el.disabled = selected === 0; });
+                bar.classList.toggle('bulk-idle', selected === 0);
+            }
             list.forEach(i => i.closest('tr')?.classList.toggle('table-active', i.checked));
         }
 

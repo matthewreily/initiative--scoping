@@ -49,7 +49,7 @@
     </fieldset>
     <div class="row g-3 mb-3 align-items-end">
         <div class="col-md-4">
-            <label asp-for="SizingMethod" class="form-label"></label>
+            <label asp-for="SizingMethod" for="sizing-method" class="form-label"></label>
             <select asp-for="SizingMethod" class="form-select" id="sizing-method">
                 <option value="@SizingMethod.Direct">Direct hours</option>
                 <option value="@SizingMethod.TShirt">T-shirt</option>
@@ -58,7 +58,7 @@
             <span asp-validation-for="SizingMethod" class="text-danger"></span>
         </div>
         <div class="col-md-2">
-            <label asp-for="SizeKey" class="form-label"></label>
+            <label asp-for="SizeKey" for="size-key" class="form-label"></label>
             <select asp-for="SizeKey" class="form-select" id="size-key">
                 <option value="">Select…</option>
                 @foreach (var o in sizeOptions)
@@ -108,7 +108,7 @@
     <fieldset class="row g-3 mb-3">
         <legend class="h6 mb-0">Schedule</legend>
         <div class="col-md-4">
-            <label asp-for="PlanningMode" class="form-label"></label>
+            <label asp-for="PlanningMode" for="planning-mode" class="form-label"></label>
             <select asp-for="PlanningMode" class="form-select" id="planning-mode">
                 <option value="@PlanningMode.EffortDriven">Effort-driven (enter hours)</option>
                 <option value="@PlanningMode.FixedDuration">Fixed duration (hours from staffing %)</option>
@@ -117,12 +117,12 @@
             <div class="form-text" id="planning-mode-help"></div>
         </div>
         <div class="col-md-4">
-            <label asp-for="TargetStart" class="form-label"></label>
+            <label asp-for="TargetStart" for="target-start" class="form-label"></label>
             <input asp-for="TargetStart" class="form-control" id="target-start" />
             <span asp-validation-for="TargetStart" class="text-danger"></span>
         </div>
         <div class="col-md-4" id="target-end-group">
-            <label asp-for="TargetEnd" class="form-label"></label>
+            <label asp-for="TargetEnd" for="target-end" class="form-label"></label>
             <input asp-for="TargetEnd" class="form-control" id="target-end" />
             <span asp-validation-for="TargetEnd" class="text-danger"></span>
             <div class="form-text" id="duration-summary"></div>

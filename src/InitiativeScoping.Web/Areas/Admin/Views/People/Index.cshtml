@@ -28,7 +28,7 @@
 </div>
 <form asp-action="BulkDelete" method="post" data-bulk>
 <table class="table table-sm align-middle people-table" data-sortable data-columns>
-    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th>External IDs</th><th>Role</th><th>Business unit</th><th>Location</th><th>Class</th><th>Actuals</th><th data-nosort></th></tr></thead>
+    <thead><tr><th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all" /></th><th>Name</th><th class="d-none d-md-table-cell">External IDs</th><th>Role</th><th>Business unit</th><th class="d-none d-md-table-cell">Location</th><th>Class</th><th class="d-none d-md-table-cell">Actuals</th><th data-nosort></th></tr></thead>
     <tbody>
     @foreach (var item in Model.Items)
     {
@@ -36,12 +36,12 @@
         <tr>
             <td><input type="checkbox" class="form-check-input" name="ids" value="@p.Id" data-bulk-item aria-label="Select row" /></td>
             <td data-sort="@p.DisplayName"><span class="status-dot @(p.IsActive ? "bg-success" : "bg-secondary")" title="@(p.IsActive ? "Active" : "Inactive")" aria-label="@(p.IsActive ? "Active" : "Inactive")"></span>@p.DisplayName</td>
-            <td class="small text-muted"><span class="d-inline-block text-truncate align-bottom" style="max-width: 10rem" title="@p.ExternalIds">@p.ExternalIds</span></td>
+            <td class="small text-muted d-none d-md-table-cell"><span class="d-inline-block text-truncate align-bottom" style="max-width: 10rem" title="@p.ExternalIds">@p.ExternalIds</span></td>
             <td data-sort="@p.ResourceType?.Name @p.Seniority!.SortOrder">@p.ResourceType?.Name<div class="small text-muted">@p.Seniority.Name</div></td>
             <td>@p.BusinessUnit?.Name</td>
-            <td>@p.Location</td>
+            <td class="d-none d-md-table-cell">@p.Location</td>
             <td>@(p.ResourcingClass?.Name ?? "—")@if (p.ResourcingClass?.IsVendor == true && p.Vendor is not null) {<div class="small text-muted">@p.Vendor.Name</div>}</td>
-            <td>@item.EntryCount</td>
+            <td class="d-none d-md-table-cell">@item.EntryCount</td>
             <td class="text-end text-nowrap">
                 <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@p.Id">Edit</a>
                 @if (item.EntryCount == 0)

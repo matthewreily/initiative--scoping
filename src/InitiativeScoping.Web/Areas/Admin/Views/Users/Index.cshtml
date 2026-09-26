@@ -42,7 +42,7 @@
                 @if (u.Status == UserAccountStatus.Pending)
                 {
                     <form asp-action="Approve" asp-route-id="@u.Id" method="post" class="d-flex gap-1">
-                        <select name="role" class="form-select form-select-sm" aria-label="Role for @u.DisplayName">
+                        <select name="role" class="form-select form-select-sm role-select" aria-label="Role for @u.DisplayName">
                             @foreach (var r in roles) { <option value="@r" selected="@(r == AppRole.User)">@r</option> }
                         </select>
                         <button type="submit" class="btn btn-success btn-sm">Approve</button>
@@ -51,7 +51,7 @@
                 else
                 {
                     <form asp-action="ChangeRole" asp-route-id="@u.Id" method="post" class="d-flex gap-1">
-                        <select name="role" class="form-select form-select-sm" aria-label="Role for @u.DisplayName" disabled="@self">
+                        <select name="role" class="form-select form-select-sm role-select" aria-label="Role for @u.DisplayName" disabled="@self">
                             @foreach (var r in roles) { <option value="@r" selected="@(r == u.Role)">@r</option> }
                         </select>
                         @if (!self) { <button type="submit" class="btn btn-outline-secondary btn-sm">Set</button> }
