@@ -32,7 +32,7 @@
             {
                 <span> &middot; Target start @i.TargetStart.ToString("yyyy-MM-dd")</span>
             }
-            &middot; Sizing: @(i.SizingMethod == SizingMethod.Direct ? "Direct hours" : $"{i.SizingMethod} {i.SizeKey}")
+            &middot; Sizing: @(i.SizingMethod == SizingMethod.Direct ? "Direct hours" : i.SizingMethod == SizingMethod.TShirt ? $"T-shirt {i.SizeKey}" : $"{i.SizingMethod} {i.SizeKey}")
             @if (i.VarianceThresholdPct is not null) { <span> &middot; Variance threshold @i.VarianceThresholdPct%</span> }
             @if (i.ContingencyPct > 0) { <span> &middot; Contingency @i.ContingencyPct.ToString("0.##")%</span> }
             @if (i.ApprovedBudget is not null) { <span> &middot; Budget @i.ApprovedBudget.Value.ToString("C0")@(string.IsNullOrEmpty(i.BudgetFiscalYear) ? "" : $" ({i.BudgetFiscalYear})")</span> }
@@ -40,47 +40,50 @@
         </div>
         <div class="mt-2"><partial name="_Lifecycle" model="i.Status" /></div>
     </div>
-    <div class="d-flex flex-wrap gap-1">
+    <div class="d-flex flex-wrap gap-1 align-items-start">
         @if (i.IsScenario)
         {
             <a class="btn btn-outline-primary btn-sm" asp-controller="Scenarios" asp-action="Compare" asp-route-id="@i.Id">Compare scenarios</a>
         }
-        else
+        @if (Model.CanEdit)
         {
-            <a class="btn btn-outline-secondary btn-sm" asp-action="Explain" asp-route-id="@i.Id">Why this number?</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-controller="Scenarios" asp-action="Compare" asp-route-id="@i.Id">Scenarios (@i.Scenarios.Count)</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a>
+            <a class="btn btn-outline-primary btn-sm" asp-action="Edit" asp-route-id="@i.Id">Edit</a>
         }
-        <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit</a>
         <div class="btn-group">
-            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
-            <ul class="dropdown-menu dropdown-menu-end">
+            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="details-actions">Actions</button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="details-actions">
+                @if (!i.IsScenario)
+                {
+                    <li><a class="dropdown-item" asp-action="Explain" asp-route-id="@i.Id">Why this number?</a></li>
+                    <li><a class="dropdown-item" asp-controller="Scenarios" asp-action="Compare" asp-route-id="@i.Id">Scenarios (@i.Scenarios.Count)</a></li>
+                    <li><a class="dropdown-item" asp-controller="Lifecycle" asp-action="Baselines" asp-route-id="@i.Id">Baselines (@i.Baselines.Count)</a></li>
+                    <li><a class="dropdown-item" asp-controller="Actuals" asp-action="Initiative" asp-route-id="@i.Id">Actuals</a></li>
+                }
+                <li><a class="dropdown-item" asp-controller="Audit" asp-action="Index" asp-route-entity="Initiative" asp-route-entityId="@i.Id">Audit log</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Export</h6></li>
                 <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="xlsx">Excel (.xlsx)</a></li>
                 <li><a class="dropdown-item" asp-controller="Portfolio" asp-action="ExportInitiative" asp-route-id="@i.Id" asp-route-format="csv">CSV</a></li>
                 @if (i.IsScenario)
                 {
-                    <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" asp-controller="Scenarios" asp-action="Export" asp-route-id="@i.Id" asp-route-format="xlsx">Scenario comparison (.xlsx)</a></li>
                     <li><a class="dropdown-item" asp-controller="Scenarios" asp-action="Export" asp-route-id="@i.Id" asp-route-format="csv">Scenario comparison (CSV)</a></li>
                 }
                 else
                 {
-                    <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" asp-action="OnePager" asp-route-id="@i.Id">One-pager (print / PDF)</a></li>
+                }
+                @if (Model.CanManage && InitiativeLifecycle.CanDelete(i.Status))
+                {
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form asp-action="Delete" asp-route-id="@i.Id" method="post" onsubmit="return confirm('@(i.IsScenario ? "Discard this scenario?" : i.Scenarios.Count > 0 ? $"Delete this initiative, its {i.Scenarios.Count} scenario(s) and all its scope?" : i.Status == InitiativeStatus.Cancelled ? $"Permanently delete this cancelled initiative, its scope{(i.Baselines.Count > 0 ? $" and {i.Baselines.Count} baseline(s)" : "")}? This cannot be undone." : "Delete this initiative and all its scope?")');">
+                            <button type="submit" class="dropdown-item text-danger">@(i.IsScenario ? "Discard scenario" : "Delete initiative")</button>
+                        </form>
+                    </li>
                 }
             </ul>
         </div>
-        @if (Model.CanEdit)
-        {
-            <a class="btn btn-outline-secondary btn-sm" asp-action="Edit" asp-route-id="@i.Id">Edit</a>
-        }
-        @if (Model.CanManage && InitiativeLifecycle.CanDelete(i.Status))
-        {
-            <form asp-action="Delete" asp-route-id="@i.Id" method="post" class="d-inline" onsubmit="return confirm('@(i.IsScenario ? "Discard this scenario?" : i.Scenarios.Count > 0 ? $"Delete this initiative, its {i.Scenarios.Count} scenario(s) and all its scope?" : i.Status == InitiativeStatus.Cancelled ? $"Permanently delete this cancelled initiative, its scope{(i.Baselines.Count > 0 ? $" and {i.Baselines.Count} baseline(s)" : "")}? This cannot be undone." : "Delete this initiative and all its scope?")');">
-                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-            </form>
-        }
     </div>
 </div>
 @if (!string.IsNullOrEmpty(i.Description))
@@ -240,7 +243,7 @@ else
 @if (Model.CanManage && !i.IsScenario && i.Status == InitiativeStatus.Cancelled)
 {
     <form asp-controller="Lifecycle" asp-action="Reopen" asp-route-id="@i.Id" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3 small inline-form" onsubmit="return confirm('Reopen this initiative as @(InitiativeLifecycle.ReopenTarget(i.Baselines.Count > 0) == InitiativeStatus.Draft ? "Draft" : "On hold")?');">
-        <span class="text-muted">Cancelled — reopen as @(InitiativeLifecycle.ReopenTarget(i.Baselines.Count > 0) == InitiativeStatus.Draft ? "Draft" : "On hold (keeps its baseline)"), or delete it above.</span>
+        <span class="text-muted">Cancelled — reopen as @(InitiativeLifecycle.ReopenTarget(i.Baselines.Count > 0) == InitiativeStatus.Draft ? "Draft" : "On hold (keeps its baseline)"), or delete it from Actions.</span>
         <input name="note" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
         <button type="submit" class="btn btn-outline-primary btn-sm">Reopen</button>
     </form>
@@ -249,7 +252,8 @@ else
 {
     <form asp-controller="Lifecycle" asp-action="ChangeStatus" asp-route-id="@i.Id" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3 small inline-form" onsubmit="return confirm('Change status to ' + this.to.value + '?');">
         <span class="text-muted">Change status:</span>
-        <select name="to" aria-label="New status" class="form-select form-select-sm w-auto">
+        <select name="to" aria-label="New status" class="form-select form-select-sm w-auto" required>
+            <option value="" selected>Choose…</option>
             @foreach (var s in Model.StatusTransitions) { <option value="@s">@s</option> }
         </select>
         <input name="note" aria-label="Note (optional)" class="form-control form-control-sm" placeholder="Note (optional)" style="width: 14rem" />
@@ -423,7 +427,7 @@ else
         <h2 class="h5" data-tour="details:4" data-tour-title="Allocations" data-tour-text="Each row is a resource type × seniority × business unit on a phase. Only combinations priced on a published rate card can be chosen, so every line gets a rate. Apply a T-shirt size to fill this from a template.">Allocations</h2>
         <div class="table-responsive table-scroll" id="allocations-table">
         <table class="table table-sm align-middle" data-sortable>
-            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Person</th><th>Location</th><th>Class</th><th>Capex / Opex</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
+            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Person</th><th>Location</th><th>Class</th><th>Capex / Opex</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort class="col-actions"></th></tr></thead>
             <tbody>
             @foreach (var a in orderedAllocations)
             {
@@ -443,7 +447,7 @@ else
                     <td class="text-end" data-sort="@line.Hours">@line.Hours.ToString("N1")</td>
                     <td class="text-end" data-sort="@(line.HourlyRate ?? -1)">@(line.HourlyRate is decimal r ? r.ToString("C2") : Html.Raw("<span class='text-danger' title='No exact rate-card match for this resource type / seniority / location / class (and vendor)'>Unpriced</span>")) @if (line.IsBlendedRate) { <span class="badge bg-light text-dark border" title="Phase spans more than one rate card; day-weighted average">blended</span> }</td>
                     <td class="text-end" data-sort="@line.Cost"><a asp-action="Explain" asp-route-id="@i.Id" asp-fragment="allocation-@a.Id" class="explain-link" title="Why this number?">@line.Cost.ToString("C0")</a></td>
-                    <td class="text-end text-nowrap">
+                    <td class="text-end text-nowrap col-actions">
                         @if (Model.ScopeWritable)
                         {
                             <a class="btn btn-outline-secondary btn-sm" asp-action="EditAllocation" asp-route-id="@a.Id" data-panel="Edit allocation">Edit</a>
@@ -465,7 +469,7 @@ else
             </tbody>
             @if (i.Allocations.Count > 0)
             {
-                <tfoot class="fw-semibold"><tr><td colspan="@((fixedDuration ? 9 : 8) + (Model.ScopeWritable ? 1 : 0))" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td></td></tr></tfoot>
+                <tfoot class="fw-semibold"><tr><td colspan="@((fixedDuration ? 9 : 8) + (Model.ScopeWritable ? 1 : 0))" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td class="col-actions"></td></tr></tfoot>
             }
         </table>
         </div>
@@ -674,7 +678,7 @@ else
         <p class="text-muted small mb-2">Software licenses and other non-labor spend. Recurring lines bill whole months/years over the phase or initiative window (any partial period counts as a full one) unless explicit dates are set.</p>
         <div class="table-responsive table-scroll" id="non-labor-table">
         <table class="table table-sm align-middle" data-sortable>
-            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all non-labor costs" /></th> }<th>Scope</th><th>Category</th><th>Description</th><th>Billing</th><th>Capex / Opex</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th>Window</th><th class="text-end">Periods</th><th class="text-end">Cost</th><th data-nosort></th></tr></thead>
+            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all non-labor costs" /></th> }<th>Scope</th><th>Category</th><th>Description</th><th>Billing</th><th>Capex / Opex</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th>Window</th><th class="text-end">Periods</th><th class="text-end">Cost</th><th data-nosort class="col-actions"></th></tr></thead>
             <tbody>
             @foreach (var nl in Model.Forecast.NonLaborLines.OrderBy(l => l.Line.PhaseId is null ? int.MaxValue : i.Phases.FirstOrDefault(p => p.Id == l.Line.PhaseId)?.Sequence ?? int.MaxValue).ThenBy(l => l.Line.Description))
             {
@@ -691,7 +695,7 @@ else
                     <td class="text-nowrap">@(nl.HasWindow ? $"{nl.Start:yyyy-MM-dd} → {nl.End:yyyy-MM-dd}" : "—")</td>
                     <td class="text-end">@(nl.Periods == 0 ? Html.Raw("<span class='text-danger' title='Empty billing window'>0</span>") : nl.Periods)</td>
                     <td class="text-end" data-sort="@nl.Cost"><a asp-action="Explain" asp-route-id="@i.Id" asp-fragment="nonlabor-@c.Id" class="explain-link" title="Why this number?">@nl.Cost.ToString("C0")</a></td>
-                    <td class="text-end text-nowrap">
+                    <td class="text-end text-nowrap col-actions">
                         @if (Model.ScopeWritable)
                         {
                             <a class="btn btn-outline-secondary btn-sm" asp-action="EditNonLaborCost" asp-route-id="@c.Id" data-panel="Edit non-labor cost">Edit</a>
@@ -709,7 +713,7 @@ else
             </tbody>
             @if (Model.Forecast.NonLaborLines.Count > 0)
             {
-                <tfoot class="fw-semibold"><tr><td colspan="@(Model.ScopeWritable ? 9 : 8)" class="text-end">Non-labor total</td><td class="text-end">@Model.Forecast.NonLaborCost.ToString("C0")</td><td></td></tr></tfoot>
+                <tfoot class="fw-semibold"><tr><td colspan="@(Model.ScopeWritable ? 9 : 8)" class="text-end">Non-labor total</td><td class="text-end">@Model.Forecast.NonLaborCost.ToString("C0")</td><td class="col-actions"></td></tr></tfoot>
             }
         </table>
         </div>

@@ -289,6 +289,18 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 .table-scroll { overflow-x: auto; scrollbar-gutter: stable; }
 .table-scroll > .table { white-space: nowrap; }
 .table-scroll > .table td.text-wrap { white-space: normal; }
+/* Row actions stay reachable while the table scrolls sideways */
+.table-scroll > .table th.col-actions,
+.table-scroll > .table td.col-actions {
+  position: sticky; right: 0; z-index: 1;
+  background: var(--is-surface);
+  box-shadow: -6px 0 6px -6px var(--is-shadow);
+}
+.table-scroll > .table > thead th.col-actions { z-index: 2; background: var(--is-surface-muted); }
+.table-scroll > .table > tbody > tr:hover > td.col-actions { background-color: var(--is-surface); }
+.table-scroll > .table > tbody > tr.table-warning > td.col-actions { background: var(--bs-warning-bg-subtle); }
+.table-scroll > .table > tbody > tr.table-active > td.col-actions { background: var(--is-surface); }
+.table-scroll > .table > tfoot td.col-actions { background: var(--is-surface-muted); }
 
 /* People roster: fits the viewport without sideways scrolling; secondary attributes stack under the primary one */
 .people-table th, .people-table td { white-space: nowrap; }
