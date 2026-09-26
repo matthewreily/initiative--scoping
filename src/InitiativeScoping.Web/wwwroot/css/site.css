@@ -205,6 +205,7 @@ th .sort-link::after { content: "\2195"; opacity: .35; margin-left: .25rem; font
 th.sorted-asc .sort-link::after { content: "\2191"; opacity: 1; }
 th.sorted-desc .sort-link::after { content: "\2193"; opacity: 1; }
 .bulk-bar { position: sticky; bottom: 0; z-index: 2; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); }
+.bulk-bar.bulk-idle { display: none !important; }
 
 /* Initiative Details: sticky tab strip with compact summary */
 .details-sticky {
@@ -292,6 +293,15 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 /* People roster: fits the viewport without sideways scrolling; secondary attributes stack under the primary one */
 .people-table th, .people-table td { white-space: nowrap; }
 .people-table td .small { white-space: normal; }
+@media (max-width: 767.98px) {
+  .people-table { font-size: .875rem; }
+  .people-table th, .people-table td, .people-table td.text-nowrap { white-space: normal; padding-left: .25rem; padding-right: .25rem; }
+  .people-table td .text-truncate { max-width: 6rem !important; }
+  .people-table td .btn { display: block; width: 100%; }
+  .people-table td .btn + .btn { margin-top: .25rem; }
+}
+/* Admin Users: role select must show the longest role name without clipping */
+.role-select { min-width: 6.5rem; width: auto; }
 .status-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .4rem; vertical-align: middle; }
 
 /* Appearance toggle: show the icon for the theme that is currently active */
