@@ -39,7 +39,7 @@
         <tr class="table-light"><th colspan="@(cols.Count + 1)"><span class="compare-section">Schedule</span></th></tr>
         <tr>
             <th scope="row">Planning mode</th>
-            @foreach (var c in cols) { <td class="text-end">@(c.Initiative.PlanningMode == PlanningMode.FixedDuration ? "Fixed duration" : "Effort driven")</td> }
+            @foreach (var c in cols) { <td class="text-end">@(c.Initiative.PlanningMode == PlanningMode.FixedDuration ? "Fixed duration" : "Effort-driven")</td> }
         </tr>
         <tr>
             <th scope="row">Sizing</th>
