@@ -67,7 +67,8 @@
             if (th.hasAttribute('data-nosort') || th.textContent.trim() === '') return;
             th.classList.add('sortable');
             th.tabIndex = 0;
-            th.setAttribute('role', 'button');
+            // a header with its own control (help tooltip, select-all) must not also be a button
+            if (!th.querySelector('button,a,input,select,[tabindex]')) th.setAttribute('role', 'button');
             const sortHint = 'Sort by ' + th.textContent.trim();
             th.title = th.title ? th.title + ' — ' + sortHint : sortHint;
             const toggle = () => {

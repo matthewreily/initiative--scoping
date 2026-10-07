@@ -49,7 +49,9 @@ npm test                                       # headless; `npm run test:headed`
 npm run report                                 # open the HTML report of the last run
 ```
 
-Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running. CI runs the suite in the `e2e` job and uploads the report + failure traces as the `playwright-report` artifact. Details in [`e2e/README.md`](e2e/README.md).
+Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running. CI runs the suite in the `e2e` job and uploads the report + failure traces as the `playwright-report` artifact.
+
+Quality gates in the same suite/CI: `tests/accessibility.spec.ts` runs [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.x A/AA) against every main page and fails on any violation; the `lighthouse` CI job runs Lighthouse CI (`e2e/lighthouserc.json`: accessibility and best-practices ≥ 90 fail the build, performance < 80 warns) and uploads the HTML reports as the `lighthouse-report` artifact. Run it locally with the app up on port 5199: `cd e2e && npm run lighthouse`. Details in [`e2e/README.md`](e2e/README.md).
 
 ### Administration
 
