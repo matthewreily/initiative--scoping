@@ -26,6 +26,7 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         var compare = WebUtility.HtmlDecode(await client.GetStringAsync($"/Initiatives/{id}/Scenarios"));
         Assert.Contains("No scenarios yet", compare);
         Assert.Contains("Live plan", compare);
+        Assert.Contains("scenario-compare-single", compare);
 
         var create = await PostFormAsync(client, details, $"/Initiatives/{id}/Scenarios", new() { ["Name"] = $"Lean {tag}" });
         Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);

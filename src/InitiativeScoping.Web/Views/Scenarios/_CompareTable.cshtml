@@ -22,7 +22,7 @@
     }
 }
 <div class="@(Model.Printable ? "" : "table-responsive")">
-<table class="table table-sm align-middle @(Model.Printable ? "" : "scenario-compare")">
+<table class="table table-sm align-middle @(Model.Printable ? "" : "scenario-compare") @(cols.Count == 1 ? "scenario-compare-single" : "")">
     <thead>
         <tr>
             <th style="min-width: 12rem"></th>
