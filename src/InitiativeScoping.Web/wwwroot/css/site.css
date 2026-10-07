@@ -352,6 +352,11 @@ th .help-hint { font-weight: 600; }
   position: sticky; left: 0; z-index: 1; background: var(--bs-body-bg);
 }
 .scenario-compare .compare-section { display: inline-block; position: sticky; left: .5rem; }
+/* Live plan only: cap the label column and keep values next to their labels instead of at the far right */
+.scenario-compare-single { width: auto; min-width: min(100%, 40rem); }
+.scenario-compare-single th[scope="row"], .scenario-compare-single thead th:first-child, .scenario-compare-single tfoot th:first-child { width: 40%; max-width: 24rem; }
+.scenario-compare-single td.text-end, .scenario-compare-single th.text-end { text-align: left !important; }
+.scenario-compare-single tbody th[colspan], .scenario-compare-single thead th[colspan] { width: auto; }
 
 @media (max-width: 575.98px) {
   .heatmap .heat-sticky { min-width: 6.5rem; max-width: 7.5rem; white-space: normal; box-shadow: 2px 0 0 var(--is-border); }
