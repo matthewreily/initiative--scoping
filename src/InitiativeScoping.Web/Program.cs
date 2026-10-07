@@ -36,6 +36,29 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 var app = builder.Build();
 
+var checkIndex = Array.IndexOf(args, "--check-migrations");
+if (checkIndex >= 0)
+{
+    // Deployment gate: fail when the database has applied migrations the candidate build does not know,
+    // i.e. the build is older than the schema. The candidate's migration ids come from the following argument    // s (one per arg) so a newer image can check on behalf of an older one; default is this build's own list.
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var candidate = args.Skip(checkIndex + 1).TakeWhile(a => !a.StartsWith("--")).ToArray();
+    if (candidate.Length == 0) candidate = db.Database.GetMigrations().ToArray();
+    var applied = db.Database.IsNpgsql() ? (await db.Database.GetAppliedMigrationsAsync()).ToList() : [];
+    var unknown = applied.Except(candidate, StringComparer.Ordinal).OrderBy(m => m, StringComparer.Ordinal).ToList();
+    Console.WriteLine($"Applied migrations: {applied.Count}; candidate build has {candidate.Length}.");
+    if (unknown.Count > 0)
+    {
+        Console.Error.WriteLine("Database has migrations the candidate build does not contain (build is older than the schema):");
+        foreach (var m in unknown) Console.Error.WriteLine($"  {m}");
+        return 1;
+    }
+
+    Console.WriteLine("Migration compatibility OK.");
+    return 0;
+}
+
 var migrateOnly = args.Contains("--migrate");
 if (migrateOnly || app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
@@ -58,7 +81,7 @@ if (migrateOnly || app.Configuration.GetValue<bool>("Database:MigrateOnStartup")
 
     if (migrateOnly)
     {
-        return;
+        return 0;
     }
 }
 
@@ -114,5 +137,6 @@ if (!app.Configuration.GetValue<bool>("Auth:UseDevelopmentAuth"))
 }
 
 app.Run();
+return 0;
 
 public partial class Program;

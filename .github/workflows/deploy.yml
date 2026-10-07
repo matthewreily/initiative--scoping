@@ -158,10 +158,30 @@ jobs:
           echo "Commit $IMAGE_TAG was deployed to dev successfully; digest $DIGEST"
           echo "IMAGE=${IMAGE_REPOSITORY}@${DIGEST}" >> "$GITHUB_ENV"
 
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require the dev schema to be compatible with this commit
+        run: |
+          # Migrations only move forward: if dev already applied a migration this commit does not contain, the
+          # older build would run against a schema it does not understand. The check runs inside the migrate job
+          # (same DB credentials/network) using the image of the ref this workflow was dispatched from, which
+          # knows `--check-migrations <ids...>`; the candidate's ids come from its Migrations folder in git.
+          MIGRATIONS_DIR=src/InitiativeScoping.Infrastructure/Persistence/Migrations
+          mapfile -t IDS < <(git ls-tree -r --name-only "$IMAGE_TAG" -- "$MIGRATIONS_DIR" \
+                               | sed -E 's#.*/##; /\.Designer\.cs$/d; /^[0-9]{14}_.*\.cs$/!d; s/\.cs$//' | sort)
+          echo "Commit $IMAGE_TAG contains ${#IDS[@]} migrations (latest: ${IDS[-1]:-none})"
+          CHECK_IMAGE="${IMAGE_REPOSITORY}:${GITHUB_SHA}"
+          crane digest "$CHECK_IMAGE" >/dev/null || { echo "No image for workflow ref $GITHUB_SHA; dispatch this workflow from main (its head is always built)." >&2; exit 1; }
+          ARGS=$(IFS=,; echo "--check-migrations,${IDS[*]}")
+          gcloud run jobs update "$MIGRATE_JOB" --region "$REGION" --image "$CHECK_IMAGE" --args "$ARGS" --quiet
+          gcloud run jobs execute "$MIGRATE_JOB" --region "$REGION" --wait --quiet \
+            || { echo "Dev database schema is newer than commit $IMAGE_TAG; redeploy a commit that includes every applied migration (see job logs)." >&2; exit 1; }
+
       - name: Run database migrations
         run: |
-          # Migrations only move forward: an older build against a schema a later migration changed may fail here.
-          gcloud run jobs update "$MIGRATE_JOB" --region "$REGION" --image "$IMAGE" --quiet
+          gcloud run jobs update "$MIGRATE_JOB" --region "$REGION" --image "$IMAGE" --args "--migrate" --quiet
           gcloud run jobs execute "$MIGRATE_JOB" --region "$REGION" --wait --quiet
 
       - name: Deploy Cloud Run service
