@@ -503,88 +503,9 @@ else
                     <a asp-action="CopyAllocations" asp-route-id="@i.Id" data-panel="Copy allocations" title="Copy every allocation line of an existing phase (this or another initiative) into one of this initiative's phases">Copy allocations from a phase…</a>
                 </p>
             }
-            <form asp-action="AddAllocation" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end mb-4" aria-describedby="allocation-bu-hint" id="add-allocation-form">
-                <div class="col-md-3">
-                    <label for="phaseid" class="form-label small mb-0">Phase</label>
-                    <select name="PhaseId" id="phaseid" asp-items="Model.Phases" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-md-3">
-                    <label for="businessunitid" class="form-label small mb-0">Business unit</label>
-                    <select name="BusinessUnitId" id="businessunitid" asp-items="@(new SelectList(Model.RateOptions.BusinessUnits, "Id", "Name", Model.NewAllocation.BusinessUnitId))" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-md-3">
-                    <label for="resourcetypeid" class="form-label small mb-0">Resource type</label>
-                    <select name="ResourceTypeId" id="resourcetypeid" asp-items="@(new SelectList(Model.RateOptions.AllResourceTypes, "Id", "Name"))" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-md-2">
-                    <label for="seniority" class="form-label small mb-0">Seniority</label>
-                    <select name="SeniorityId" id="seniority" asp-items="@(new SelectList(Model.RateOptions.Seniorities, "Id", "Name"))" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-md-2">
-                    <label for="location" class="form-label small mb-0">Location</label>
-                    <select name="Location" id="location" asp-items="@(new SelectList(Model.RateOptions.AllLocations, "Onshore"))" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-md-2">
-                    <label for="resourcingclass" class="form-label small mb-0">Class</label>
-                    <select name="ResourcingClassId" id="resourcingclass" asp-items="classes" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-md-2" data-vendor-field hidden>
-                    <label for="vendorid" class="form-label small mb-0">Vendor</label>
-                    <select name="VendorId" id="vendorid" asp-items="@(new SelectList(Model.RateOptions.Vendors, "Id", "Name"))" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-md-3">
-                    <label for="personid" class="form-label small mb-0">People <span class="text-muted fw-normal">(≤ Qty)</span></label>
-                    <select name="PersonIds" id="personid" multiple size="3" asp-items="@(new MultiSelectList(Model.RateOptions.People, "Id", "Name", Model.NewAllocation.PersonIds))" class="form-select form-select-sm" title="Optional roster people matching this resource type, seniority, business unit and class; one seat each, up to the quantity">
-                        <option value="">Unassigned</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="rate-preview-new" class="form-label small mb-0">Hourly rate</label>
-                    <input id="rate-preview-new" class="form-control form-control-sm" readonly tabindex="-1" />
-                </div>
-                <div class="col-md-2">
-                    <label for="quantity" class="form-label small mb-0">Quantity</label>
-                    <input name="Quantity" id="quantity" type="number" min="1" class="form-control form-control-sm" value="1" required />
-                </div>
-                @if (fixedDuration)
-                {
-                    <div class="col-md-2">
-                        <label for="allocationpercent" class="form-label small mb-0">Staffing %</label>
-                        <input name="AllocationPercent" id="allocationpercent" type="number" min="0.01" max="100" step="0.01" class="form-control form-control-sm" value="100" required aria-describedby="allocationpercent-help" title="100% = all working hours in the phase." />
-                        <span class="visually-hidden" id="allocationpercent-help">100% = all working hours in the phase.</span>
-                    </div>
-                    <div class="col-md-2">
-                        <label for="computed-hours-new" class="form-label small mb-0">Hours (each)</label>
-                        <input id="computed-hours-new" class="form-control form-control-sm" readonly tabindex="-1" aria-describedby="computed-hours-new-help" title="Computed from staffing % and phase working hours; final value set on save." />
-                        <span class="visually-hidden" id="computed-hours-new-help">Computed from staffing % and phase working hours; final value set on save.</span>
-                    </div>
-                }
-                else
-                {
-                    <div class="col-md-2">
-                        <label for="estimatedhours" class="form-label small mb-0">Hours (each)</label>
-                        <input name="EstimatedHours" id="estimatedhours" type="number" min="0.25" step="0.25" class="form-control form-control-sm" required />
-                    </div>
-                }
-                <div class="col-md-2">
-                    <label for="capitalization" class="form-label small mb-0">Capex %</label>
-                    <input name="CapexPercent" id="capitalization" type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" value="@Model.NewAllocation.CapexPercent.ToString("0.##")" title="Share of this line's cost that is capitalised; the rest is Opex" required />
-                </div>
-                <div class="col-md-3">
-                    <label for="contractreference" class="form-label small mb-0">Contract ref</label>
-                    <input name="ContractReference" id="contractreference" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-3">
-                    <label for="costcenter" class="form-label small mb-0">Cost center</label>
-                    <input name="CostCenter" id="costcenter" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Add</button></div>
-            </form>
-            <partial name="_RateOptionsScript" model="@(new RateOptionsScriptModel("phaseid", "resourcetypeid", "seniority", "location", "resourcingclass", "rate-preview-new", Model.RateOptions, Model.NewAllocation) { VendorSelectId = "vendorid", BusinessUnitSelectId = "businessunitid", PersonSelectId = "personid", QuantityInputId = "quantity", CapexInputId = "capitalization" })" />
-            @if (fd is not null)
-            {
-                <partial name="_ComputedHoursScript" model="@(new ComputedHoursScriptModel("phaseid", "allocationpercent", "computed-hours-new", fd.PhaseWorkingDays, fd.HoursPerDay))" />
-            }
+            <p class="mb-4">
+                <a class="btn btn-primary btn-sm" asp-action="AddAllocation" asp-route-id="@i.Id" data-panel="Add allocation" id="add-allocation">Add allocation</a>
+            </p>
         }
 
             </div>

@@ -196,11 +196,12 @@ public class InitiativeTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         var details = $"/Initiatives/Details/{id}";
         await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-03-01", ["PlannedEnd"] = "2026-04-30" });
 
-        var html = await client.GetStringAsync(details);
-        Assert.Matches("<select name=\"BusinessUnitId\" id=\"businessunitid\"[^>]*>\\s*<option selected=\"selected\" value=\"\\d+\">Boarding</option>", html);
-        Assert.Contains("<select name=\"Location\" id=\"location\"", html);
+        Assert.Contains($"/Initiatives/AddAllocation/{id}", await client.GetStringAsync(details));
+        var html = await client.GetStringAsync($"/Initiatives/AddAllocation/{id}");
+        Assert.Matches("<select[^>]*id=\"BusinessUnitId\"[^>]*>\\s*<option selected=\"selected\" value=\"\\d+\">Boarding</option>", html);
+        Assert.Contains("id=\"Location\"", html);
         Assert.Contains("<option selected=\"selected\">Onshore</option>", html);
-        Assert.Contains("id=\"rate-preview-new\"", html);
+        Assert.Contains("id=\"rate-preview\"", html);
         Assert.DoesNotContain("No published rate card has any rates yet", html);
     }
 

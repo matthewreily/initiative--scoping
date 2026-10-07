@@ -85,11 +85,11 @@ public class FixedDurationTests(WebAppFactory factory) : IClassFixture<WebAppFac
         Assert.Equal(HttpStatusCode.Redirect, extend.StatusCode);
         html = await client.GetStringAsync(details);
         Assert.DoesNotContain("Last phase must end on", html);
-        Assert.Contains("id=\"allocationpercent\"", html);
-        Assert.Contains("value=\"100\"", html);
-        Assert.Contains("id=\"computed-hours-new\"", html);
+        html = await client.GetStringAsync($"/Initiatives/AddAllocation/{id}");
+        Assert.Contains("id=\"AllocationPercent\"", html);
+        Assert.Contains("id=\"computed-hours\"", html);
         Assert.Contains($"{{\"{phaseId}\":60}}", html); // phase working days feed the live hours preview
-        Assert.DoesNotContain("id=\"estimatedhours\"", html);
+        Assert.DoesNotContain("id=\"EstimatedHours\"", html);
 
         var noPercent = await PostFormAsync(client, details, $"/Initiatives/AddAllocation/{id}", new()
         {

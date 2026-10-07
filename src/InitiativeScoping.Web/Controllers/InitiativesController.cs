@@ -582,6 +582,34 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     // ----- Allocations -----
 
+    public async Task<IActionResult> AddAllocation(int id, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanEdit(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        if (!InitiativeAccess.IsScopeEditable(initiative))
+        {
+            return RedirectWithError(ScopeLockedMessage, id);
+        }
+
+        await PopulateAllocationLists(initiative, ct);
+        var model = NewAllocationModel(id, initiative.BusinessUnitId, await ActiveClassesAsync(ct));
+        if (initiative.PlanningMode == PlanningMode.FixedDuration)
+        {
+            model.AllocationPercent = 100;
+        }
+
+        return View(nameof(EditAllocation), model);
+    }
+
     [HttpPost]
     public async Task<IActionResult> AddAllocation(int id, AllocationEditModel model, CancellationToken ct)
     {
@@ -604,7 +632,16 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await ValidateAllocation(model, initiative, ct);
         if (!ModelState.IsValid)
         {
-            return RedirectWithFormErrors("add-allocation-form", id);
+            if (!SidePanel.IsPanelRequest(Request))
+            {
+                return RedirectWithError(FirstError(), id);
+            }
+
+            model.Id = 0;
+            model.InitiativeId = id;
+            await PopulateAllocationLists(initiative, ct);
+            ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([model.SeniorityId], ct);
+            return View(nameof(EditAllocation), model);
         }
 
         var allocation = new InitiativeAllocation

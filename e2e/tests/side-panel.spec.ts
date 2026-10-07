@@ -39,6 +39,20 @@ test.describe('Side-panel editing', () => {
     await expect(panel).toBeVisible();
     await panel.getByRole('button', { name: 'Cancel' }).click();
     await expect(panel).toBeHidden();
+
+    // Add allocation: opens in the panel, validates in place, and a good add closes it with a new row
+    const rowsBefore = await page.locator('#allocations-table tbody tr').count();
+    await page.locator('#add-allocation').click();
+    await expect(panel.getByRole('heading', { name: 'Add allocation' })).toBeVisible();
+    await expect(panel.locator('#rate-preview')).toHaveValue(/\$/);
+    await panel.locator('#EstimatedHours').fill('0');
+    await panel.getByRole('button', { name: 'Add' }).click();
+    await expect(panel.getByText(/hours/i).first()).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/Initiatives/Details/${id}`));
+    await panel.locator('#EstimatedHours').fill('40');
+    await panel.getByRole('button', { name: 'Add' }).click();
+    await expect(panel).toBeHidden();
+    await expect(page.locator('#allocations-table tbody tr')).toHaveCount(rowsBefore + 1);
   });
 
   test('the edit page still works as a full page', async ({ page }) => {

@@ -18,15 +18,18 @@ test.describe('Resourcing classes and labor Capex % defaults', () => {
     await createInitiative(page, uniqueName('E2E Capex'));
     await addPhase(page, 'Build', isoDate(0), isoDate(30));
 
-    const capex = page.locator('#capitalization');
+    await page.locator('#add-allocation').click();
+    const panel = page.locator('#side-panel');
+    await expect(panel.getByRole('heading', { name: 'Add allocation' })).toBeVisible();
+    const capex = panel.locator('#CapexPercent');
     await expect(capex).toHaveValue('70');
 
-    await page.locator('#resourcingclass').selectOption({ label: 'Vendor' });
+    await panel.locator('#ResourcingClassId').selectOption({ label: 'Vendor' });
     await expect(capex).toHaveValue('100');
 
     // A hand-typed value is kept when the class changes again.
     await capex.fill('42');
-    await page.locator('#resourcingclass').selectOption({ label: 'Internal' });
+    await panel.locator('#ResourcingClassId').selectOption({ label: 'Internal' });
     await expect(capex).toHaveValue('42');
   });
 

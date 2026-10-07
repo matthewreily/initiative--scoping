@@ -132,8 +132,8 @@ public class FiscalPeriodTests
         var id = await CreateInitiativeAsync(client, factory, $"Capex default {tag}");
         var details = $"/Initiatives/Details/{id}";
         await PostFormAsync(client, details, $"/Initiatives/AddPhase/{id}", new() { ["Name"] = "Build", ["PlannedStart"] = "2026-05-01", ["PlannedEnd"] = "2026-08-31" });
-        var page = await client.GetStringAsync(details);
-        Assert.Matches("id=\"capitalization\"[^>]*value=\"70\"", page);
+        var page = await client.GetStringAsync($"/Initiatives/AddAllocation/{id}");
+        Assert.Matches("id=\"CapexPercent\"[^>]*value=\"70(\\.0+)?\"", page);
         Assert.Contains("\"capex\":70", page);
         Assert.Contains("\"capex\":100", page);
 
@@ -169,8 +169,8 @@ public class FiscalPeriodTests
             new() { ["Name"] = "Vendor", ["IsVendor"] = "true", ["DefaultCapexPercent"] = "80", ["SortOrder"] = "2", ["IsActive"] = "true" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await PostFormAsync(client, internalEdit, internalEdit,
             new() { ["Name"] = "Internal", ["IsVendor"] = "false", ["DefaultCapexPercent"] = "101", ["SortOrder"] = "1", ["IsActive"] = "true" })).StatusCode);
-        page = await client.GetStringAsync(details);
-        Assert.Matches("id=\"capitalization\"[^>]*value=\"55.5\"", page);
+        page = await client.GetStringAsync($"/Initiatives/AddAllocation/{id}");
+        Assert.Matches("id=\"CapexPercent\"[^>]*value=\"55.5\"", page);
         Assert.Contains("\"capex\":55.5", page);
         Assert.Contains("\"capex\":80", page);
         using (var scope = factory.Services.CreateScope())
