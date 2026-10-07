@@ -39,7 +39,7 @@ public class NamedPeopleTests(WebAppFactory factory) : IClassFixture<WebAppFacto
         }
 
         // Only Jane is offered: right type/seniority/BU/class and active. Outsider's BU is not participating; Gone is inactive.
-        var form = await client.GetStringAsync(details);
+        var form = await client.GetStringAsync($"/Initiatives/AddAllocation/{id}");
         Assert.Contains($"Jane {tag}", form);
         Assert.Contains($"Quinn {tag}", form);
         Assert.DoesNotContain($"Out {tag}", form);

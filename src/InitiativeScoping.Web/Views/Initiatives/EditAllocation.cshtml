@@ -10,7 +10,9 @@
     var locations = rateOptions.AllLocations.Append(Model.Location).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(l => l, StringComparer.OrdinalIgnoreCase);
     // Staffing-only: the initiative is Active / On hold, so only who fills the seats can change; every other field is shown read-only and the form posts to ReassignPeople.
     var staffing = ViewBag.StaffingOnly is true;
-    ViewData["Title"] = staffing ? "Reassign People" : "Edit Allocation";
+    var create = Model.Id == 0;
+    var heading = staffing ? "Reassign people" : create ? "Add allocation" : "Edit allocation";
+    ViewData["Title"] = heading;
     var fixedDuration = initiative.PlanningMode == PlanningMode.FixedDuration;
     var panel = SidePanel.IsPanelRequest(Context.Request);
     if (panel) { Layout = SidePanel.Layout; }
@@ -20,9 +22,9 @@
 <nav aria-label="breadcrumb"><ol class="breadcrumb">
     <li class="breadcrumb-item"><a asp-action="Index">Initiatives</a></li>
     <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@initiative.Id">@initiative.Name</a></li>
-    <li class="breadcrumb-item active">@(staffing ? "Reassign people" : "Edit allocation")</li>
+    <li class="breadcrumb-item active">@heading</li>
 </ol></nav>
-<h1 class="h3">@(staffing ? "Reassign people" : "Edit allocation")</h1>
+<h1 class="h3">@heading</h1>
 }
 @if (staffing)
 {
@@ -44,8 +46,9 @@ else
     }
 </p>
 }
-<form asp-action="@(staffing ? "ReassignPeople" : "EditAllocation")" asp-route-id="@Model.Id" method="post" class="@(panel ? null : "col-lg-8")">
+<form asp-action="@(staffing ? "ReassignPeople" : create ? "AddAllocation" : "EditAllocation")" asp-route-id="@(create ? Model.InitiativeId : Model.Id)" method="post" class="@(panel ? null : "col-lg-8")">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <h3 class="h6 text-muted text-uppercase small mt-2">What</h3>
     <div class="row g-3 mb-3">
         <div class="col-md-6">
             <label asp-for="PhaseId" class="form-label"></label>
@@ -98,6 +101,7 @@ else
             <input id="rate-preview" class="form-control" readonly tabindex="-1" />
         </div>
     </div>
+    <h3 class="h6 text-muted text-uppercase small mt-4">How much</h3>
     <div class="row g-3 mb-3">
         <div class="col-md-3">
             <label asp-for="PersonIds" class="form-label">People <span class="text-muted fw-normal small">(one seat each, ≤ Qty)</span></label>
@@ -133,9 +137,12 @@ else
         }
         <div class="col-md-2">
             <label asp-for="CapexPercent" class="form-label"></label>
-            <input asp-for="CapexPercent" class="form-control" type="number" min="0" max="100" step="0.01" title="Share of this line's cost that is capitalised; the rest is Opex" readonly="@staffing" />
+            <input asp-for="CapexPercent" asp-format="{0:0.##}" class="form-control" type="number" min="0" max="100" step="0.01" title="Share of this line's cost that is capitalised; the rest is Opex" readonly="@staffing" />
             <span asp-validation-for="CapexPercent" class="text-danger"></span>
         </div>
+    </div>
+    <h3 class="h6 text-muted text-uppercase small mt-4">Details</h3>
+    <div class="row g-3 mb-3">
         <div class="col-md-3">
             <label asp-for="ContractReference" class="form-label"></label>
             <input asp-for="ContractReference" class="form-control" readonly="@staffing" />
@@ -147,7 +154,7 @@ else
             <span asp-validation-for="CostCenter" class="text-danger"></span>
         </div>
     </div>
-    <button type="submit" class="btn btn-primary">@(staffing ? "Reassign people" : "Save")</button>
+    <button type="submit" class="btn btn-primary">@(staffing ? "Reassign people" : create ? "Add" : "Save")</button>
     @if (panel) { <button type="button" class="btn btn-link" data-bs-dismiss="offcanvas">Cancel</button> }
     else { <a asp-action="Details" asp-route-id="@initiative.Id" class="btn btn-link">Cancel</a> }
 </form>

@@ -324,12 +324,19 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
             ["Name"] = "Build", ["PlannedStart"] = "2027-01-04", ["PlannedEnd"] = "2027-01-29"
         });
         Assert.Equal(HttpStatusCode.Redirect, addPhase.StatusCode);
-        Assert.Contains(name, await client.GetStringAsync(detailsUrl));
+        Assert.Contains(name, await client.GetStringAsync($"/Initiatives/AddAllocation/{initiativeId}"));
         int phaseId;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             phaseId = await db.Phases.Where(p => p.InitiativeId == initiativeId).Select(p => p.Id).SingleAsync();
+            var card = await db.RateCards.FirstAsync();
+            db.RateCardEntries.Add(new RateCardEntry
+            {
+                RateCardId = card.Id, ResourceTypeId = typeId, SeniorityId = levelId,
+                Location = "Onshore", ResourcingClassId = ResourcingClass.InternalId, HourlyRate = 1m
+            });
+            await db.SaveChangesAsync();
         }
 
         var unknown = await PostFormAsync(client, detailsUrl, $"/Initiatives/AddAllocation/{initiativeId}", new()
@@ -352,6 +359,11 @@ public class SeniorityCatalogTests(WebAppFactory factory) : IClassFixture<WebApp
         });
         Assert.Equal(HttpStatusCode.Redirect, ok.StatusCode);
         Assert.Contains(name, await client.GetStringAsync(detailsUrl));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.True(await db.InitiativeAllocations.AnyAsync(a => a.InitiativeId == initiativeId && a.SeniorityId == levelId));
+        }
     }
 
     private async Task<int> LevelCountAsync(string name)
