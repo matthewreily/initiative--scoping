@@ -179,11 +179,21 @@ public sealed record CostPreviewScriptModel(string Prefix, IReadOnlyList<Catalog
 public class MemberEditModel
 {
     public int InitiativeId { get; set; }
-    [Required, StringLength(200), Display(Name = "User id")]
+    [Required(ErrorMessage = "Pick a user from the list."), StringLength(200), Display(Name = "User")]
     public string UserId { get; set; } = string.Empty;
+    /// <summary>Set by the picker for directory people who have no account yet.</summary>
+    [StringLength(200)]
+    public string? DisplayName { get; set; }
+    [StringLength(320)]
+    public string? Email { get; set; }
     [Required]
     public InitiativeMemberRole Role { get; set; } = InitiativeMemberRole.Contributor;
 }
+
+public sealed record UserPickerOption(string Id, string Name, string Email, string Source);
+
+/// <param name="Error">Directory lookup failure, if any; app users are still listed.</param>
+public sealed record UserPickerResult(IReadOnlyList<UserPickerOption> Users, string? Error, bool DirectoryAvailable);
 
 public class ApplySizeModel
 {

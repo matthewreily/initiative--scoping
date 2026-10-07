@@ -798,25 +798,15 @@ else
         @if (Model.CanManage)
         {
             <form asp-action="AddMember" asp-route-id="@i.Id" method="post" class="row g-2 align-items-end">
-                <div class="col-6">
+                <div class="col-6 user-picker" data-user-picker="@Url.Action("SearchUsers", new { id = i.Id })">
                     <label for="userid" class="form-label small mb-0">User</label>
-                    @{
-                        var knownUsers = Users.ActiveUsers().Where(u => i.Members.All(m => m.UserId != u.UserId)).ToList();
-                    }
-                    @if (knownUsers.Count > 0)
-                    {
-                        <select name="UserId" id="userid" class="form-select form-select-sm" required>
-                            <option value="">Choose a user…</option>
-                            @foreach (var u in knownUsers)
-                            {
-                                <option value="@u.UserId">@u.DisplayName (@u.Email)</option>
-                            }
-                        </select>
-                    }
-                    else
-                    {
-                        <input name="UserId" id="userid" class="form-control form-control-sm" placeholder="user id / object id" required />
-                    }
+                    <input type="hidden" name="UserId" data-user-picker-value />
+                    <input type="hidden" name="DisplayName" data-user-picker-name />
+                    <input type="hidden" name="Email" data-user-picker-email />
+                    <input type="search" id="userid" class="form-control form-control-sm" placeholder="Search by name or e-mail…" autocomplete="off"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="userid-list" aria-describedby="userid-help" required />
+                    <div id="userid-list" class="list-group list-group-flush border rounded mt-1 overflow-auto user-picker-list" role="listbox" aria-label="Matching users" hidden></div>
+                    <div id="userid-help" class="form-text">Pick someone who already uses Scopewell@(DirectorySearch.IsAvailable ? ", or search the company directory for anyone who has not signed in yet" : "").</div>
                 </div>
                 <div class="col-4">
                     <label for="role" class="form-label small mb-0">Role</label>

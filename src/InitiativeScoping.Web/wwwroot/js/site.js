@@ -844,3 +844,126 @@ document.addEventListener('keydown', e => {
     window.addEventListener('pageshow', e => { if (e.persisted) reset(); });
     window.addEventListener('pagehide', () => { bar.classList.remove('is-active'); });
 })();
+
+// Team-tab user picker: searches app users (and the directory when configured) and fills the hidden UserId.
+(function () {
+    document.querySelectorAll('[data-user-picker]').forEach(root => {
+        const url = root.dataset.userPicker;
+        const value = root.querySelector('[data-user-picker-value]');
+        const nameField = root.querySelector('[data-user-picker-name]');
+        const emailField = root.querySelector('[data-user-picker-email]');
+        const search = root.querySelector('input[type="search"]');
+        const list = root.querySelector('[role="listbox"]');
+        if (!url || !value || !search || !list) { return; }
+        let timer = null;
+        let controller = null;
+        let options = [];
+        let active = -1;
+
+        function select(opt) {
+            value.value = opt.id;
+            if (nameField) { nameField.value = opt.source === 'directory' ? opt.name : ''; }
+            if (emailField) { emailField.value = opt.source === 'directory' ? opt.email : ''; }
+            search.value = opt.email ? opt.name + ' (' + opt.email + ')' : opt.name;
+            search.setCustomValidity('');
+            close();
+        }
+        function clear() {
+            value.value = '';
+            if (nameField) { nameField.value = ''; }
+            if (emailField) { emailField.value = ''; }
+            search.setCustomValidity(search.value.trim() === '' ? '' : 'Pick a user from the list.');
+        }
+        function close() {
+            list.hidden = true;
+            list.replaceChildren();
+            search.setAttribute('aria-expanded', 'false');
+            search.removeAttribute('aria-activedescendant');
+            options = [];
+            active = -1;
+        }
+        function item(text, cls) {
+            const el = document.createElement('div');
+            el.className = 'list-group-item small py-1 px-2 ' + (cls || 'text-muted');
+            el.textContent = text;
+            return el;
+        }
+        function render(data) {
+            list.replaceChildren();
+            options = data.users || [];
+            options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.id = search.id + '-opt-' + index;
+                btn.className = 'list-group-item list-group-item-action py-1 px-2 small d-flex align-items-center gap-2';
+                btn.setAttribute('role', 'option');
+                btn.setAttribute('aria-selected', 'false');
+                const name = document.createElement('span');
+                name.textContent = opt.name;
+                const email = document.createElement('span');
+                email.className = 'text-muted text-truncate';
+                email.textContent = opt.email;
+                btn.append(name, email);
+                if (opt.source === 'directory') {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge text-bg-light border fw-normal ms-auto';
+                    badge.textContent = 'Not signed in yet';
+                    btn.append(badge);
+                }
+                btn.addEventListener('mousedown', e => e.preventDefault());
+                btn.addEventListener('click', () => select(opt));
+                list.append(btn);
+            });
+            if (data.error) {
+                list.append(item(data.error, 'text-warning-emphasis'));
+            }
+            if (options.length === 0 && !data.error) {
+                const q = search.value.trim();
+                list.append(item(q.length < 2 && data.directoryAvailable ? 'Type at least 2 characters to search the directory' : 'No users match "' + q + '"'));
+            }
+            list.hidden = false;
+            search.setAttribute('aria-expanded', 'true');
+            active = -1;
+        }
+        function highlight(index) {
+            const items = list.querySelectorAll('[role="option"]');
+            if (items.length === 0) { return; }
+            active = (index + items.length) % items.length;
+            items.forEach((el, i) => {
+                el.classList.toggle('active', i === active);
+                el.setAttribute('aria-selected', i === active ? 'true' : 'false');
+            });
+            search.setAttribute('aria-activedescendant', items[active].id);
+            items[active].scrollIntoView({ block: 'nearest' });
+        }
+        function load() {
+            if (controller) { controller.abort(); }
+            controller = new AbortController();
+            const q = search.value.trim();
+            fetch(url + (url.includes('?') ? '&' : '?') + 'q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' }, signal: controller.signal })
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(render)
+                .catch(err => { if (err !== undefined && err.name !== 'AbortError') { render({ users: [], error: 'Could not search users right now.' }); } });
+        }
+        search.addEventListener('input', () => {
+            clear();
+            clearTimeout(timer);
+            timer = setTimeout(load, 200);
+        });
+        search.addEventListener('focus', () => { if (list.hidden) { load(); } });
+        search.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) { load(); } else { highlight(active + 1); } }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(active - 1); }
+            else if (e.key === 'Enter' && !list.hidden && active >= 0 && options[active]) { e.preventDefault(); select(options[active]); }
+            else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); close(); }
+        });
+        document.addEventListener('click', e => { if (!root.contains(e.target)) { close(); } });
+        search.form?.addEventListener('submit', e => {
+            if (value.value !== '') { return; }
+            if (options.length === 1) { select(options[0]); return; }
+            e.preventDefault();
+            search.setCustomValidity('Pick a user from the list.');
+            search.reportValidity();
+        });
+    });
+})();

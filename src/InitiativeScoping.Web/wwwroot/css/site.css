@@ -430,3 +430,7 @@ th .help-hint { font-weight: 600; }
   .print-page .badge { border: 1px solid #999; color: #000 !important; background: #fff !important; }
   .print-page .text-danger, .print-page .text-success, .print-page .text-warning-emphasis { color: #000 !important; font-weight: 600; }
 }
+
+/* Team-tab user picker */
+.user-picker { position: relative; }
+.user-picker-list { position: absolute; left: 0; right: 0; z-index: 1030; max-height: 14rem; background: var(--bs-body-bg); box-shadow: var(--bs-box-shadow-sm); }

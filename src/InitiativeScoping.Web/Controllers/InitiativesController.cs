@@ -16,7 +16,7 @@ namespace InitiativeScoping.Web.Controllers;
 
 [Authorize(Policy = AppPolicies.CanView)]
 [AutoValidateAntiforgeryToken]
-public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IConfiguration config, IWorkCalendar workCalendar) : Controller
+public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IConfiguration config, IWorkCalendar workCalendar, IUserDirectory users, IDirectorySearch directorySearch) : Controller
 {
     private const string Entity = nameof(Initiative);
     private const string ScopeLockedMessage = "Scope is locked; it can only change in Draft or during an approved re-baseline.";
@@ -1397,6 +1397,53 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
 
     // ----- Members -----
 
+    /// <summary>Team picker source: active app users (excluding current members), plus directory people when a directory is configured and the term is specific enough.</summary>
+    [HttpGet]
+    public async Task<IActionResult> SearchUsers(int id, string? q, CancellationToken ct)
+    {
+        var initiative = await LoadAsync(id, ct);
+        if (initiative is null)
+        {
+            return NotFound();
+        }
+
+        if (!InitiativeAccess.CanManage(currentUser, initiative))
+        {
+            return Forbid();
+        }
+
+        var term = (q ?? string.Empty).Trim();
+        var members = initiative.Members.Select(m => m.UserId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var known = users.ActiveUsers()
+            .Where(u => !members.Contains(u.UserId))
+            .Where(u => term.Length == 0
+                || u.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || u.Email.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .Take(20)
+            .Select(u => new UserPickerOption(u.UserId, u.DisplayName, u.Email, "app"))
+            .ToList();
+
+        string? error = null;
+        if (directorySearch.IsAvailable && term.Length >= 2)
+        {
+            var result = await directorySearch.SearchAsync(term, ct);
+            error = result.Error;
+            var ids = result.Users.Select(u => u.ObjectId).ToList();
+            var emails = result.Users.Select(u => u.Email).ToList();
+            var accounts = await db.UserAccounts.AsNoTracking()
+                .Where(a => (a.ObjectId != null && ids.Contains(a.ObjectId)) || emails.Contains(a.Email))
+                .Select(a => new { a.ObjectId, a.Email })
+                .ToListAsync(ct);
+            var seenIds = accounts.Where(a => a.ObjectId != null).Select(a => a.ObjectId!).Concat(members).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var seenEmails = accounts.Select(a => a.Email).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            known.AddRange(result.Users
+                .Where(u => !seenIds.Contains(u.ObjectId) && !seenEmails.Contains(u.Email))
+                .Select(u => new UserPickerOption(u.ObjectId, u.DisplayName, u.Email, "directory")));
+        }
+
+        return Json(new UserPickerResult(known, error, directorySearch.IsAvailable));
+    }
+
     [HttpPost]
     public async Task<IActionResult> AddMember(int id, MemberEditModel model, CancellationToken ct)
     {
@@ -1427,9 +1474,43 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             existing.Role = model.Role;
         }
 
+        var invited = await EnsureUserAccountAsync(userId, model, initiative, ct);
         audit.Record(Entity, initiative.Id, AuditActions.Update, new { Action = "AddMember", UserId = userId, model.Role });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"{userId} is now {model.Role}.", id);
+        if (invited)
+        {
+            users.Invalidate();
+        }
+
+        var note = invited ? " They have not signed in yet; an Admin can approve their access under Admin → Users." : string.Empty;
+        return RedirectWithSuccess($"{users.Display(userId)} is now {model.Role}.{note}", id);
+    }
+
+    /// <summary>A directory person picked on the Team tab gets a Pending account so their name shows instead of an object id and Admins see them to approve.</summary>
+    private async Task<bool> EnsureUserAccountAsync(string userId, MemberEditModel model, Initiative initiative, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(model.DisplayName) || string.IsNullOrWhiteSpace(model.Email))
+        {
+            return false;
+        }
+
+        var email = model.Email.Trim();
+        if (await db.UserAccounts.AnyAsync(a => a.ObjectId == userId || a.Email == email, ct))
+        {
+            return false;
+        }
+
+        db.UserAccounts.Add(new UserAccount
+        {
+            ObjectId = userId,
+            Email = email,
+            DisplayName = model.DisplayName.Trim(),
+            Role = AppRole.Viewer,
+            Status = UserAccountStatus.Pending,
+            CreatedAt = clock.GetUtcNow(),
+            Note = $"Added to the team of '{initiative.Name}' by {users.Display(currentUser.UserId)}"
+        });
+        return true;
     }
 
     [HttpPost]
