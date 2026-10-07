@@ -7,9 +7,12 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "lighthouse": "lhci autorun"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@lhci/cli": "0.15.1",
     "@playwright/test": "1.49.1",
     "@types/node": "20.17.10",
     "typescript": "5.7.2"

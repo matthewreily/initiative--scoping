@@ -67,6 +67,11 @@ Shared helpers (`createInitiative`, `addPhase`, `applySize`, `uniqueName`) live 
    of leftovers when running against a shared instance.
 4. Run it with `npx playwright test tests/<file>.spec.ts --headed` while developing.
 
+## Accessibility and Lighthouse gates
+
+- `tests/accessibility.spec.ts` scans the main pages with `@axe-core/playwright` (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`; `color-contrast` is left to Lighthouse) and fails on any violation, printing rule, impact and the first offending selectors.
+- `npm run lighthouse` (`lighthouserc.json`) audits six pages of an app already running on `http://127.0.0.1:5199` in dev-auth mode: accessibility / best-practices < 0.9 fail, performance < 0.8 warns. Reports land in `lighthouse-report/`. CI runs this as the separate `lighthouse` job.
+
 ## CI
 
 The `e2e` job in `.github/workflows/ci.yml` builds the web project, installs Chromium, type-checks and runs

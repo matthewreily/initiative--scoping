@@ -73,3 +73,44 @@ jobs:
             e2e/playwright-report
             e2e/test-results
           retention-days: 14
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: dotnet build src/InitiativeScoping.Web --configuration Release
+      - run: npm ci
+        working-directory: e2e
+      - name: Start the app (dev auth, SQLite)
+        working-directory: e2e
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://127.0.0.1:5199
+          ConnectionStrings__Default: Data Source=${{ github.workspace }}/e2e/.e2e-data/lighthouse.db
+          Auth__UseDevelopmentAuth: 'true'
+          Auth__Dev__Roles__0: Admin
+          Serilog__MinimumLevel__Default: Warning
+        run: |
+          mkdir -p .e2e-data
+          dotnet run --project ../src/InitiativeScoping.Web --no-build --no-launch-profile -c Release > app.log 2>&1 &
+          for i in $(seq 60); do curl -sf http://127.0.0.1:5199/health && break; sleep 2; done
+      - run: npm run lighthouse
+        working-directory: e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: |
+            e2e/lighthouse-report
+            e2e/app.log
+          retention-days: 14
