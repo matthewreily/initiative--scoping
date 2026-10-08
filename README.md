@@ -18,7 +18,7 @@ e2e/                                    Playwright end-to-end tests (real browse
 
 ## Local development
 
-Prerequisites: .NET 8 SDK.
+Prerequisites: .NET 8 SDK on `PATH` (`dotnet --version` → 8.x); Node 20+ only for the Playwright suite below.
 
 ```bash
 dotnet build
@@ -116,7 +116,7 @@ dotnet run --project src/InitiativeScoping.Web
 
 Or run the whole stack as containers: `docker compose up --build` (web on http://localhost:8080, dev auth, migrated + seeded).
 
-Migrations live in `InitiativeScoping.Infrastructure` and target PostgreSQL (Npgsql). `DateTimeOffset` columns map to `timestamp with time zone`, so all timestamps must be UTC (the app uses `TimeProvider.GetUtcNow()` throughout):
+Migrations live in `src/InitiativeScoping.Infrastructure/Persistence/Migrations` and target PostgreSQL (Npgsql). `DateTimeOffset` columns map to `timestamp with time zone`, so all timestamps must be UTC (the app uses `TimeProvider.GetUtcNow()` throughout):
 
 ```bash
 dotnet ef migrations add <Name> -p src/InitiativeScoping.Infrastructure -s src/InitiativeScoping.Web -o Persistence/Migrations -- --Database:Provider=PostgreSql
