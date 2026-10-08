@@ -18,15 +18,55 @@ e2e/                                    Playwright end-to-end tests (real browse
 
 ## Local development
 
-Prerequisites: .NET 8 SDK.
+Two ways to run Scopewell locally; both sign every request in as `Dev User` (`Admin`) via the development auth scheme (`appsettings.Development.json` → `Auth:Dev`), so no Entra ID setup is needed.
+
+### Option A — Docker only (recommended; Windows, macOS, Linux)
+
+Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Docker Engine + Compose v2 on Linux). No .NET SDK or Node needed on the host.
+
+```bash
+docker compose --profile dev up            # first start pulls the SDK image and restores packages (a few minutes)
+```
+
+Open http://localhost:5086. The `dev` service runs `dotnet watch` inside the official .NET 8 SDK image with the repository mounted at `/src`, against the `postgres` service (migrated + seeded on start, same engine as dev/prod): edit any `.cs` / `.cshtml` / `wwwroot` file on the host and the app hot-reloads (or restarts for edits hot reload can't apply). `bin/`, `obj/` and the NuGet cache live in named volumes, so the container never collides with a host-side IDE build.
+
+Everyday commands (all from the repo root):
+
+```bash
+docker compose --profile dev up -d                      # run in the background; `docker compose logs -f dev` to tail
+docker compose run --rm tools dotnet test               # unit + integration tests in the container
+docker compose run --rm tools dotnet build              # compile only
+docker compose --profile dev down                       # stop; add `-v` to also drop the database and build caches
+```
+
+Add a migration from the container (`tools` is the same SDK image and volumes as `dev`, minus the app settings; it writes into the mounted source tree):
+
+```bash
+docker compose run --rm tools sh -c "dotnet tool install -g dotnet-ef && ~/.dotnet/tools/dotnet-ef migrations add <Name> -p src/InitiativeScoping.Infrastructure -s src/InitiativeScoping.Web -o Persistence/Migrations -- --Database:Provider=PostgreSql"
+```
+
+Reset the database: `docker compose --profile dev down -v` then `up` again (migrations and seed data are reapplied).
+
+To run the app exactly as it ships (published image, no hot reload): `docker compose up --build` → http://localhost:8080.
+
+### Option B — .NET SDK on the host
+
+Prerequisites: .NET 8 SDK on `PATH` (`dotnet --version` → 8.x); Node 20+ only for the Playwright suite below.
 
 ```bash
 dotnet build
 dotnet test
-dotnet run --project src/InitiativeScoping.Web
+dotnet run --project src/InitiativeScoping.Web        # http://localhost:5086, SQLite
 ```
 
-The `Development` environment uses SQLite (`initiative-scoping.dev.db`, created and seeded on startup) and a development auth scheme that signs every request in as `Dev User` with the `Admin` role (`appsettings.Development.json` → `Auth:Dev`: `UserId`, `DisplayName`, `Email`, `Roles`). No Entra ID setup is needed locally.
+The `Development` environment uses SQLite (`initiative-scoping.dev.db`, created and seeded on startup). The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes stop the app, delete `src/InitiativeScoping.Web/initiative-scoping.dev.db` (and any `.db-shm` / `.db-wal` siblings), and restart to rebuild and reseed it.
+
+To use PostgreSQL instead of SQLite with a host-side SDK, start only the database in Docker and use the `LocalPostgres` launch profile (`src/InitiativeScoping.Web/Properties/launchSettings.json`, which sets `ASPNETCORE_ENVIRONMENT=Staging`, the compose connection string, migrate/seed on startup and dev auth — no shell-specific `export` / `$env:` lines):
+
+```bash
+docker compose up -d postgres
+dotnet run --project src/InitiativeScoping.Web --launch-profile LocalPostgres
+```
 
 CI enforces **≥ 80 % line coverage** (EF migrations excluded). Reproduce locally with:
 
@@ -34,8 +74,6 @@ CI enforces **≥ 80 % line coverage** (EF migrations excluded). Reproduce local
 dotnet test --collect:"XPlat Code Coverage" --settings tests/coverage.runsettings --results-directory TestResults
 python3 tests/coverage-check.py TestResults 80   # `python` on Windows
 ```
-
-The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes stop the app, delete `src/InitiativeScoping.Web/initiative-scoping.dev.db` (and any `.db-shm` / `.db-wal` siblings) in your file explorer or shell, and restart to rebuild and reseed it.
 
 ### End-to-end tests (Playwright)
 
@@ -49,7 +87,7 @@ npm test                                       # headless; `npm run test:headed`
 npm run report                                 # open the HTML report of the last run
 ```
 
-Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running. CI runs the suite in the `e2e` job and uploads the report + failure traces as the `playwright-report` artifact.
+Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running (e.g. the Docker `dev` service). CI runs the suite in the `e2e` job and uploads the report + failure traces as the `playwright-report` artifact.
 
 Quality gates in the same suite/CI: `tests/accessibility.spec.ts` runs [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.x A/AA) against every main page and fails on any violation; the `lighthouse` CI job runs Lighthouse CI (`e2e/lighthouserc.json`: accessibility and best-practices ≥ 90 fail the build, performance < 80 warns) and uploads the HTML reports as the `lighthouse-report` artifact. Run it locally with the app up on port 5199: `cd e2e && npm run lighthouse`. Details in [`e2e/README.md`](e2e/README.md).
 
@@ -106,14 +144,7 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 
 ### PostgreSQL
 
-```bash
-docker compose up -d postgres
-dotnet run --project src/InitiativeScoping.Web --launch-profile LocalPostgres
-```
-
-The `LocalPostgres` launch profile (`src/InitiativeScoping.Web/Properties/launchSettings.json`) sets `ASPNETCORE_ENVIRONMENT=Staging` (Production disables `Auth:UseDevelopmentAuth`), the compose connection string, `Database:MigrateOnStartup`, `Database:SeedOnStartup` and dev auth, so no shell-specific `export` / `$env:` lines are needed on Windows, macOS or Linux. Override any value with your own environment variable when needed.
-
-Or run the whole stack as containers: `docker compose up --build` (web on http://localhost:8080, dev auth, migrated + seeded).
+Local setups are described under [Local development](#local-development) (Docker `dev` profile, or `LocalPostgres` launch profile against `docker compose up -d postgres`).
 
 Migrations live in `InitiativeScoping.Infrastructure` and target PostgreSQL (Npgsql). `DateTimeOffset` columns map to `timestamp with time zone`, so all timestamps must be UTC (the app uses `TimeProvider.GetUtcNow()` throughout):
 

@@ -29,5 +29,61 @@ services:
       Database__SeedOnStartup: "true"
       Auth__UseDevelopmentAuth: "true"
 
+  # Docker-only development loop (no .NET SDK on the host): source is mounted and
+  # `dotnet watch` rebuilds / hot-reloads on save. `docker compose --profile dev up`.
+  dev:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    profiles: ["dev"]
+    working_dir: /src
+    command: >
+      dotnet watch --project src/InitiativeScoping.Web run
+      --no-launch-profile --urls http://0.0.0.0:5086
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5086:5086"
+    volumes: &sdk-volumes
+      - .:/src
+      - nuget:/root/.nuget/packages
+      - dev-bin-domain:/src/src/InitiativeScoping.Domain/bin
+      - dev-obj-domain:/src/src/InitiativeScoping.Domain/obj
+      - dev-bin-application:/src/src/InitiativeScoping.Application/bin
+      - dev-obj-application:/src/src/InitiativeScoping.Application/obj
+      - dev-bin-infrastructure:/src/src/InitiativeScoping.Infrastructure/bin
+      - dev-obj-infrastructure:/src/src/InitiativeScoping.Infrastructure/obj
+      - dev-bin-web:/src/src/InitiativeScoping.Web/bin
+      - dev-obj-web:/src/src/InitiativeScoping.Web/obj
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      Database__Provider: PostgreSql
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=initiative_scoping;Username=postgres;Password=${POSTGRES_PASSWORD:-devpass}"
+      Database__MigrateOnStartup: "true"
+      Database__SeedOnStartup: "true"
+      Auth__UseDevelopmentAuth: "true"
+
+  # One-off SDK commands against the mounted source (tests, build, dotnet-ef) without the
+  # dev service's app settings: `docker compose run --rm tools dotnet test`.
+  tools:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    profiles: ["tools"]
+    working_dir: /src
+    entrypoint: []
+    volumes: *sdk-volumes
+    environment:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
 volumes:
   pg-data:
+  nuget:
+  dev-bin-domain:
+  dev-obj-domain:
+  dev-bin-application:
+  dev-obj-application:
+  dev-bin-infrastructure:
+  dev-obj-infrastructure:
+  dev-bin-web:
+  dev-obj-web:
