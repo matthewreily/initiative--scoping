@@ -1,0 +1,12 @@
+# Tooling image for `docker compose run --rm pull-dev-db`: gcloud (reads the host login
+# mounted at /root/.config/gcloud), Cloud SQL Auth Proxy and the PostgreSQL 16 client.
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:alpine
+ARG TARGETARCH=amd64
+ARG PROXY_VERSION=2.14.1
+RUN apk add --no-cache postgresql16-client bash curl \
+ && curl -fsSL -o /usr/local/bin/cloud-sql-proxy \
+      "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v${PROXY_VERSION}/cloud-sql-proxy.linux.${TARGETARCH}" \
+ && chmod +x /usr/local/bin/cloud-sql-proxy
+COPY pull-dev-db.sh /usr/local/bin/pull-dev-db
+RUN chmod +x /usr/local/bin/pull-dev-db
+ENTRYPOINT ["pull-dev-db"]
