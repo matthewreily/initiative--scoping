@@ -32,10 +32,10 @@ CI enforces **≥ 80 % line coverage** (EF migrations excluded). Reproduce local
 
 ```bash
 dotnet test --collect:"XPlat Code Coverage" --settings tests/coverage.runsettings --results-directory TestResults
-python3 tests/coverage-check.py TestResults 80
+python3 tests/coverage-check.py TestResults 80   # `python` on Windows
 ```
 
-The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes delete `src/InitiativeScoping.Web/initiative-scoping.dev.db*` and restart to rebuild and reseed it.
+The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes stop the app, delete `src/InitiativeScoping.Web/initiative-scoping.dev.db` (and any `.db-shm` / `.db-wal` siblings) in your file explorer or shell, and restart to rebuild and reseed it.
 
 ### End-to-end tests (Playwright)
 
@@ -108,11 +108,10 @@ Every admin create/update/delete/publish/retire/import writes an `AuditEvent` ro
 
 ```bash
 docker compose up -d postgres
-export ASPNETCORE_ENVIRONMENT=Staging          # Production disables Auth:UseDevelopmentAuth
-export ConnectionStrings__Default="Host=localhost;Port=5432;Database=initiative_scoping;Username=postgres;Password=devpass"
-export Database__MigrateOnStartup=true Database__SeedOnStartup=true Auth__UseDevelopmentAuth=true
-dotnet run --project src/InitiativeScoping.Web
+dotnet run --project src/InitiativeScoping.Web --launch-profile LocalPostgres
 ```
+
+The `LocalPostgres` launch profile (`src/InitiativeScoping.Web/Properties/launchSettings.json`) sets `ASPNETCORE_ENVIRONMENT=Staging` (Production disables `Auth:UseDevelopmentAuth`), the compose connection string, `Database:MigrateOnStartup`, `Database:SeedOnStartup` and dev auth, so no shell-specific `export` / `$env:` lines are needed on Windows, macOS or Linux. Override any value with your own environment variable when needed.
 
 Or run the whole stack as containers: `docker compose up --build` (web on http://localhost:8080, dev auth, migrated + seeded).
 

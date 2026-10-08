@@ -27,6 +27,19 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
+    "LocalPostgres": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5086",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Staging",
+        "ConnectionStrings__Default": "Host=localhost;Port=5432;Database=initiative_scoping;Username=postgres;Password=devpass",
+        "Database__MigrateOnStartup": "true",
+        "Database__SeedOnStartup": "true",
+        "Auth__UseDevelopmentAuth": "true"
+      }
+    },
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
