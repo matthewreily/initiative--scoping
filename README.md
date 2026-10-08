@@ -47,6 +47,14 @@ docker compose run --rm tools sh -c "dotnet tool install -g dotnet-ef && ~/.dotn
 
 Reset the database: `docker compose --profile dev down -v` then `up` again (migrations and seed data are reapplied).
 
+Copy the GCP **dev** database into your local `postgres` (real initiatives, rate cards, people instead of the seed data). Needs the host `gcloud` logged in (`gcloud auth login`) with `roles/cloudsql.client` + `roles/secretmanager.secretAccessor` on `initiative-scoping-dev`; everything else (Cloud SQL Auth Proxy, `pg_dump`/`pg_restore`) runs in a container:
+
+```bash
+docker compose run --rm pull-dev-db          # Windows: set GCLOUD_CONFIG_DIR=%APPDATA%\gcloud first (default is ~/.config/gcloud)
+```
+
+It replaces the local `public` schema with a fresh dump, skips the Data Protection keys (KMS-wrapped for dev, recreated locally), and the app applies any newer migrations on next start. You still browse as `Dev User` (Admin); `GCP_PROJECT=initiative-scoping-prod` would pull prod if you have access. Script: `deploy/local/pull-dev-db.sh`.
+
 To run the app exactly as it ships (published image, no hot reload): `docker compose up --build` → http://localhost:8080.
 
 ### Option B — .NET SDK on the host
