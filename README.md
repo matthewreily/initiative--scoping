@@ -47,6 +47,8 @@ docker compose run --rm tools sh -c "dotnet tool install -g dotnet-ef && ~/.dotn
 
 Reset the database: `docker compose --profile dev down -v` then `up` again (migrations and seed data are reapplied).
 
+> The GCP environments are decommissioned (see [`ENVIRONMENTS.md`](ENVIRONMENTS.md)), so `pull-dev-db` has nothing to pull from; restore a saved snapshot with `restore-db` instead (steps 3–5 below).
+
 Copy the GCP **dev** database into your local `postgres` (real initiatives, rate cards, people instead of the seed data). Needs the host `gcloud` logged in (`gcloud auth login`) with `roles/cloudsql.client` + `roles/secretmanager.secretAccessor` on `initiative-scoping-dev`; everything else (Cloud SQL Auth Proxy, `pg_dump`/`pg_restore`) runs in a container:
 
 ```bash
@@ -116,9 +118,9 @@ npm test                                       # headless; `npm run test:headed`
 npm run report                                 # open the HTML report of the last run
 ```
 
-Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running (e.g. the Docker `dev` service). CI runs the suite in the `e2e` job and uploads the report + failure traces as the `playwright-report` artifact.
+Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running (e.g. the Docker `dev` service). CI does not run the suite while the project is paused (the `e2e` and `lighthouse` jobs were removed from `.github/workflows/ci.yml`; restore them from git history), so run it locally before merging UI changes.
 
-Quality gates in the same suite/CI: `tests/accessibility.spec.ts` runs [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.x A/AA) against every main page and fails on any violation; the `lighthouse` CI job runs Lighthouse CI (`e2e/lighthouserc.json`: accessibility and best-practices ≥ 90 fail the build, performance < 80 warns) and uploads the HTML reports as the `lighthouse-report` artifact. Run it locally with the app up on port 5199: `cd e2e && npm run lighthouse`. Details in [`e2e/README.md`](e2e/README.md).
+Quality gates in the same suite: `tests/accessibility.spec.ts` runs [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.x A/AA) against every main page and fails on any violation; Lighthouse CI (`e2e/lighthouserc.json`: accessibility and best-practices < 90 fail, performance < 80 warns) writes HTML reports to `e2e/lighthouse-report/`. Run it locally with the app up on port 5199: `cd e2e && npm run lighthouse`. Details in [`e2e/README.md`](e2e/README.md).
 
 ### Administration
 
@@ -184,6 +186,8 @@ dotnet ef migrations add <Name> -p src/InitiativeScoping.Infrastructure -s src/I
 To apply migrations without starting the web server (used by the Cloud Run migrate job): `dotnet InitiativeScoping.Web.dll --migrate`.
 
 ## Deployment (GCP)
+
+> **Decommissioned (October 2026):** both GCP projects are deleted and the deploy workflow is disabled; nothing below is live. How to bring it back is in [`ENVIRONMENTS.md`](ENVIRONMENTS.md).
 
 See [`deploy/gcp/README.md`](deploy/gcp/README.md): Terraform for Cloud Run + Cloud SQL (PostgreSQL 16) + Secret Manager + Artifact Registry + Workload Identity Federation, and `.github/workflows/deploy.yml` which builds the image, runs the migrate job, deploys and smoke-tests `/health`. Live URLs, console links and identifiers for every environment are listed in [`ENVIRONMENTS.md`](ENVIRONMENTS.md). An interactive architecture diagram (hosting, data, identity, pipelines, OpenTelemetry) is in [`docs/environment-diagram.html`](docs/environment-diagram.html) — open it in a browser.
 
