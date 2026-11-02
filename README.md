@@ -57,6 +57,27 @@ It replaces the local `public` schema with a fresh dump, skips the Data Protecti
 
 To run the app exactly as it ships (published image, no hot reload): `docker compose up --build` → http://localhost:8080.
 
+#### Demo from a dev snapshot
+
+Save a copy of the GCP dev database to a file once, then restore it into Docker whenever you need a demo (no GCP access needed after step 2). Snapshots go to `./backups/` (git-ignored; they hold real dev data, so don't share them outside the team).
+
+1. Log in to GCP on the host (same role requirements as above): `gcloud auth login` (Windows: `set GCLOUD_CONFIG_DIR=%APPDATA%\gcloud` in the same terminal before step 2).
+2. Save a snapshot — writes `backups/dev-<UTC timestamp>.dump`, leaves the local database untouched:
+
+   ```bash
+   docker compose run --rm pull-dev-db --save
+   ```
+
+3. Restore it (stop the app first if it is running: `docker compose stop web`). With no argument the newest file in `backups/` is used; pass a path to pick one, e.g. `backups/dev-20261027-150000.dump`:
+
+   ```bash
+   docker compose run --rm restore-db
+   ```
+
+   It prints `<n> initiatives, <n> users` when done.
+4. Start the demo: `docker compose up --build web` → http://localhost:8080 (signed in as `Dev User`, Admin; pending migrations run on startup).
+5. Reset after a demo: repeat steps 3–4. To move the demo to another machine, copy the `.dump` file into that clone's `backups/` folder and start at step 3.
+
 ### Option B — .NET SDK on the host
 
 Prerequisites: .NET 8 SDK on `PATH` (`dotnet --version` → 8.x); Node 20+ only for the Playwright suite below.

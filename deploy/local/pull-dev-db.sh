@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Copy the GCP dev database into the local compose `postgres` service.
 #
-#   docker compose run --rm pull-dev-db
+#   docker compose run --rm pull-dev-db          # dump + restore into local postgres
+#   docker compose run --rm pull-dev-db --save   # only save backups/dev-<stamp>.dump (restore later
+#                                                # with `docker compose run --rm restore-db`)
 #
 # Source: the Cloud SQL instance named in the `<app>-<env>-db-connection` secret of
 # $GCP_PROJECT (default initiative-scoping-dev), reached through the Cloud SQL Auth Proxy
 # with the gcloud login mounted from the host. Needs roles/cloudsql.client and
 # roles/secretmanager.secretAccessor on that project.
-# Target: $TARGET_HOST/$TARGET_DB (defaults to the compose `postgres` service); the public
-# schema is replaced. Data Protection keys are not copied (they are wrapped with the dev
+# Target: restore-db.sh ($TARGET_HOST/$TARGET_DB, default the compose `postgres` service);
+# the public schema is replaced. Data Protection keys are not copied (they are wrapped with the dev
 # project's KMS key and unusable locally); the app recreates them on first start.
 #
 # For tests / non-GCP sources set SOURCE_HOST (+ SOURCE_PORT/SOURCE_USER/SOURCE_PASSWORD/
@@ -17,12 +19,14 @@ set -euo pipefail
 
 GCP_PROJECT="${GCP_PROJECT:-initiative-scoping-dev}"
 SECRET_NAME="${SECRET_NAME:-${GCP_PROJECT}-db-connection}"
-TARGET_HOST="${TARGET_HOST:-postgres}"
-TARGET_PORT="${TARGET_PORT:-5432}"
-TARGET_DB="${TARGET_DB:-initiative_scoping}"
-TARGET_USER="${TARGET_USER:-postgres}"
-TARGET_PASSWORD="${TARGET_PASSWORD:-devpass}"
-DUMP="${DUMP:-/tmp/dev.dump}"
+BACKUP_DIR="${BACKUP_DIR:-/backups}"
+SAVE_ONLY=false
+[[ "${1:-}" == "--save" ]] && SAVE_ONLY=true
+if $SAVE_ONLY; then
+  DUMP="${DUMP:-$BACKUP_DIR/${GCP_PROJECT#initiative-scoping-}-$(date -u +%Y%m%d-%H%M%S).dump}"
+else
+  DUMP="${DUMP:-/tmp/dev.dump}"
+fi
 
 log() { printf '\n==> %s\n' "$*"; }
 
@@ -56,17 +60,10 @@ PGPASSWORD="$SOURCE_PASSWORD" pg_dump -h "$SOURCE_HOST" -p "$SOURCE_PORT" -U "$S
   -Fc --no-owner --no-privileges -f "$DUMP"
 ls -la "$DUMP"
 
-log "Restoring into $TARGET_HOST:$TARGET_PORT/$TARGET_DB (replacing schema public)"
-export PGPASSWORD="$TARGET_PASSWORD"
-for _ in $(seq 1 30); do pg_isready -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -q && break; sleep 1; done
-psql -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TARGET_DB" -v ON_ERROR_STOP=1 -q \
-  -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-pg_restore -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TARGET_DB" \
-  --no-owner --no-privileges --exit-on-error "$DUMP"
-psql -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TARGET_DB" -v ON_ERROR_STOP=1 -q \
-  -c 'TRUNCATE "DataProtectionKeys";'
-rm -f "$DUMP"
+if $SAVE_ONLY; then
+  log "Saved snapshot ./backups/$(basename "$DUMP"). Restore with: docker compose run --rm restore-db"
+  exit 0
+fi
 
-log "Done. Start the app (docker compose --profile dev up); pending migrations run on startup."
-psql -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TARGET_DB" -tA \
-  -c 'SELECT count(*) || '"'"' initiatives, '"'"' || (SELECT count(*) FROM "UserAccounts") || '"'"' users'"'"' FROM "Initiatives";'
+restore-db "$DUMP"
+rm -f "$DUMP"

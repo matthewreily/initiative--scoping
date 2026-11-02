@@ -77,7 +77,7 @@ services:
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
   # Copy the GCP dev database into the local `postgres` (see deploy/local/pull-dev-db.sh):
-  # `docker compose run --rm pull-dev-db`. Uses the host gcloud login mounted read-write.
+  # `docker compose run --rm pull-dev-db` (`--save` writes ./backups/dev-<stamp>.dump only). Uses the host gcloud login mounted read-write.
   pull-dev-db:
     build:
       context: deploy/local
@@ -88,10 +88,27 @@ services:
         condition: service_healthy
     volumes:
       - "${GCLOUD_CONFIG_DIR:-~/.config/gcloud}:/root/.config/gcloud"
+      - ./backups:/backups
     environment:
       GCP_PROJECT: "${GCP_PROJECT:-initiative-scoping-dev}"
       TARGET_PASSWORD: "${POSTGRES_PASSWORD:-devpass}"
       CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
+
+  # Restore a snapshot from ./backups (see deploy/local/restore-db.sh):
+  # `docker compose run --rm restore-db [backups/<file>.dump]` (default: newest).
+  restore-db:
+    build:
+      context: deploy/local
+      dockerfile: Dockerfile.pull-db
+    profiles: ["tools"]
+    entrypoint: ["restore-db"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backups:/backups
+    environment:
+      TARGET_PASSWORD: "${POSTGRES_PASSWORD:-devpass}"
 
 volumes:
   pg-data:
