@@ -70,12 +70,10 @@ Shared helpers (`createInitiative`, `addPhase`, `applySize`, `uniqueName`) live 
 ## Accessibility and Lighthouse gates
 
 - `tests/accessibility.spec.ts` scans the main pages with `@axe-core/playwright` (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`; `color-contrast` is left to Lighthouse) and fails on any violation, printing rule, impact and the first offending selectors.
-- `npm run lighthouse` (`lighthouserc.json`) audits six pages of an app already running on `http://127.0.0.1:5199` in dev-auth mode: accessibility / best-practices < 0.9 fail, performance < 0.8 warns. Reports land in `lighthouse-report/`. CI runs this as the separate `lighthouse` job.
+- `npm run lighthouse` (`lighthouserc.json`) audits six pages of an app already running on `http://127.0.0.1:5199` in dev-auth mode: accessibility / best-practices < 0.9 fail, performance < 0.8 warns. Reports land in `lighthouse-report/`. Not run in CI while the project is paused.
 
 ## CI
 
-The `e2e` job in `.github/workflows/ci.yml` builds the web project, installs Chromium, type-checks and runs
-the suite on every pull request and push to `main`. On failure the HTML report, screenshots, traces and
-videos are attached to the run as the `playwright-report` artifact — download it and run
-`npx playwright show-report <extracted folder>/playwright-report` to inspect, or open a `trace.zip` at
-https://trace.playwright.dev.
+While the project is paused, CI only builds and runs the .NET tests: the `e2e` and `lighthouse` jobs were removed from
+`.github/workflows/ci.yml` to save Actions minutes. Run the suite locally before merging UI changes, and restore the jobs
+from git history when work resumes.

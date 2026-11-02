@@ -1,5 +1,14 @@
 # Environments & links
 
+> **Decommissioned (October 2026): the project is paused.** Both GCP projects (`initiative-scoping-dev`, `initiative-scoping-prod`), their billing budgets, the billing export and both Entra app registrations were deleted, and the *Deploy to GCP* workflow is disabled. Every URL, console link and client ID below is dead and kept only as a record of the previous setup. The data was saved as `pg_dump` snapshots (`dev-*.dump`, `prod-*.dump`) taken with `docker compose run --rm pull-dev-db --save` and stored outside the repo; demo locally with `docker compose run --rm restore-db` (see README → "Demo from a dev snapshot").
+>
+> **Bringing it back**
+>
+> 1. Within 30 days of deletion: `gcloud projects undelete initiative-scoping-dev` (and `-prod`), and restore the app registrations in Entra → App registrations → *Deleted applications*. Then re-create the budgets/billing export, enable the workflow (`gh workflow enable "Deploy to GCP"`) and push to `main`.
+> 2. After 30 days the project IDs can never be reused: pick new IDs (e.g. `scopewell-dev`/`scopewell-prod`) and update `project_id` in `deploy/gcp/env/*.tfvars`, the state bucket in `deploy/gcp/env/*.gcs.tfbackend`, the GitHub `dev`/`prod` environment variables the deploy workflow reads (`GCP_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SERVICE_ACCOUNT`, `DEV_IMAGE_REPOSITORY`) and the links in this file. Run `deploy/entra/register-app.sh <env>` (new client IDs go into the tfvars), then `deploy/gcp/bootstrap-project.sh <env> 00EDAE-09A2AC-75569D` per environment, dev first (see `deploy/gcp/README.md` → "One-time setup per environment").
+> 3. Restore the data: with a fresh environment up, load a snapshot into its Cloud SQL database through the Cloud SQL Auth Proxy (`pg_restore --no-owner --no-privileges --clean --if-exists -d <connection string> <file>.dump`, then `TRUNCATE "DataProtectionKeys";` because the old KMS-wrapped keys are gone).
+> 4. Re-enable the CI `e2e` and `lighthouse` jobs (removed while paused; restore them from git history of `.github/workflows/ci.yml`).
+
 The app is branded **Scopewell**; the code, GCP resources (`initiative-scoping-*`) and Entra app registrations (`Initiative Scoping (dev|prod)`) keep their original names.
 
 Where everything for this app lives. Keep this file current when an environment is added or a resource is renamed;

@@ -1,5 +1,7 @@
 # Deploying to Google Cloud
 
+> **Decommissioned (October 2026):** `initiative-scoping-dev` and `initiative-scoping-prod` are deleted and `.github/workflows/deploy.yml` is disabled. This guide still describes how to stand an environment up again; see [`ENVIRONMENTS.md`](../../ENVIRONMENTS.md) → "Bringing it back" for what changes first (new project IDs after 30 days).
+
 Target architecture (one stack per environment, `dev` and `prod`):
 
 ```
