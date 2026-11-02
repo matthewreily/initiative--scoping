@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Local database snapshots (docker compose run --rm pull-dev-db --save)
+backups/
+
 # User-specific files
 *.rsuser
 *.suo
