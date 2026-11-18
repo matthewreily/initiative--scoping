@@ -140,9 +140,9 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             return NotFound();
         }
 
-        if (await db.ActualEntries.AnyAsync(e => e.PersonId == id, ct))
+        if (await db.ActualEntries.AnyAsync(e => e.PersonId == id, ct) || await db.PodMembers.AnyAsync(e => e.PersonId == id, ct))
         {
-            return RedirectWithError($"'{person.DisplayName}' has imported actuals and cannot be deleted. Deactivate instead.");
+            return RedirectWithError($"'{person.DisplayName}' has imported actuals or pod memberships and cannot be deleted. Deactivate instead.");
         }
 
         db.People.Remove(person);
@@ -399,7 +399,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
     [HttpPost]
     public Task<IActionResult> BulkDelete(int[] ids, CancellationToken ct) => BulkDeleteRows(
         db, db.People, ids, x => p => x.Contains(p.Id),
-        async (p, c) => !await db.ActualEntries.AnyAsync(e => e.PersonId == p.Id, c),
+        async (p, c) => !(await db.ActualEntries.AnyAsync(e => e.PersonId == p.Id, c) || await db.PodMembers.AnyAsync(e => e.PersonId == p.Id, c)),
         p => p.DisplayName,
         p => audit.Record(nameof(Person), p.Id, AuditActions.Delete, new { p.DisplayName }),
         "person", "people", "has imported actuals; deactivate instead", ct);

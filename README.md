@@ -16,6 +16,12 @@ tests/
 e2e/                                    Playwright end-to-end tests (real browser, see e2e/README.md)
 ```
 
+## Development Pods
+
+Admins manage **Applications / Platforms** and **Development Pods** in Admin. A pod belongs to a business unit and groups active roster people and application/platform ownership; people and apps may belong to multiple pods. On an initiative, use **Assign pod / Application tags** beside Add allocation to tag apps, see suggested pods, and assign an active pod to selected phases. Each priced active member becomes an individually editable seat, owned by the pod's business unit even on a different-BU initiative. Unpriced members are reported and skipped. Individual allocation entry is unchanged.
+
+The Costs tab includes a **By pod** rollup and a link to group the allocation list by pod. **Re-sync** previews new-member seats and former/inactive-member removals before applying; existing-member seats keep manual edits. Scope changes use the same Draft/approved re-baseline lifecycle gates as manual allocations. SQLite development databases use schema-from-model (no separate SQLite migrations); recreate an old disposable development database after pulling schema changes.
+
 ## Local development
 
 Two ways to run Scopewell locally; both sign every request in as `Dev User` (`Admin`) via the development auth scheme (`appsettings.Development.json` → `Auth:Dev`), so no Entra ID setup is needed.

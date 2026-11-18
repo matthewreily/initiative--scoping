@@ -76,6 +76,7 @@ public static class ScenarioPlanner
         {
             Phase = Map(a.Phase, a.PhaseId) ?? throw new InvalidOperationException($"Allocation {a.Id} references a phase outside the plan."),
             BusinessUnitId = a.BusinessUnitId,
+            PodId = a.PodId,
             ResourceTypeId = a.ResourceTypeId,
             SeniorityId = a.SeniorityId,
             Location = a.Location,

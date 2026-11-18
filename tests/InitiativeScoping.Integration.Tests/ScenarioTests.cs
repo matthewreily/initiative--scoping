@@ -15,6 +15,59 @@ public class ScenarioTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
     private static readonly Regex TokenRegex = new("name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"", RegexOptions.Compiled);
     private static readonly Regex DetailsRegex = new("/Initiatives/Details/(\\d+)", RegexOptions.Compiled);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Clone_and_promote_transfer_application_tags(bool tagged)
+    {
+        var client = factory.CreateClient(NoRedirect);
+        await client.GetAsync("/");
+        int id, commonId, oldId, newId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var apps = Enumerable.Range(0, 3).Select(_ => new ApplicationPlatform { Name = Guid.NewGuid().ToString("N") }).ToArray();
+            db.ApplicationPlatforms.AddRange(apps);
+            var initiative = new Initiative { Name = "Tagged plan", CreatedBy = "dev-user", BusinessUnitId = (await db.BusinessUnits.FirstAsync()).Id };
+            db.Initiatives.Add(initiative);
+            await db.SaveChangesAsync();
+            id = initiative.Id; commonId = apps[0].Id; oldId = apps[1].Id; newId = apps[2].Id;
+            if (tagged)
+            {
+                db.InitiativeApplications.AddRange(new InitiativeApplication { InitiativeId = id, ApplicationPlatformId = commonId }, new InitiativeApplication { InitiativeId = id, ApplicationPlatformId = oldId });
+                await db.SaveChangesAsync();
+            }
+        }
+        var create = await PostFormAsync(client, $"/Initiatives/Details/{id}", $"/Initiatives/{id}/Scenarios", new() { ["Name"] = "Tagged scenario" });
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var scenarioId = int.Parse(DetailsRegex.Match(create.Headers.Location!.ToString()).Groups[1].Value);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tags = await db.InitiativeApplications.Where(a => a.InitiativeId == scenarioId).ToListAsync();
+            Assert.Equal(tagged ? new[] { commonId, oldId }.Order() : Enumerable.Empty<int>(), tags.Select(a => a.ApplicationPlatformId).Order());
+            if (tagged)
+            {
+                db.InitiativeApplications.Remove(tags.Single(a => a.ApplicationPlatformId == oldId));
+                db.InitiativeApplications.Add(new InitiativeApplication { InitiativeId = scenarioId, ApplicationPlatformId = newId });
+            }
+            else
+            {
+                db.InitiativeApplications.Add(new InitiativeApplication { InitiativeId = id, ApplicationPlatformId = oldId });
+            }
+            await db.SaveChangesAsync();
+        }
+        var promote = await PostFormAsync(client, $"/Initiatives/{id}/Scenarios", $"/Initiatives/{id}/Scenarios/{scenarioId}/Promote", new());
+        Assert.Equal(HttpStatusCode.Redirect, promote.StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tags = await db.InitiativeApplications.Where(a => a.InitiativeId == id).Select(a => a.ApplicationPlatformId).ToListAsync();
+            Assert.Equal(tagged ? new[] { commonId, newId }.Order() : Enumerable.Empty<int>(), tags.Order());
+            Assert.False(await db.InitiativeApplications.AnyAsync(a => a.InitiativeId == scenarioId));
+        }
+    }
+
     [Fact]
     public async Task Clone_compare_and_promote_replace_the_live_plan_and_remove_the_scenario()
     {

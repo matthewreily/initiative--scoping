@@ -116,6 +116,8 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
 
         var scenario = ScenarioPlanner.Clone(source, name, currentUser.UserId, clock.GetUtcNow());
         db.Initiatives.Add(scenario);
+        var applicationIds = await db.InitiativeApplications.Where(a => a.InitiativeId == source.Id).Select(a => a.ApplicationPlatformId).ToListAsync(ct);
+        db.InitiativeApplications.AddRange(applicationIds.Select(appId => new InitiativeApplication { Initiative = scenario, ApplicationPlatformId = appId }));
         await db.SaveChangesAsync(ct);
         audit.Record(Entity, scenario.Id, AuditActions.Create, new { scenario.Name, Scenario = true, ScenarioOf = scenario.ScenarioOfId, ClonedFrom = source.Id });
         await db.SaveChangesAsync(ct);
@@ -167,6 +169,12 @@ public class ScenariosController(AppDbContext db, ICurrentUser currentUser, IAud
         db.Phases.AddRange(plan.Phases);
         db.InitiativeAllocations.AddRange(plan.Allocations);
         db.InitiativeNonLaborCosts.AddRange(plan.NonLaborCosts);
+
+        var applicationIds = await db.InitiativeApplications.Where(a => a.InitiativeId == scenario.Id).Select(a => a.ApplicationPlatformId).ToListAsync(ct);
+        var parentApplications = await db.InitiativeApplications.Where(a => a.InitiativeId == parent.Id).ToListAsync(ct);
+        db.InitiativeApplications.RemoveRange(parentApplications.Where(a => !applicationIds.Contains(a.ApplicationPlatformId)));
+        db.InitiativeApplications.AddRange(applicationIds.Except(parentApplications.Select(a => a.ApplicationPlatformId))
+            .Select(appId => new InitiativeApplication { InitiativeId = parent.Id, ApplicationPlatformId = appId }));
 
         RemoveGraph(scenario);
         audit.Record(Entity, parent.Id, AuditActions.Update, new

@@ -1,0 +1,31 @@
+@model InitiativePodsModel
+@{ ViewData["Title"] = "Preview pod re-sync"; var plan = Model.Preview!; }
+<h1 class="h3">Re-sync @Model.Pod!.Name</h1>
+<p>Existing member seats are untouched. Additions use the allocation % of the oldest pod seat in each phase. Confirm recalculates against current membership.</p>
+<h2 class="h5">Seats to add (@plan.Add.Count)</h2>
+<ul>
+@foreach (var seat in plan.Add)
+{
+    <li>@Model.Pod.Members.First(m => m.PersonId == seat.PersonIds.Single()).Person?.DisplayName — @Model.Initiative.Phases.First(p => p.Id == seat.PhaseId).Name — @seat.AllocationPercent% — @seat.EstimatedHours.ToString("N1") hours</li>
+}
+</ul>
+<h2 class="h5">Seats to remove (@plan.Remove.Count)</h2>
+<ul>
+@foreach (var seat in plan.Remove)
+{
+    <li>@(seat.PersonNames ?? "Unassigned seat") — @Model.Initiative.Phases.First(p => p.Id == seat.PhaseId).Name</li>
+}
+</ul>
+@foreach (var warning in plan.Skipped) { <p class="text-warning-emphasis">@warning</p> }
+<h2 class="h5">Departed people to remove from retained allocations (@plan.Update.Sum(u => u.People.Count))</h2>
+<ul>
+@foreach (var update in plan.Update)
+{
+    <li>@string.Join(", ", update.People.Select(p => p.Person?.DisplayName ?? $"Person #{p.PersonId}")) — @Model.Initiative.Phases.First(p => p.Id == update.Allocation.PhaseId).Name — quantity @update.Allocation.Quantity → @(update.Allocation.Quantity - update.People.Count). Remaining members and per-seat settings are retained.</li>
+}
+</ul>
+<form asp-action="ConfirmResyncPod" asp-route-id="@Model.Initiative.Id" method="post">
+    <input type="hidden" name="podId" value="@Model.PodId" />
+    <button class="btn btn-primary" type="submit">Confirm re-sync</button>
+    <a asp-action="DevelopmentPods" asp-route-id="@Model.Initiative.Id" class="btn btn-outline-secondary">Cancel</a>
+</form>

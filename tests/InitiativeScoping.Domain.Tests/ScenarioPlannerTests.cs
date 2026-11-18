@@ -8,6 +8,19 @@ public class ScenarioPlannerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 1, 0, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(12)]
+    public void Clone_and_promote_preserve_allocation_pod_linkage(int? podId)
+    {
+        var live = Live();
+        live.Allocations[0].PodId = podId;
+        var scenario = ScenarioPlanner.Clone(live, "Scenario", "owner", Now);
+        Assert.Equal(podId, scenario.Allocations[0].PodId);
+        ScenarioPlanner.Promote(scenario, live);
+        Assert.Equal(podId, live.Allocations[0].PodId);
+    }
+
     private static RateCard Card() => new()
     {
         Name = "2026", EffectiveStart = new DateOnly(2026, 1, 1), Status = RateCardStatus.Published,

@@ -41,6 +41,7 @@ public static class DbSeeder
         if (await db.ResourceTypes.AnyAsync(ct))
         {
             await BackfillTemplatesAsync(db, ct);
+            await SeedPodsAsync(db, ct);
             return;
         }
 
@@ -104,6 +105,25 @@ public static class DbSeeder
         }
         db.RateCards.Add(card);
 
+        await db.SaveChangesAsync(ct);
+        await SeedPodsAsync(db, ct);
+    }
+
+    private static async Task SeedPodsAsync(AppDbContext db, CancellationToken ct)
+    {
+        if (await db.ApplicationPlatforms.AnyAsync(ct) || await db.Pods.AnyAsync(ct)) return;
+        var bu = await db.BusinessUnits.FirstOrDefaultAsync(ct);
+        var type = await db.ResourceTypes.FirstOrDefaultAsync(ct);
+        var level = await db.SeniorityLevels.OrderBy(x => x.SortOrder).FirstOrDefaultAsync(ct);
+        var cls = await db.ResourcingClasses.FirstOrDefaultAsync(x => !x.IsVendor, ct);
+        if (bu is null || type is null || level is null || cls is null) return;
+        var portal = new ApplicationPlatform { Name = "Customer Portal" };
+        var platform = new ApplicationPlatform { Name = "Integration Platform" };
+        var engineer = new Person { DisplayName = "Sample Pod Engineer", BusinessUnitId = bu.Id, ResourceTypeId = type.Id, SeniorityId = level.Id, Location = "Onshore", ResourcingClassId = cls.Id };
+        var analyst = new Person { DisplayName = "Sample Platform Engineer", BusinessUnitId = bu.Id, ResourceTypeId = type.Id, SeniorityId = level.Id, Location = "Onshore", ResourcingClassId = cls.Id };
+        db.Pods.AddRange(
+            new Pod { Name = "Portal Pod", BusinessUnitId = bu.Id, Description = "Sample customer portal delivery pod", Members = [new PodMember { Person = engineer }], Applications = [new PodApplication { ApplicationPlatform = portal }] },
+            new Pod { Name = "Platform Pod", BusinessUnitId = bu.Id, Description = "Sample integration platform delivery pod", Members = [new PodMember { Person = analyst }, new PodMember { Person = engineer }], Applications = [new PodApplication { ApplicationPlatform = platform }] });
         await db.SaveChangesAsync(ct);
     }
 
