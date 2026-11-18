@@ -4,6 +4,9 @@
     var phases = (Microsoft.AspNetCore.Mvc.Rendering.SelectList)ViewBag.Phases;
     var rateOptions = (RateOptionsData)ViewBag.RateOptions;
     var currentSeniority = (SeniorityLevel?)ViewBag.CurrentSeniority;
+    var vendors = ViewBag.CurrentVendor is Vendor savedVendor
+        ? rateOptions.Vendors.Append(new NamedId(savedVendor.Id, savedVendor.Name + " (inactive)")).ToList()
+        : rateOptions.Vendors;
     var seniorities = rateOptions.Seniorities.Any(s => s.Id == Model.SeniorityId) || currentSeniority is null
         ? rateOptions.Seniorities
         : rateOptions.Seniorities.Append(new NamedId(currentSeniority.Id, currentSeniority.Name + " (inactive)")).ToList();
@@ -88,11 +91,11 @@ else
             <label asp-for="VendorId" class="form-label"></label>
             @if (staffing)
             {
-                <select asp-for="VendorId" asp-items="@(new SelectList(rateOptions.Vendors, "Id", "Name"))" class="form-select" disabled data-locked="true"></select>
+                <select asp-for="VendorId" asp-items="@(new SelectList(vendors, "Id", "Name"))" class="form-select" disabled data-locked="true"></select>
             }
             else
             {
-                <select asp-for="VendorId" asp-items="@(new SelectList(rateOptions.Vendors, "Id", "Name"))" class="form-select"></select>
+                <select asp-for="VendorId" asp-items="@(new SelectList(vendors, "Id", "Name"))" class="form-select"></select>
             }
             <span asp-validation-for="VendorId" class="text-danger"></span>
         </div>

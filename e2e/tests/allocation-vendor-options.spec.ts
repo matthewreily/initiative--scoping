@@ -15,6 +15,7 @@ test('add and edit offer vendor classes only with an active, priced vendor', asy
   await page.locator('#EffectiveStart').fill(isoDate(3650));
   await page.locator('#EffectiveEnd').fill(isoDate(3655));
   await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const cardUrl = page.url();
   const csv = [
     'ResourceType,Seniority,Location,ResourcingClass,HourlyRate,Vendor,Discipline',
     `${typeName},Senior,Onshore,Internal,100,,Engineering`,
@@ -31,7 +32,7 @@ test('add and edit offer vendor classes only with an active, priced vendor', asy
   await expect(page.locator('.alert-info')).toContainText('This card is published');
 
   const id = await createInitiative(page, uniqueName('Vendor options'));
-  await addPhase(page, 'Future build', isoDate(3650), isoDate(3652));
+  await addPhase(page, 'Future build', isoDate(3651), isoDate(3652));
   const addUrl = `/Initiatives/AddAllocation/${id}`;
   await page.goto(addUrl);
   await page.locator('#ResourceTypeId').selectOption({ label: typeName });
@@ -85,4 +86,34 @@ test('add and edit offer vendor classes only with an active, priced vendor', asy
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/Initiatives/Details/${id}`));
   await expect(page.locator('#allocations-table')).toContainText(vendorName);
+
+  await page.goto(editUrl!);
+  const savedClass = await page.locator('#ResourcingClassId').inputValue();
+  const savedVendor = await page.locator('#VendorId').inputValue();
+  await expect(page.locator('#CapexPercent')).toHaveValue('100');
+  await page.goto(cardUrl);
+  await page.locator('#retire-end').fill(isoDate(3650));
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Retire', exact: true }).click();
+  await expect(page.locator('.alert-secondary')).toContainText('This card is retired');
+
+  for (const inactive of [false, true]) {
+    if (inactive) {
+      await page.goto(vendorEdit!);
+      await page.locator('#IsActive').uncheck();
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
+    }
+    await page.goto(editUrl!);
+    await expect(page.locator('#ResourcingClassId')).toHaveValue(savedClass);
+    await expect(page.locator('#VendorId')).toHaveValue(savedVendor);
+    await expect(page.locator('#VendorId option:checked')).toBeEnabled();
+    await expect(page.locator('#CapexPercent')).toHaveValue('100');
+    await expect(page.locator('#rate-preview')).toHaveClass(/is-invalid/);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/Initiatives/Details/${id}`));
+    await page.goto(editUrl!);
+    await expect(page.locator('#ResourcingClassId')).toHaveValue(savedClass);
+    await expect(page.locator('#VendorId')).toHaveValue(savedVendor);
+    await expect(page.locator('#CapexPercent')).toHaveValue('100');
+  }
 });

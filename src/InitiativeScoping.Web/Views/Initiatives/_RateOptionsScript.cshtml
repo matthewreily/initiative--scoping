@@ -72,6 +72,7 @@
         }
 
         function sync(preferCurrent) {
+            const preserveSaved = preferCurrent && @(Model.Current.Id > 0 ? "true" : "false");
             const allPriced = pricedFor(phase.value);
             let priced = allPriced.filter(o => !classIsVendor(o.cls) || vendors.some(id => vendorRowMatches(o, id)));
             const currentPriced = priced.some(o => same(o.type, current.type) && same(o.seniority, current.seniority) && sameText(o.location, current.location) && same(o.cls, current.cls) && vendorRowMatches(o, current.vendor));
@@ -84,6 +85,7 @@
             restrict(location, [...new Set(bySen.map(o => o.location))], pick(location, 'location'), sameText);
             const byLoc = bySen.filter(o => sameText(o.location, location.value));
             const allowedClasses = priced.length === 0 ? classes.filter(c => !c.isVendor).map(c => c.id) : [...new Set(byLoc.map(o => o.cls))];
+            if (preserveSaved) { allowedClasses.push(current.cls); }
             restrict(cls, allowedClasses, pick(cls, 'cls'), same, false);
             const byCls = byLoc.filter(o => same(o.cls, cls.value));
             let match;
@@ -91,7 +93,9 @@
                 if (isVendor()) {
                     if (vendorWrap) { vendorWrap.hidden = false; }
                     vendor.disabled = vendor.dataset.locked === 'true';
-                    restrict(vendor, vendors.filter(id => byCls.some(o => vendorRowMatches(o, id))), pick(vendor, 'vendor'), sameVendor, false);
+                    const allowedVendors = vendors.filter(id => byCls.some(o => vendorRowMatches(o, id)));
+                    if (preserveSaved && current.vendor !== '') { allowedVendors.push(current.vendor); }
+                    restrict(vendor, allowedVendors, pick(vendor, 'vendor'), sameVendor, false);
                     match = vendorMatch(byCls, vendor.value);
                 } else {
                     if (vendorWrap) { vendorWrap.hidden = true; }
@@ -103,7 +107,7 @@
                 match = byCls[0];
             }
             syncPeople(preferCurrent);
-            syncCapex();
+            if (!preserveSaved) { syncCapex(); }
             if (match) {
                 output.value = money.format(match.rate) + ' /h';
                 output.classList.remove('is-invalid');

@@ -1777,6 +1777,9 @@ public partial class InitiativesController(AppDbContext db, ICurrentUser current
             options = options with { People = people };
         }
         ViewBag.RateOptions = options;
+        ViewBag.CurrentVendor = existing?.VendorId is int vendorId && options.Vendors.All(v => v.Id != vendorId)
+            ? await db.Vendors.FindAsync([vendorId], ct)
+            : null;
         ViewBag.CurrentSeniority = null;
         if (initiative.PlanningMode == PlanningMode.FixedDuration)
         {
