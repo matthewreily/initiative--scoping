@@ -31,6 +31,18 @@ test('pod allocations keep rate and cost visible without horizontal scrolling on
 
   for (const width of [1024, 1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
+    const phaseName = container.locator('.allocation-phase-name').first();
+    const podBadge = container.locator('.allocation-pod-badge').first();
+    await expect(phaseName).toHaveAttribute('title', 'Implementation and verification');
+    await expect(podBadge).toHaveAttribute('title', pod);
+    for (const label of [phaseName, podBadge]) {
+      await expect(label).toHaveCSS('white-space', 'nowrap');
+      await expect(label).toHaveCSS('text-overflow', 'ellipsis');
+      await expect(label).toHaveCSS('overflow', 'hidden');
+      if (width === 1024) {
+        expect(await label.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
+      }
+    }
     const metrics = await container.evaluate(el => {
       const bounds = el.getBoundingClientRect();
       const table = el.querySelector('table')!;

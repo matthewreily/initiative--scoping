@@ -307,6 +307,7 @@ kbd { font-size: .8em; padding: .1rem .35rem; }
 #allocations-table th, #allocations-table td { overflow-wrap: anywhere; }
 #allocations-table .text-nowrap { white-space: normal !important; }
 #allocations-table .badge { max-width: 100%; overflow-wrap: anywhere; }
+#allocations-table .allocation-phase-name, #allocations-table .allocation-pod-badge { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .allocation-fit-table .allocation-select { width: 3%; }
 .allocation-fit-table .allocation-quantity { width: 4%; }
 .allocation-fit-table .allocation-hours { width: 8%; }
