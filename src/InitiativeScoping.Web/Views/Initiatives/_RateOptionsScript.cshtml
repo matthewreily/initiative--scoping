@@ -23,6 +23,7 @@
         const phaseStarts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(phaseStarts));
         // Resourcing class catalog: vendor-backed classes show the Vendor picker; each class carries the labor Capex % default.
         const classes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(classes));
+        const vendors = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Data.Vendors.Select(v => v.Id)));
         const classOf = id => classes.find(c => String(c.id) === String(id));
         const classIsVendor = id => classOf(id)?.isVendor === true;
         const capex = byId('@Model.CapexInputId');
@@ -40,15 +41,15 @@
         }
 
         // Restricts a select to the given allowed values, keeping the preferred value when it is still allowed.
-        function restrict(select, allowed, preferred, eq) {
+        function restrict(select, allowed, preferred, eq, allowAllWhenEmpty = true) {
             let kept = null;
             for (const opt of select.options) {
-                const ok = allowed.length === 0 || allowed.some(a => eq(a, opt.value));
+                const ok = (allowAllWhenEmpty && allowed.length === 0) || allowed.some(a => eq(a, opt.value));
                 opt.hidden = !ok;
                 opt.disabled = !ok;
                 if (ok && kept === null && (preferred === null || eq(preferred, opt.value))) { kept = opt.value; }
             }
-            if (kept === null) { kept = Array.from(select.options).find(o => !o.disabled)?.value ?? select.value; }
+            if (kept === null) { kept = Array.from(select.options).find(o => !o.disabled)?.value ?? ''; }
             select.value = kept;
         }
 
@@ -71,8 +72,9 @@
         }
 
         function sync(preferCurrent) {
+            const preserveSaved = preferCurrent && @(Model.Current.Id > 0 ? "true" : "false");
             const allPriced = pricedFor(phase.value);
-            let priced = allPriced;
+            let priced = allPriced.filter(o => !classIsVendor(o.cls) || vendors.some(id => vendorRowMatches(o, id)));
             const currentPriced = priced.some(o => same(o.type, current.type) && same(o.seniority, current.seniority) && sameText(o.location, current.location) && same(o.cls, current.cls) && vendorRowMatches(o, current.vendor));
             if (preferCurrent && current.type !== '0' && !currentPriced) { priced = []; } // keep a legacy unpriced allocation visible as saved
             const pick = (sel, key) => preferCurrent ? current[key] : sel.value;
@@ -82,15 +84,18 @@
             const bySen = byType.filter(o => same(o.seniority, seniority.value));
             restrict(location, [...new Set(bySen.map(o => o.location))], pick(location, 'location'), sameText);
             const byLoc = bySen.filter(o => sameText(o.location, location.value));
-            restrict(cls, [...new Set(byLoc.map(o => o.cls))], pick(cls, 'cls'), same);
+            const allowedClasses = priced.length === 0 ? classes.filter(c => !c.isVendor).map(c => c.id) : [...new Set(byLoc.map(o => o.cls))];
+            if (preserveSaved) { allowedClasses.push(current.cls); }
+            restrict(cls, allowedClasses, pick(cls, 'cls'), same, false);
             const byCls = byLoc.filter(o => same(o.cls, cls.value));
             let match;
             if (vendor) {
                 if (isVendor()) {
                     if (vendorWrap) { vendorWrap.hidden = false; }
                     vendor.disabled = vendor.dataset.locked === 'true';
-                    const anyVendor = byCls.length === 0 || byCls.some(o => o.vendor === null);
-                    restrict(vendor, anyVendor ? [] : [...new Set(byCls.map(o => o.vendor))], pick(vendor, 'vendor'), sameVendor);
+                    const allowedVendors = vendors.filter(id => byCls.some(o => vendorRowMatches(o, id)));
+                    if (preserveSaved && current.vendor !== '') { allowedVendors.push(current.vendor); }
+                    restrict(vendor, allowedVendors, pick(vendor, 'vendor'), sameVendor, false);
                     match = vendorMatch(byCls, vendor.value);
                 } else {
                     if (vendorWrap) { vendorWrap.hidden = true; }
@@ -102,7 +107,7 @@
                 match = byCls[0];
             }
             syncPeople(preferCurrent);
-            syncCapex();
+            if (!preserveSaved) { syncCapex(); }
             if (match) {
                 output.value = money.format(match.rate) + ' /h';
                 output.classList.remove('is-invalid');

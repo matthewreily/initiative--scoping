@@ -15,6 +15,11 @@ test.describe('Resourcing classes and labor Capex % defaults', () => {
     await page.goto('/Admin/WorkCalendar');
     await expect(page.locator('#InternalCapexPercent')).toHaveCount(0);
 
+    await page.goto('/Admin/Vendors/Create');
+    await page.locator('#Name').fill(uniqueName('Capex vendor'));
+    await page.locator('#IsActive').check();
+    await page.getByRole('button', { name: 'Save' }).click();
+
     await createInitiative(page, uniqueName('E2E Capex'));
     await addPhase(page, 'Build', isoDate(0), isoDate(30));
 

@@ -429,8 +429,8 @@ else
 
         <h2 class="h5" data-tour="details:4" data-tour-title="Allocations" data-tour-text="Each row is a resource type × seniority × business unit on a phase. Only combinations priced on a published rate card can be chosen, so every line gets a rate. Apply a T-shirt size to fill this from a template.">Allocations</h2>
         <div class="table-responsive table-scroll" id="allocations-table">
-        <table class="table table-sm align-middle" data-sortable="@(groupByPod ? null : "")">
-            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Person</th><th>Location</th><th>Class</th><th>Capex / Opex</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort class="col-actions"></th></tr></thead>
+        <table class="table table-sm align-middle allocation-fit-table" data-sortable="@(groupByPod ? null : "")">
+            <thead><tr>@if (Model.ScopeWritable) { <th data-nosort class="allocation-select"><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th class="allocation-phase">Phase</th><th class="allocation-bu">Business unit</th><th class="allocation-resource">Resource type</th><th class="allocation-detail-column">Seniority</th><th class="allocation-people">Person</th><th class="allocation-detail-column">Location</th><th class="allocation-detail-column">Class</th><th class="allocation-detail-column">Capex / Opex</th><th class="text-end allocation-quantity">Qty</th>@if (fixedDuration) { <th class="text-end allocation-detail-column">Staffing %</th> }<th class="text-end allocation-hours">Hours</th><th class="text-end allocation-rate">Rate</th><th class="text-end allocation-cost">Cost</th><th data-nosort class="col-actions"></th></tr></thead>
             <tbody>
             @foreach (var a in orderedAllocations)
             {
@@ -439,21 +439,21 @@ else
                 if (groupByPod && previousPod != podKey)
                 {
                     previousPod = podKey;
-                    <tr class="table-light" data-nosort><th colspan="@(13 + (Model.ScopeWritable ? 1 : 0) + (fixedDuration ? 1 : 0))">@(a.Pod?.Name ?? "Unassigned/Individual")</th></tr>
+                    <tr class="table-light" data-nosort><th class="allocation-detail-column" colspan="@(13 + (Model.ScopeWritable ? 1 : 0) + (fixedDuration ? 1 : 0))">@(a.Pod?.Name ?? "Unassigned/Individual")</th><th class="allocation-compact-cell" colspan="@(9 + (Model.ScopeWritable ? 1 : 0))">@(a.Pod?.Name ?? "Unassigned/Individual")</th></tr>
                 }
                 <tr class="@(line.IsUnpriced ? "table-warning" : "")">
                     @if (Model.ScopeWritable) { <td><input type="checkbox" class="form-check-input" name="allocationIds" value="@a.Id" form="bulk-allocations" data-bulk-item aria-label="Select allocation" /></td> }
-                    <td data-sort="@(i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence)">@phaseNames.GetValueOrDefault(a.PhaseId)</td>
-                    <td>@a.BusinessUnit?.Name @if (a.Pod is not null) { <span class="badge text-bg-info text-wrap d-block">@a.Pod.Name</span> }</td>
-                    <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
-                    <td data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
+                    <td data-sort="@(i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence)"><span class="allocation-phase-name" title="@phaseNames.GetValueOrDefault(a.PhaseId)">@phaseNames.GetValueOrDefault(a.PhaseId)</span></td>
+                    <td>@a.BusinessUnit?.Name @if (a.Pod is not null) { <span class="badge text-bg-info allocation-pod-badge" title="@a.Pod.Name">@a.Pod.Name</span> }<span class="allocation-compact-details small text-muted">@(a.Vendor is null ? a.ResourcingClass?.Name : $"{a.ResourcingClass?.Name}: {a.Vendor.Name}")</span></td>
+                    <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)<span class="allocation-compact-details small text-muted">@a.Seniority!.Name · @a.Location</span><span class="allocation-compact-details small text-muted">@CapexSplit.Label(a.CapexPercent)</span></td>
+                    <td class="allocation-detail-column" data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
                     <td>@if (a.HasNamedPeople) { foreach (var p in a.NamedPeople) { <span class="allocation-person d-block text-nowrap">@p.DisplayName @if (!p.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } @if (Model.StaffingWritable) { <form asp-action="UnassignPerson" asp-route-id="@a.Id" method="post" class="d-inline"><input type="hidden" name="personId" value="@p.Id" /><button type="submit" class="btn btn-link btn-sm p-0 align-baseline text-danger text-decoration-none" title="Unassign @p.DisplayName (the seat stays, unassigned)" aria-label="Unassign @p.DisplayName">&times;</button></form> }</span> } if (a.UnassignedSeats > 0) { <span class="text-muted small d-block">+ @a.UnassignedSeats unassigned</span> } } else { <span class="text-muted">—</span> }</td>
-                    <td>@a.Location</td>
-                    <td>@(a.Vendor is null ? a.ResourcingClass?.Name ?? "—" : $"{a.ResourcingClass?.Name ?? "Vendor"}: {a.Vendor.Name}")</td>
-                    <td class="allocation-capitalization" data-sort="@a.CapexPercent" title="@a.CapexPercent.ToString("0.##")% Capex / @((100m - a.CapexPercent).ToString("0.##"))% Opex">@CapexSplit.Label(a.CapexPercent)</td>
+                    <td class="allocation-detail-column">@a.Location</td>
+                    <td class="allocation-detail-column">@(a.Vendor is null ? a.ResourcingClass?.Name ?? "—" : $"{a.ResourcingClass?.Name ?? "Vendor"}: {a.Vendor.Name}")</td>
+                    <td class="allocation-capitalization allocation-detail-column" data-sort="@a.CapexPercent" title="@a.CapexPercent.ToString("0.##")% Capex / @((100m - a.CapexPercent).ToString("0.##"))% Opex">@CapexSplit.Label(a.CapexPercent)</td>
                     <td class="text-end">@a.Quantity</td>
-                    @if (fixedDuration) { <td class="text-end">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
-                    <td class="text-end" data-sort="@line.Hours">@line.Hours.ToString("N1")</td>
+                    @if (fixedDuration) { <td class="text-end allocation-detail-column">@(a.AllocationPercent is decimal pct ? pct.ToString("0.##") + "%" : "—")</td> }
+                    <td class="text-end" data-sort="@line.Hours">@line.Hours.ToString("N1")@if (fixedDuration) { <span class="allocation-compact-details small text-muted">@(a.AllocationPercent?.ToString("0.##") ?? "—")% staffed</span> }</td>
                     <td class="text-end" data-sort="@(line.HourlyRate ?? -1)">@(line.HourlyRate is decimal r ? r.ToString("C2") : Html.Raw("<span class='text-danger' title='No exact rate-card match for this resource type / seniority / location / class (and vendor)'>Unpriced</span>")) @if (line.IsBlendedRate) { <span class="badge bg-light text-dark border" title="Phase spans more than one rate card; day-weighted average">blended</span> }</td>
                     <td class="text-end" data-sort="@line.Cost"><a asp-action="Explain" asp-route-id="@i.Id" asp-fragment="allocation-@a.Id" class="explain-link" title="Why this number?">@line.Cost.ToString("C0")</a></td>
                     <td class="text-end text-nowrap col-actions">
@@ -473,12 +473,12 @@ else
             }
             @if (i.Allocations.Count == 0)
             {
-                <tr data-nosort><td colspan="14" class="text-muted">No allocations yet.</td></tr>
+                <tr data-nosort><td colspan="@(13 + (Model.ScopeWritable ? 1 : 0) + (fixedDuration ? 1 : 0))" class="text-muted allocation-detail-column">No allocations yet.</td><td colspan="@(9 + (Model.ScopeWritable ? 1 : 0))" class="text-muted allocation-compact-cell">No allocations yet.</td></tr>
             }
             </tbody>
             @if (i.Allocations.Count > 0)
             {
-                <tfoot class="fw-semibold"><tr><td colspan="@((fixedDuration ? 9 : 8) + (Model.ScopeWritable ? 1 : 0))" class="text-end">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td class="col-actions"></td></tr></tfoot>
+                <tfoot class="fw-semibold"><tr><td colspan="@(9 + (fixedDuration ? 1 : 0) + (Model.ScopeWritable ? 1 : 0))" class="text-end allocation-detail-column">Labor total</td><td colspan="@(5 + (Model.ScopeWritable ? 1 : 0))" class="text-end allocation-compact-cell">Labor total</td><td class="text-end">@Model.Forecast.TotalHours.ToString("N1")</td><td></td><td class="text-end">@Model.Forecast.LaborCost.ToString("C0")</td><td class="col-actions"></td></tr></tfoot>
             }
         </table>
         </div>
