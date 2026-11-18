@@ -2,7 +2,12 @@ using InitiativeScoping.Domain.Entities;
 
 namespace InitiativeScoping.Domain.Services;
 
-public sealed record PodPlan(IReadOnlyList<InitiativeAllocation> Add, IReadOnlyList<InitiativeAllocation> Remove, IReadOnlyList<string> Skipped);
+public sealed record PodSeatRemoval(InitiativeAllocation Allocation, IReadOnlyList<InitiativeAllocationPerson> People);
+
+public sealed record PodPlan(IReadOnlyList<InitiativeAllocation> Add, IReadOnlyList<InitiativeAllocation> Remove, IReadOnlyList<string> Skipped)
+{
+    public IReadOnlyList<PodSeatRemoval> Update { get; init; } = [];
+}
 
 public static class PodPlanner
 {
@@ -48,6 +53,9 @@ public static class PodPlanner
         var existing = allocations.Where(a => a.InitiativeId == initiativeId && a.PodId == pod.Id).OrderBy(a => a.Id).ToList();
         var members = pod.Members.Where(m => m.Person?.IsActive == true).Select(m => m.PersonId).ToHashSet();
         var remove = existing.Where(a => !a.PersonIds.Any(members.Contains)).ToList();
+        var update = existing.Where(a => a.PersonIds.Any(members.Contains))
+            .Select(a => new PodSeatRemoval(a, a.People.Where(p => !members.Contains(p.PersonId)).ToList()))
+            .Where(u => u.People.Count > 0).ToList();
         var add = new List<InitiativeAllocation>();
         var skipped = new List<string>();
         foreach (var group in existing.GroupBy(a => a.PhaseId))
@@ -69,6 +77,6 @@ public static class PodPlanner
             skipped.AddRange(plan.Skipped);
         }
 
-        return new PodPlan(add, remove, skipped);
+        return new PodPlan(add, remove, skipped) { Update = update };
     }
 }

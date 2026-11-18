@@ -6,6 +6,29 @@ namespace InitiativeScoping.Domain.Tests;
 
 public class PodPlannerTests
 {
+    [Fact]
+    public void Resync_removes_only_departed_people_from_mixed_allocations()
+    {
+        var seats = PodPlanner.Assign(9, Team(Member(1)), [Build], 50, Cards(), Holidays, 8).Add.ToList();
+        var allocation = seats.Single();
+        allocation.Quantity = 3;
+        allocation.People.Add(new InitiativeAllocationPerson { PersonId = 2 });
+        allocation.People.Add(new InitiativeAllocationPerson { PersonId = 3 });
+        allocation.EstimatedHours = 123;
+        var plan = PodPlanner.Resync(9, Team(Member(1), Member(2, false)), [Build], seats, Cards(), Holidays, 8);
+        Assert.Empty(plan.Remove);
+        Assert.Empty(plan.Add);
+        var update = Assert.Single(plan.Update);
+        Assert.Same(allocation, update.Allocation);
+        Assert.Equal(new[] { 2, 3 }, update.People.Select(p => p.PersonId));
+        Assert.Equal(3, allocation.Quantity);
+        Assert.Equal(123, allocation.EstimatedHours);
+        Assert.Empty(PodPlanner.Resync(9, Team(Member(1), Member(2), Member(3)), [Build], seats, Cards(), Holidays, 8).Update);
+        var allGone = PodPlanner.Resync(9, Team(), [Build], seats, Cards(), Holidays, 8);
+        Assert.Same(allocation, Assert.Single(allGone.Remove));
+        Assert.Empty(allGone.Update);
+    }
+
     private static readonly Phase Build = new() { Id = 1, Name = "Build", PlannedStart = new(2026, 1, 5), PlannedEnd = new(2026, 1, 9) };
     private static readonly IReadOnlySet<DateOnly> Holidays = new HashSet<DateOnly> { new(2026, 1, 6) };
     private static Person Member(int id, bool active = true) => new() { Id = id, DisplayName = $"Person {id}", IsActive = active, ResourceTypeId = 1, SeniorityId = 3, Location = "Onshore", ResourcingClassId = 1, ResourcingClass = new() { Name = "Internal", DefaultCapexPercent = 70 } };

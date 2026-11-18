@@ -17,6 +17,13 @@
 }
 </ul>
 @foreach (var warning in plan.Skipped) { <p class="text-warning-emphasis">@warning</p> }
+<h2 class="h5">Departed people to remove from retained allocations (@plan.Update.Sum(u => u.People.Count))</h2>
+<ul>
+@foreach (var update in plan.Update)
+{
+    <li>@string.Join(", ", update.People.Select(p => p.Person?.DisplayName ?? $"Person #{p.PersonId}")) — @Model.Initiative.Phases.First(p => p.Id == update.Allocation.PhaseId).Name — quantity @update.Allocation.Quantity → @(update.Allocation.Quantity - update.People.Count). Remaining members and per-seat settings are retained.</li>
+}
+</ul>
 <form asp-action="ConfirmResyncPod" asp-route-id="@Model.Initiative.Id" method="post">
     <input type="hidden" name="podId" value="@Model.PodId" />
     <button class="btn btn-primary" type="submit">Confirm re-sync</button>

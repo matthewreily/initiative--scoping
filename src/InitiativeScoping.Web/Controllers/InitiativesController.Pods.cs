@@ -82,10 +82,15 @@ public partial class InitiativesController
         var calendar = await workCalendar.GetAsync(ct);
         var plan = PodPlanner.Resync(id, pod, initiative.Phases, initiative.Allocations, await LoadRateCardsAsync(ct), calendar.Holidays, calendar.HoursPerDay);
         db.InitiativeAllocations.RemoveRange(plan.Remove);
+        foreach (var update in plan.Update)
+        {
+            db.InitiativeAllocationPeople.RemoveRange(update.People);
+            update.Allocation.Quantity -= update.People.Count;
+        }
         db.InitiativeAllocations.AddRange(plan.Add);
-        audit.Record(nameof(Initiative), id, AuditActions.Update, new { Operation = "ResyncPod", PodId = podId, Added = plan.Add.Select(a => new { a.PhaseId, PersonIds = a.PersonIds.ToArray(), a.AllocationPercent }).ToArray(), Removed = plan.Remove.Select(a => a.Id).ToArray(), plan.Skipped });
+        audit.Record(nameof(Initiative), id, AuditActions.Update, new { Operation = "ResyncPod", PodId = podId, Added = plan.Add.Select(a => new { a.PhaseId, PersonIds = a.PersonIds.ToArray(), a.AllocationPercent }).ToArray(), Removed = plan.Remove.Select(a => a.Id).ToArray(), Updated = plan.Update.Select(u => new { u.Allocation.Id, RemovedPersonIds = u.People.Select(p => p.PersonId).ToArray(), u.Allocation.Quantity }).ToArray(), plan.Skipped });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Pod re-synced: {plan.Add.Count} seats added, {plan.Remove.Count} removed. {SkippedMessage(plan)}", id);
+        return RedirectWithSuccess($"Pod re-synced: {plan.Add.Count} seats added, {plan.Remove.Count} allocations removed, {plan.Update.Sum(u => u.People.Count)} departed people removed from retained allocations. {SkippedMessage(plan)}", id);
     }
 
     private Task<Pod?> LoadPod(int id, CancellationToken ct) => db.Pods.Include(p => p.Members).ThenInclude(m => m.Person).ThenInclude(p => p!.ResourcingClass).AsSplitQuery().SingleOrDefaultAsync(p => p.Id == id, ct);
