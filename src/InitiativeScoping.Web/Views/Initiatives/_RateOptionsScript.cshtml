@@ -120,7 +120,7 @@
         function syncPeople(preferCurrent) {
             if (!person) { return; }
             const vendorId = isVendor() && vendor ? vendor.value : '';
-            const eligible = people.filter(p => same(p.type, type.value) && same(p.seniority, seniority.value) && (!bu || same(p.bu, bu.value))
+            const eligible = people.filter(p => same(p.type, type.value) && same(p.seniority, seniority.value) && (@(ViewBag.PodAllocation is true ? "true" : "false") || !bu || same(p.bu, bu.value))
                 && same(p.cls, cls.value) && (!classIsVendor(p.cls) || sameVendor(p.vendor, vendorId)));
             const wanted = preferCurrent ? current.people : Array.from(person.selectedOptions).map(o => o.value);
             let kept = 0;

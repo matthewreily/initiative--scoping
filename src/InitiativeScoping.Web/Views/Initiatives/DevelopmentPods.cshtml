@@ -1,0 +1,49 @@
+@model InitiativePodsModel
+@{ ViewData["Title"] = "Development Pods"; }
+<h1 class="h3">Development Pods — @Model.Initiative.Name</h1>
+<p><a asp-action="Details" asp-route-id="@Model.Initiative.Id">Back to initiative</a></p>
+<h2 class="h5">Application / Platform tags</h2>
+@if (Model.CanEdit)
+{
+    <form asp-action="UpdateApplications" asp-route-id="@Model.Initiative.Id" method="post" class="mb-4">
+        @foreach (var app in Model.Applications.Where(a => a.IsActive))
+        {
+            <label class="d-block"><input type="checkbox" name="applicationIds" value="@app.Id" checked="@Model.ApplicationIds.Contains(app.Id)" /> @app.Name</label>
+        }
+        <button class="btn btn-outline-primary btn-sm mt-2" type="submit">Save tags</button>
+    </form>
+}
+else
+{
+    <p>@string.Join(", ", Model.Applications.Where(a => Model.ApplicationIds.Contains(a.Id)).Select(a => a.Name))</p>
+}
+<h2 class="h5">Suggested pods</h2>
+@if (Model.Suggested.Count == 0) { <p class="text-muted">No active pods own the tagged applications/platforms.</p> }
+<div class="d-flex flex-wrap gap-2 mb-4">
+@foreach (var pod in Model.Suggested)
+{
+    <span class="border rounded p-2">@pod.Name @if (Model.CanEdit) { <a asp-action="DevelopmentPods" asp-route-id="@Model.Initiative.Id" asp-route-podId="@pod.Id" asp-fragment="assign-pod">Assign</a> }</span>
+}
+</div>
+@if (Model.CanEdit)
+{
+    <h2 class="h5" id="assign-pod">Assign pod</h2>
+    <form asp-action="AssignPod" asp-route-id="@Model.Initiative.Id" method="post" class="col-12 col-lg-6 mb-4">
+        <label asp-for="PodId" class="form-label">Pod</label>
+        <select asp-for="PodId" asp-items="@(new SelectList(Model.Pods, "Id", "Name"))" class="form-select mb-3" required><option value="">Choose…</option></select>
+        <fieldset class="mb-3"><legend class="h6">Phases</legend>
+        @foreach (var phase in Model.Initiative.Phases.OrderBy(p => p.Sequence))
+        {
+            <label class="d-block"><input type="checkbox" name="PhaseIds" value="@phase.Id" /> @phase.Name</label>
+        }
+        </fieldset>
+        <label asp-for="AllocationPercent" class="form-label">Allocation %</label><input asp-for="AllocationPercent" type="number" min="0.01" max="100" step="0.01" class="form-control mb-3" />
+        <button class="btn btn-primary" type="submit">Assign pod</button>
+    </form>
+    <h2 class="h5">Re-sync assigned pods</h2>
+    <p class="small text-muted">Preview membership changes before applying. Existing member seats keep their manual edits.</p>
+    @foreach (var pod in Model.Initiative.Allocations.Where(a => a.Pod?.IsActive == true).Select(a => a.Pod!).DistinctBy(p => p.Id))
+    {
+        <p><a asp-action="ResyncPod" asp-route-id="@Model.Initiative.Id" asp-route-podId="@pod.Id">Re-sync @pod.Name</a></p>
+    }
+}

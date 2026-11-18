@@ -16,7 +16,7 @@ namespace InitiativeScoping.Web.Controllers;
 
 [Authorize(Policy = AppPolicies.CanView)]
 [AutoValidateAntiforgeryToken]
-public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IConfiguration config, IWorkCalendar workCalendar, IUserDirectory users, IDirectorySearch directorySearch) : Controller
+public partial class InitiativesController(AppDbContext db, ICurrentUser currentUser, IAuditLog audit, TimeProvider clock, IConfiguration config, IWorkCalendar workCalendar, IUserDirectory users, IDirectorySearch directorySearch) : Controller
 {
     private const string Entity = nameof(Initiative);
     private const string ScopeLockedMessage = "Scope is locked; it can only change in Draft or during an approved re-baseline.";
@@ -818,7 +818,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             return Forbid();
         }
 
-        await PopulateAllocationLists(allocation.Initiative!, ct);
+        await PopulateAllocationLists(allocation.Initiative!, ct, allocation);
         ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
         ViewBag.StaffingOnly = !InitiativeAccess.IsScopeEditable(allocation.Initiative!) && InitiativeAccess.IsStaffingEditable(allocation.Initiative!);
         return View(new AllocationEditModel
@@ -856,7 +856,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await ValidateAllocation(model, initiative, ct, allocation);
         if (!ModelState.IsValid)
         {
-            await PopulateAllocationLists(initiative, ct);
+            await PopulateAllocationLists(initiative, ct, allocation);
             ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([model.SeniorityId], ct)
                 ?? await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
             return View(model);
@@ -916,7 +916,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         await ValidateAllocationPersonAsync(staffing, initiative, allocation, ct);
         if (!ModelState.IsValid)
         {
-            await PopulateAllocationLists(initiative, ct);
+            await PopulateAllocationLists(initiative, ct, allocation);
             ViewBag.CurrentSeniority = await db.SeniorityLevels.FindAsync([allocation.SeniorityId], ct);
             ViewBag.StaffingOnly = true;
             return View(nameof(EditAllocation), staffing);
@@ -1625,6 +1625,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .Include(i => i.Phases)
             .Include(i => i.Allocations).ThenInclude(a => a.ResourceType)
             .Include(i => i.Allocations).ThenInclude(a => a.BusinessUnit)
+            .Include(i => i.Allocations).ThenInclude(a => a.Pod)
             .Include(i => i.Allocations).ThenInclude(a => a.Vendor)
             .Include(i => i.Allocations).ThenInclude(a => a.ResourcingClass)
             .Include(i => i.Allocations).ThenInclude(a => a.Seniority)
@@ -1760,11 +1761,22 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
             .ToList();
     }
 
-    private async Task PopulateAllocationLists(Initiative initiative, CancellationToken ct)
+    private async Task PopulateAllocationLists(Initiative initiative, CancellationToken ct, InitiativeAllocation? existing = null)
     {
         ViewBag.Initiative = initiative;
         ViewBag.Phases = new SelectList(initiative.Phases.OrderBy(p => p.Sequence), "Id", "Name");
-        ViewBag.RateOptions = await BuildRateOptionsAsync(initiative, await LoadRateCardsAsync(ct), ct);
+        var options = await BuildRateOptionsAsync(initiative, await LoadRateCardsAsync(ct), ct);
+        ViewBag.PodAllocation = existing?.PodId is not null;
+        if (existing?.PodId is not null)
+        {
+            var bu = await db.BusinessUnits.FindAsync([existing.BusinessUnitId], ct);
+            if (bu is not null && options.BusinessUnits.All(b => b.Id != bu.Id))
+                options = options with { BusinessUnits = options.BusinessUnits.Append(new NamedId(bu.Id, bu.Name)).ToList() };
+            var people = await db.People.Where(p => p.IsActive || existing.PersonIds.Contains(p.Id)).OrderBy(p => p.DisplayName)
+                .Select(p => new PersonOption(p.Id, p.DisplayName, p.ResourceTypeId, p.SeniorityId, p.BusinessUnitId, p.ResourcingClassId, p.VendorId)).ToListAsync(ct);
+            options = options with { People = people };
+        }
+        ViewBag.RateOptions = options;
         ViewBag.CurrentSeniority = null;
         if (initiative.PlanningMode == PlanningMode.FixedDuration)
         {
@@ -1982,7 +1994,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
                 ModelState.AddModelError(nameof(model.PersonIds), $"{person.DisplayName} is inactive on the roster.");
             }
 
-            if (!initiative.ParticipatingBusinessUnitIds.Contains(person.BusinessUnitId) || person.BusinessUnitId != model.BusinessUnitId)
+            if (existing?.PodId is null && (!initiative.ParticipatingBusinessUnitIds.Contains(person.BusinessUnitId) || person.BusinessUnitId != model.BusinessUnitId))
             {
                 ModelState.AddModelError(nameof(model.PersonIds), $"{person.DisplayName} belongs to a different business unit than this allocation.");
             }
@@ -2014,7 +2026,7 @@ public class InitiativesController(AppDbContext db, ICurrentUser currentUser, IA
         }
 
         var participates = initiative.ParticipatingBusinessUnitIds.Contains(model.BusinessUnitId);
-        if (!participates)
+        if (!participates && !(existing?.PodId is not null && existing.BusinessUnitId == model.BusinessUnitId))
         {
             ModelState.AddModelError(nameof(model.BusinessUnitId), "Select one of the initiative's participating business units.");
         }

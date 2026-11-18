@@ -200,6 +200,8 @@ public class PhaseDateHistory
 
 public class InitiativeAllocation
 {
+    public int? PodId { get; set; }
+    public Pod? Pod { get; set; }
     public int Id { get; set; }
     public int InitiativeId { get; set; }
     public Initiative? Initiative { get; set; }

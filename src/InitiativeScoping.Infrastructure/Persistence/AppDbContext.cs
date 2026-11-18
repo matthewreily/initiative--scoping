@@ -8,6 +8,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
+    public DbSet<ApplicationPlatform> ApplicationPlatforms => Set<ApplicationPlatform>();
+    public DbSet<Pod> Pods => Set<Pod>();
+    public DbSet<PodMember> PodMembers => Set<PodMember>();
+    public DbSet<PodApplication> PodApplications => Set<PodApplication>();
+    public DbSet<InitiativeApplication> InitiativeApplications => Set<InitiativeApplication>();
     public DbSet<Discipline> Disciplines => Set<Discipline>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<SeniorityLevel> SeniorityLevels => Set<SeniorityLevel>();
@@ -61,6 +66,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
             e.HasIndex(x => x.Name).IsUnique();
         });
+
+        b.Entity<ApplicationPlatform>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+        b.Entity<Pod>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200).UseCollation(ciCollation);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.HasIndex(x => x.Name).IsUnique();
+            e.HasOne(x => x.BusinessUnit).WithMany().HasForeignKey(x => x.BusinessUnitId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PodMember>().HasKey(x => new { x.PodId, x.PersonId });
+        b.Entity<PodMember>().HasOne(x => x.Person).WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<PodApplication>().HasKey(x => new { x.PodId, x.ApplicationPlatformId });
+        b.Entity<PodApplication>().HasOne(x => x.ApplicationPlatform).WithMany().HasForeignKey(x => x.ApplicationPlatformId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<InitiativeApplication>().HasKey(x => new { x.InitiativeId, x.ApplicationPlatformId });
+        b.Entity<InitiativeApplication>().HasOne(x => x.ApplicationPlatform).WithMany().HasForeignKey(x => x.ApplicationPlatformId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<InitiativeAllocation>().HasOne(x => x.Pod).WithMany().HasForeignKey(x => x.PodId).OnDelete(DeleteBehavior.Restrict);
 
         b.Entity<Discipline>(e =>
         {

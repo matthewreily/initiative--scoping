@@ -1,0 +1,23 @@
+@model PodEditModel
+@{ ViewData["Title"] = "Edit Development Pods"; }
+<h2 class="h4">@ViewData["Title"]</h2>
+<form method="post" class="col-12 col-lg-8">
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <div class="mb-3"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" /></div>
+    <div class="form-check mb-3"><input asp-for="IsActive" class="form-check-input" /><label asp-for="IsActive" class="form-check-label">Active</label></div>
+    <div class="mb-3"><label asp-for="BusinessUnitId" class="form-label">Business unit</label><select asp-for="BusinessUnitId" asp-items="@(new SelectList(Model.BusinessUnits, "Id", "Name"))" class="form-select"><option value="">Choose…</option></select></div>
+    <div class="mb-3"><label asp-for="Description" class="form-label"></label><textarea asp-for="Description" class="form-control"></textarea></div>
+    <fieldset class="mb-3"><legend class="h6">Active roster members</legend>
+    @foreach (var person in Model.People)
+    {
+        <label class="d-block"><input type="checkbox" name="PersonIds" value="@person.Id" checked="@Model.PersonIds.Contains(person.Id)" /> @person.DisplayName</label>
+    }
+    </fieldset>
+    <fieldset class="mb-3"><legend class="h6">Applications / Platforms</legend>
+    @foreach (var app in Model.Applications)
+    {
+        <label class="d-block"><input type="checkbox" name="ApplicationIds" value="@app.Id" checked="@Model.ApplicationIds.Contains(app.Id)" /> @app.Name</label>
+    }
+    </fieldset>
+    <button type="submit" class="btn btn-primary">Save</button> <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+</form>

@@ -91,7 +91,8 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
         var referenced = await db.Initiatives.AnyAsync(i => i.BusinessUnitId == id, ct)
                          || await db.InitiativeBusinessUnits.AnyAsync(i => i.BusinessUnitId == id, ct)
                          || await db.InitiativeAllocations.AnyAsync(a => a.BusinessUnitId == id, ct)
-                         || await db.People.AnyAsync(p => p.BusinessUnitId == id, ct);
+                         || await db.People.AnyAsync(p => p.BusinessUnitId == id, ct)
+                         || await db.Pods.AnyAsync(p => p.BusinessUnitId == id, ct);
         if (referenced)
         {
             return RedirectWithError($"'{unit.Name}' is referenced by initiatives or people and cannot be deleted. Deactivate it instead.");
@@ -109,7 +110,8 @@ public class BusinessUnitsController(AppDbContext db, IAuditLog audit) : AdminCo
         async (u, c) => !(await db.Initiatives.AnyAsync(i => i.BusinessUnitId == u.Id, c)
                           || await db.InitiativeBusinessUnits.AnyAsync(i => i.BusinessUnitId == u.Id, c)
                           || await db.InitiativeAllocations.AnyAsync(a => a.BusinessUnitId == u.Id, c)
-                          || await db.People.AnyAsync(p => p.BusinessUnitId == u.Id, c)),
+                          || await db.People.AnyAsync(p => p.BusinessUnitId == u.Id, c)
+                          || await db.Pods.AnyAsync(p => p.BusinessUnitId == u.Id, c)),
         u => u.Name,
         u => audit.Record(nameof(BusinessUnit), u.Id, AuditActions.Delete, new { u.Name }),
         "business unit", "business units", "referenced; deactivate instead", ct);

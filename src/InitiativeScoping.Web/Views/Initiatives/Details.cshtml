@@ -10,8 +10,11 @@
     var billingModels = Html.GetEnumSelectList<BillingModel>();
     var phaseNames = i.Phases.ToDictionary(p => p.Id, p => p.Name);
     var lineByAllocation = Model.Forecast.Lines.ToDictionary(l => l.Allocation.Id);
+    var groupByPod = Context.Request.Query["groupBy"] == "pod";
+    string? previousPod = null;
     var orderedAllocations = i.Allocations
-        .OrderBy(a => i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence ?? int.MaxValue)
+        .OrderBy(a => groupByPod ? a.Pod?.Name ?? "Unassigned/Individual" : "")
+        .ThenBy(a => i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence ?? int.MaxValue)
         .ThenBy(a => Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId))
         .ThenBy(a => a.Seniority!.SortOrder).ToList();
     var fixedDuration = i.PlanningMode == PlanningMode.FixedDuration;
@@ -426,16 +429,22 @@ else
 
         <h2 class="h5" data-tour="details:4" data-tour-title="Allocations" data-tour-text="Each row is a resource type × seniority × business unit on a phase. Only combinations priced on a published rate card can be chosen, so every line gets a rate. Apply a T-shirt size to fill this from a template.">Allocations</h2>
         <div class="table-responsive table-scroll" id="allocations-table">
-        <table class="table table-sm align-middle" data-sortable>
+        <table class="table table-sm align-middle" data-sortable="@(groupByPod ? null : "")">
             <thead><tr>@if (Model.ScopeWritable) { <th data-nosort><input type="checkbox" class="form-check-input" data-bulk-all aria-label="Select all allocations" /></th> }<th>Phase</th><th>Business unit</th><th>Resource type</th><th>Seniority</th><th>Person</th><th>Location</th><th>Class</th><th>Capex / Opex</th><th class="text-end">Qty</th>@if (fixedDuration) { <th class="text-end">Staffing %</th> }<th class="text-end">Hours</th><th class="text-end">Rate</th><th class="text-end">Cost</th><th data-nosort class="col-actions"></th></tr></thead>
             <tbody>
             @foreach (var a in orderedAllocations)
             {
                 var line = lineByAllocation[a.Id];
+                var podKey = a.PodId?.ToString() ?? "individual";
+                if (groupByPod && previousPod != podKey)
+                {
+                    previousPod = podKey;
+                    <tr class="table-light" data-nosort><th colspan="@(13 + (Model.ScopeWritable ? 1 : 0) + (fixedDuration ? 1 : 0))">@(a.Pod?.Name ?? "Unassigned/Individual")</th></tr>
+                }
                 <tr class="@(line.IsUnpriced ? "table-warning" : "")">
                     @if (Model.ScopeWritable) { <td><input type="checkbox" class="form-check-input" name="allocationIds" value="@a.Id" form="bulk-allocations" data-bulk-item aria-label="Select allocation" /></td> }
                     <td data-sort="@(i.Phases.FirstOrDefault(p => p.Id == a.PhaseId)?.Sequence)">@phaseNames.GetValueOrDefault(a.PhaseId)</td>
-                    <td>@a.BusinessUnit?.Name</td>
+                    <td>@a.BusinessUnit?.Name @if (a.Pod is not null) { <span class="badge text-bg-info text-wrap d-block">@a.Pod.Name</span> }</td>
                     <td>@Model.ResourceTypeNames.GetValueOrDefault(a.ResourceTypeId)</td>
                     <td data-sort="@a.Seniority!.SortOrder">@a.Seniority.Name</td>
                     <td>@if (a.HasNamedPeople) { foreach (var p in a.NamedPeople) { <span class="allocation-person d-block text-nowrap">@p.DisplayName @if (!p.IsActive) { <span class="badge bg-secondary" title="Inactive on the roster">inactive</span> } @if (Model.StaffingWritable) { <form asp-action="UnassignPerson" asp-route-id="@a.Id" method="post" class="d-inline"><input type="hidden" name="personId" value="@p.Id" /><button type="submit" class="btn btn-link btn-sm p-0 align-baseline text-danger text-decoration-none" title="Unassign @p.DisplayName (the seat stays, unassigned)" aria-label="Unassign @p.DisplayName">&times;</button></form> }</span> } if (a.UnassignedSeats > 0) { <span class="text-muted small d-block">+ @a.UnassignedSeats unassigned</span> } } else { <span class="text-muted">—</span> }</td>
@@ -505,6 +514,7 @@ else
             }
             <p class="mb-4">
                 <a class="btn btn-primary btn-sm" asp-action="AddAllocation" asp-route-id="@i.Id" data-panel="Add allocation" id="add-allocation">Add allocation</a>
+                <a class="btn btn-outline-primary btn-sm" asp-action="DevelopmentPods" asp-route-id="@i.Id">Assign pod / Application tags</a>
             </p>
         }
 
@@ -593,6 +603,10 @@ else
         </div>
     </div>
     <div class="tab-pane fade" id="pane-costs" role="tabpanel" aria-labelledby="tab-costs">
+        @if (Model.ScopeWritable)
+        {
+            <p><a class="btn btn-outline-primary btn-sm" asp-action="DevelopmentPods" asp-route-id="@i.Id">Assign pod / Re-sync</a></p>
+        }
         <div class="row g-4">
             <div class="col-lg-7">
         <h2 class="h5" id="non-labor-costs">Non-labor costs</h2>
@@ -727,6 +741,17 @@ else
         </table>
         </div>
 
+        <h2 class="h5 mt-4">By pod</h2>
+        <p><a asp-action="Details" asp-route-id="@i.Id" asp-route-groupBy="pod" asp-fragment="pane-plan">Group allocation list by pod</a> · <a asp-action="DevelopmentPods" asp-route-id="@i.Id">Application tags / Suggested pods / Re-sync</a></p>
+        <table class="table table-sm" id="rollup-by-pod">
+            <thead><tr><th>Pod</th><th class="text-end">Hours</th><th class="text-end">Cost</th></tr></thead>
+            <tbody>
+            @foreach (var group in Model.Forecast.Lines.GroupBy(l => l.Allocation.PodId))
+            {
+                <tr><td>@(group.First().Allocation.Pod?.Name ?? "Unassigned/Individual")</td><td class="text-end">@group.Sum(l => l.Hours).ToString("N1")</td><td class="text-end">@group.Sum(l => l.Cost).ToString("C0") @if (group.Any(l => l.IsUnpriced)) { <span class="text-warning">&#9888;</span> }</td></tr>
+            }
+            </tbody>
+        </table>
         <h2 class="h5 mt-4">Rollup by resourcing business unit</h2>
         <div class="table-responsive">
         <table class="table table-sm" id="rollup-by-bu">

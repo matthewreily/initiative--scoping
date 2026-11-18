@@ -1,0 +1,9 @@
+@model ApplicationPlatformEditModel
+@{ ViewData["Title"] = "Edit Applications / Platforms"; }
+<h2 class="h4">@ViewData["Title"]</h2>
+<form method="post" class="col-12 col-lg-8">
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <div class="mb-3"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" /></div>
+    <div class="form-check mb-3"><input asp-for="IsActive" class="form-check-input" /><label asp-for="IsActive" class="form-check-label">Active</label></div>
+    <button type="submit" class="btn btn-primary">Save</button> <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+</form>

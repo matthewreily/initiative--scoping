@@ -293,6 +293,31 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.ToTable("AllocationTemplateLines");
                 });
 
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.ApplicationPlatform", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .UseCollation("case_insensitive");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ApplicationPlatforms");
+                });
+
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.AuditEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -897,6 +922,9 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Property<int>("PhaseId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("PodId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
@@ -919,6 +947,8 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.HasIndex("InitiativeId");
 
                     b.HasIndex("PhaseId");
+
+                    b.HasIndex("PodId");
 
                     b.HasIndex("ResourceTypeId");
 
@@ -953,6 +983,21 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("InitiativeAllocationPeople");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.InitiativeApplication", b =>
+                {
+                    b.Property<int>("InitiativeId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ApplicationPlatformId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("InitiativeId", "ApplicationPlatformId");
+
+                    b.HasIndex("ApplicationPlatformId");
+
+                    b.ToTable("InitiativeApplications");
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.InitiativeBusinessUnit", b =>
@@ -1244,6 +1289,70 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.HasIndex("PhaseId");
 
                     b.ToTable("PhaseDateHistories");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.Pod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BusinessUnitId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .UseCollation("case_insensitive");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessUnitId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Pods");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.PodApplication", b =>
+                {
+                    b.Property<int>("PodId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ApplicationPlatformId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PodId", "ApplicationPlatformId");
+
+                    b.HasIndex("ApplicationPlatformId");
+
+                    b.ToTable("PodApplications");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.PodMember", b =>
+                {
+                    b.Property<int>("PodId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PersonId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PodId", "PersonId");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("PodMembers");
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.RateCard", b =>
@@ -1788,6 +1897,11 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("InitiativeScoping.Domain.Entities.Pod", "Pod")
+                        .WithMany()
+                        .HasForeignKey("PodId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("InitiativeScoping.Domain.Entities.ResourceType", "ResourceType")
                         .WithMany()
                         .HasForeignKey("ResourceTypeId")
@@ -1817,6 +1931,8 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Phase");
 
+                    b.Navigation("Pod");
+
                     b.Navigation("ResourceType");
 
                     b.Navigation("ResourcingClass");
@@ -1843,6 +1959,25 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Navigation("Allocation");
 
                     b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.InitiativeApplication", b =>
+                {
+                    b.HasOne("InitiativeScoping.Domain.Entities.ApplicationPlatform", "ApplicationPlatform")
+                        .WithMany()
+                        .HasForeignKey("ApplicationPlatformId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("InitiativeScoping.Domain.Entities.Initiative", "Initiative")
+                        .WithMany()
+                        .HasForeignKey("InitiativeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApplicationPlatform");
+
+                    b.Navigation("Initiative");
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.InitiativeBusinessUnit", b =>
@@ -1993,6 +2128,55 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Navigation("Phase");
                 });
 
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.Pod", b =>
+                {
+                    b.HasOne("InitiativeScoping.Domain.Entities.BusinessUnit", "BusinessUnit")
+                        .WithMany()
+                        .HasForeignKey("BusinessUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BusinessUnit");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.PodApplication", b =>
+                {
+                    b.HasOne("InitiativeScoping.Domain.Entities.ApplicationPlatform", "ApplicationPlatform")
+                        .WithMany()
+                        .HasForeignKey("ApplicationPlatformId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("InitiativeScoping.Domain.Entities.Pod", "Pod")
+                        .WithMany("Applications")
+                        .HasForeignKey("PodId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApplicationPlatform");
+
+                    b.Navigation("Pod");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.PodMember", b =>
+                {
+                    b.HasOne("InitiativeScoping.Domain.Entities.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("InitiativeScoping.Domain.Entities.Pod", "Pod")
+                        .WithMany("Members")
+                        .HasForeignKey("PodId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+
+                    b.Navigation("Pod");
+                });
+
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.RateCardEntry", b =>
                 {
                     b.HasOne("InitiativeScoping.Domain.Entities.RateCard", "RateCard")
@@ -2116,6 +2300,13 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.Phase", b =>
                 {
                     b.Navigation("DateHistory");
+                });
+
+            modelBuilder.Entity("InitiativeScoping.Domain.Entities.Pod", b =>
+                {
+                    b.Navigation("Applications");
+
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.RateCard", b =>

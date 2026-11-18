@@ -33,6 +33,16 @@ Three application roles, granted in-app at `Admin → Users`:
 
 ## 1. First-time setup (Admin)
 
+### Development Pods and application ownership
+
+In **Admin → Applications / Platforms**, create active app tags. In **Admin → Development Pods**, create a pod with a required business unit, optional description, active roster members and app ownership. Membership and app changes are audited. People and apps can each belong to multiple pods. Deactivate referenced catalogs instead of deleting them.
+
+On an initiative's Plan tab, **Assign pod / Application tags** opens app tagging, suggested pods (active pods owning any tagged app), and pod assignment. Choose a pod, one or more phases, and an allocation % (default 100). Each active, priced member receives a quantity-one named seat per phase; hours use the phase's working days and the work calendar, and Capex % starts at the person's resourcing-class default. The seat's business unit is the pod's, not necessarily the initiative's or person's. Members without a rate covering the phase are skipped and named in the result message. Assigning the same pod/member/phase again does not duplicate that seat.
+
+Seats remain editable as normal. Costs includes **By pod**, with non-pod allocations under **Unassigned/Individual**, and a link to group the Plan list by pod. The pod name is also shown under each seat's business unit.
+
+Use **Re-sync** from the pod page to preview joiners and leavers. Joiners get seats only in phases that already contain this pod's seats. When existing seats have different percentages, new seats use the oldest seat's percentage in that phase (or its equivalent hours-derived percentage in effort-driven mode). Existing member seats are never overwritten. Former or inactive members' pod-linked seats are removed; individually created seats are unaffected. Confirmation recalculates the preview against current membership and is audited. Assignment, tag edits and re-sync require initiative edit permission and Draft scope or an approved re-baseline, just like manual allocation changes.
+
 1. **Business Units** – `Admin → Business Units`. Create one per cost centre/BU. Deactivate rather than delete once initiatives reference a BU.
 2. **Disciplines** – `Admin → Disciplines` (e.g. *Engineering*, *QA*, *Product*, *Design*). Every resource type must belong to exactly one discipline, so create these first. Deactivate a discipline to hide it from new resource types; it can only be deleted once no resource type references it.
 3. **Resource Types** – `Admin → Resource Types` (e.g. *Software Engineer*, *QA Analyst*, *Product Manager*), each assigned to a discipline from the list above.
