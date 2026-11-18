@@ -7,6 +7,23 @@ namespace InitiativeScoping.Domain.Tests;
 public class PodPlannerTests
 {
     [Fact]
+    public void Assign_skips_vendor_members_without_a_vendor_even_with_a_generic_rate()
+    {
+        var person = Member(1);
+        person.ResourcingClassId = 2;
+        person.ResourcingClass = new ResourcingClass { Name = "Vendor", IsVendor = true, DefaultCapexPercent = 100 };
+        var cards = Cards();
+        cards[0].Entries[0].ResourcingClassId = 2;
+        var plan = PodPlanner.Assign(9, Team(person), [Build], 100, cards, Holidays, 8);
+        Assert.Empty(plan.Add);
+        Assert.Contains("select a vendor", Assert.Single(plan.Skipped));
+        person.VendorId = 10;
+        var valid = PodPlanner.Assign(9, Team(person), [Build], 100, cards, Holidays, 8);
+        Assert.Equal(10, Assert.Single(valid.Add).VendorId);
+        Assert.Empty(valid.Skipped);
+    }
+
+    [Fact]
     public void Resync_removes_only_departed_people_from_mixed_allocations()
     {
         var seats = PodPlanner.Assign(9, Team(Member(1)), [Build], 50, Cards(), Holidays, 8).Add.ToList();

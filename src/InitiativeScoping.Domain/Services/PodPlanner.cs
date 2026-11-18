@@ -25,6 +25,12 @@ public static class PodPlanner
         {
             foreach (var person in pod.Members.Select(m => m.Person).OfType<Person>().Where(p => p.IsActive).DistinctBy(p => p.Id))
             {
+                if (person.ResourcingClass?.IsVendor == true && person.VendorId is null)
+                {
+                    skipped.Add($"{person.DisplayName} ({phase.Name}): select a vendor for vendor-supplied resources");
+                    continue;
+                }
+
                 var key = new RateKey(person.ResourceTypeId, person.SeniorityId, person.Location, person.ResourcingClassId, person.VendorId);
                 if (RateResolver.ResolveBlended(cards, key, phase.PlannedStart, phase.PlannedEnd) is null)
                 {
