@@ -13,7 +13,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "http://localhost:5086",
+      "applicationUrl": "http://localhost:15086",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
@@ -22,7 +22,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:7009;http://localhost:5086",
+      "applicationUrl": "https://localhost:17009;http://localhost:15086",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
@@ -31,10 +31,10 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "http://localhost:5086",
+      "applicationUrl": "http://localhost:15086",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Staging",
-        "ConnectionStrings__Default": "Host=localhost;Port=5432;Database=initiative_scoping;Username=postgres;Password=devpass",
+        "ConnectionStrings__Default": "Host=localhost;Port=15432;Database=initiative_scoping;Username=postgres;Password=devpass",
         "Database__MigrateOnStartup": "true",
         "Database__SeedOnStartup": "true",
         "Auth__UseDevelopmentAuth": "true"

@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-devpass}"
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${WEB_HOST_PORT:-18080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Staging
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=initiative_scoping;Username=postgres;Password=${POSTGRES_PASSWORD:-devpass}"
@@ -42,7 +42,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "5086:5086"
+      - "${DEV_HOST_PORT:-15086}:5086"
     volumes: &sdk-volumes
       - .:/src
       - nuget:/root/.nuget/packages
