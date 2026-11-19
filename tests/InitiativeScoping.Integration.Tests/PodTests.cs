@@ -160,6 +160,38 @@ public class PodTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
         Assert.Equal(HttpStatusCode.Redirect, (await Post(client, "/Admin/ApplicationPlatforms", $"/Admin/ApplicationPlatforms/Delete/{app.Id}")).StatusCode);
     }
 
+    [Theory]
+    [InlineData(";")]
+    [InlineData(":")]
+    public async Task Pod_create_and_edit_reject_csv_delimiters_without_saving_changes(string delimiter)
+    {
+        var client = Client();
+        await client.GetAsync("/Admin/Pods");
+        var name = "Safe " + Guid.NewGuid().ToString("N");
+        var invalidName = name + delimiter + "invalid";
+        int podId, buId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            buId = await db.BusinessUnits.Where(b => b.IsActive).Select(b => b.Id).FirstAsync();
+            var pod = new Pod { Name = name, BusinessUnitId = buId };
+            db.Pods.Add(pod);
+            await db.SaveChangesAsync();
+            podId = pod.Id;
+        }
+        foreach (var page in new[] { "/Admin/Pods/Create", $"/Admin/Pods/Edit/{podId}" })
+        {
+            var response = await Post(client, page, page, ("Name", invalidName), ("BusinessUnitId", buId.ToString()), ("IsActive", "true"));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("Pod names cannot contain ';' or ':'", WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync()));
+        }
+        using var verification = factory.Services.CreateScope();
+        var context = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await context.Pods.AnyAsync(p => p.Name == invalidName));
+        Assert.Equal(name, (await context.Pods.FindAsync(podId))!.Name);
+        Assert.False(await context.AuditEvents.AnyAsync(a => a.Entity == nameof(Pod) && a.EntityId == podId.ToString()));
+    }
+
     [Fact]
     public async Task Assign_and_resync_expand_across_business_units_skip_unpriced_and_preserve_manual_edits()
     {

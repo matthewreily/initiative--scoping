@@ -16,7 +16,10 @@ public sealed record PeopleCsvRow(
     ResourcingClass ResourcingClass,
     bool IsActive,
     string? Vendor = null,
-    string? Discipline = null);
+    string? Discipline = null,
+    IReadOnlyList<PeopleCsvPod>? Pods = null);
+
+public sealed record PeopleCsvPod(string Name, decimal? MembershipPercent = null);
 
 public sealed record PeopleCsvError(int Line, string Message);
 
@@ -26,22 +29,22 @@ public sealed record PeopleCsvResult(IReadOnlyList<PeopleCsvRow> Rows, IReadOnly
 }
 
 /// <summary>
-/// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive][,Vendor][,Discipline]
+/// CSV format: DisplayName,ExternalIds,ResourceType,BusinessUnit,Seniority,Location,ResourcingClass[,IsActive][,Vendor][,Discipline][,Pods]
 /// ExternalIds is ';'-separated (may be empty). ResourceType and Seniority are catalog names (unknown names are added to the catalogs on import);
 /// Discipline is only used when a new resource type is created.
 /// ResourcingClass is a catalog name (e.g. Internal|Vendor; the legacy "InternalFte" is accepted). IsActive defaults to true. Vendor names the catalog vendor for vendor-class rows and must be blank otherwise.
 /// </summary>
 public static class PeopleCsv
 {
-    public static readonly string[] Headers = ["DisplayName", "ExternalIds", "ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "IsActive", "Vendor", "Discipline"];
-    private static readonly string[] Required = Headers[..^3];
+    public static readonly string[] Headers = ["DisplayName", "ExternalIds", "ResourceType", "BusinessUnit", "Seniority", "Location", "ResourcingClass", "IsActive", "Vendor", "Discipline", "Pods"];
+    private static readonly string[] Required = Headers[..7];
 
     private static readonly CsvConfiguration Config = new(CultureInfo.InvariantCulture)
     {
         TrimOptions = TrimOptions.Trim,
         MissingFieldFound = null,
         HeaderValidated = null,
-        PrepareHeaderForMatch = a => a.Header.Replace(" ", string.Empty).ToLowerInvariant()
+        PrepareHeaderForMatch = a => NormalizeHeader(a.Header)
     };
 
     public static PeopleCsvResult Parse(TextReader reader, IReadOnlyList<ResourcingClass> classes)
@@ -56,17 +59,18 @@ public static class PeopleCsv
             return new PeopleCsvResult(rows, errors);
         }
 
-        var header = csv.HeaderRecord ?? [];
-        var missing = Required.Where(h => !header.Contains(h, StringComparer.OrdinalIgnoreCase)).ToList();
+        var header = (csv.HeaderRecord ?? []).Select(NormalizeHeader).ToArray();
+        var missing = Required.Where(h => !header.Contains(NormalizeHeader(h))).ToList();
         if (missing.Count > 0)
         {
             errors.Add(new PeopleCsvError(1, $"Missing column(s): {string.Join(", ", missing)}"));
             return new PeopleCsvResult(rows, errors);
         }
 
-        var hasActive = header.Contains("IsActive", StringComparer.OrdinalIgnoreCase);
-        var hasVendor = header.Contains("Vendor", StringComparer.OrdinalIgnoreCase);
-        var hasDiscipline = header.Contains("Discipline", StringComparer.OrdinalIgnoreCase);
+        var hasActive = header.Contains("isactive");
+        var hasVendor = header.Contains("vendor");
+        var hasDiscipline = header.Contains("discipline");
+        var hasPods = header.Contains("pods");
 
         while (csv.Read())
         {
@@ -134,7 +138,35 @@ public static class PeopleCsv
                 continue;
             }
 
-            rows.Add(new PeopleCsvRow(name, ids, resourceType, businessUnit, seniority, location, resourcingClass, isActive, vendor, discipline));
+            var pods = new List<PeopleCsvPod>();
+            var podCell = hasPods ? csv.GetField("Pods") : null;
+            var invalidPods = false;
+            if (!string.IsNullOrWhiteSpace(podCell))
+            {
+                foreach (var entry in podCell.Split(';', StringSplitOptions.TrimEntries))
+                {
+                    var parts = entry.Split(':', StringSplitOptions.TrimEntries);
+                    decimal? percent = null;
+                    var value = 100m;
+                    if (parts.Length > 2 || string.IsNullOrWhiteSpace(parts[0]) || parts[0].Length > 200
+                        || (parts.Length == 2 && (!decimal.TryParse(parts[1], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out value) || value < 1 || value > 100)))
+                    {
+                        errors.Add(new PeopleCsvError(line, $"Invalid Pods entry '{entry}': use Name or Name:NN (membership % 1–100; pod name at most 200 characters)."));
+                        invalidPods = true;
+                        break;
+                    }
+                    if (parts.Length == 2) percent = value;
+                    if (pods.Any(p => string.Equals(p.Name, parts[0], StringComparison.OrdinalIgnoreCase)))
+                    {
+                        errors.Add(new PeopleCsvError(line, $"Duplicate pod '{parts[0]}' in Pods."));
+                        invalidPods = true;
+                        break;
+                    }
+                    pods.Add(new PeopleCsvPod(parts[0], percent));
+                }
+            }
+            if (invalidPods) continue;
+            rows.Add(new PeopleCsvRow(name, ids, resourceType, businessUnit, seniority, location, resourcingClass, isActive, vendor, discipline, pods));
         }
 
         foreach (var dup in rows.GroupBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
@@ -172,10 +204,17 @@ public static class PeopleCsv
             csv.WriteField(r.IsActive ? "true" : "false");
             csv.WriteField(r.Vendor ?? string.Empty);
             csv.WriteField(r.Discipline ?? string.Empty);
+            csv.WriteField(string.Join(";", (r.Pods ?? []).Select(p => p.MembershipPercent is { } percent ? $"{p.Name}:{percent.ToString(CultureInfo.InvariantCulture)}" : p.Name)));
             csv.NextRecord();
         }
         csv.Flush();
     }
+
+    private static string NormalizeHeader(string header) => header.Replace(" ", string.Empty).ToLowerInvariant() switch
+    {
+        "pod" or "developmentpod" or "developmentpods" => "pods",
+        var name => name
+    };
 
     private static bool TryParseBool(string value, out bool result)
     {
