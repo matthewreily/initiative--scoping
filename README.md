@@ -34,7 +34,9 @@ Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 docker compose --profile dev up            # first start pulls the SDK image and restores packages (a few minutes)
 ```
 
-Open http://localhost:5086. The `dev` service runs `dotnet watch` inside the official .NET 8 SDK image with the repository mounted at `/src`, against the `postgres` service (migrated + seeded on start, same engine as dev/prod): edit any `.cs` / `.cshtml` / `wwwroot` file on the host and the app hot-reloads (or restarts for edits hot reload can't apply). `bin/`, `obj/` and the NuGet cache live in named volumes, so the container never collides with a host-side IDE build.
+Open http://localhost:15086. The `dev` service runs `dotnet watch` inside the official .NET 8 SDK image with the repository mounted at `/src`, against the `postgres` service (migrated + seeded on start, same engine as dev/prod): edit any `.cs` / `.cshtml` / `wwwroot` file on the host and the app hot-reloads (or restarts for edits hot reload can't apply). `bin/`, `obj/` and the NuGet cache live in named volumes, so the container never collides with a host-side IDE build.
+
+Host ports default to 15086 (`dev`), 18080 (`web`) and 15432 (`postgres`) to avoid clashing with other local apps. Override them with `DEV_HOST_PORT`, `WEB_HOST_PORT` and `POSTGRES_HOST_PORT` in a `.env` file next to `docker-compose.yml`. Containers still listen on 5086, 8080 and 5432 internally.
 
 Everyday commands (all from the repo root):
 
@@ -63,7 +65,7 @@ docker compose run --rm pull-dev-db          # Windows: set GCLOUD_CONFIG_DIR=%A
 
 It replaces the local `public` schema with a fresh dump, skips the Data Protection keys (KMS-wrapped for dev, recreated locally), and the app applies any newer migrations on next start. You still browse as `Dev User` (Admin); `GCP_PROJECT=initiative-scoping-prod` would pull prod if you have access. Script: `deploy/local/pull-dev-db.sh`.
 
-To run the app exactly as it ships (published image, no hot reload): `docker compose up --build` → http://localhost:8080.
+To run the app exactly as it ships (published image, no hot reload): `docker compose up --build` → http://localhost:18080.
 
 #### Demo from a dev snapshot
 
@@ -83,7 +85,7 @@ Save a copy of the GCP dev database to a file once, then restore it into Docker 
    ```
 
    It prints `<n> initiatives, <n> users` when done.
-4. Start the demo: `docker compose up --build web` → http://localhost:8080 (signed in as `Dev User`, Admin; pending migrations run on startup).
+4. Start the demo: `docker compose up --build web` → http://localhost:18080 (signed in as `Dev User`, Admin; pending migrations run on startup).
 5. Reset after a demo: repeat steps 3–4. To move the demo to another machine, copy the `.dump` file into that clone's `backups/` folder and start at step 3.
 
 ### Option B — .NET SDK on the host
@@ -93,7 +95,7 @@ Prerequisites: .NET 8 SDK on `PATH` (`dotnet --version` → 8.x); Node 20+ only 
 ```bash
 dotnet build
 dotnet test
-dotnet run --project src/InitiativeScoping.Web        # http://localhost:5086, SQLite
+dotnet run --project src/InitiativeScoping.Web        # http://localhost:15086, SQLite
 ```
 
 The `Development` environment uses SQLite (`initiative-scoping.dev.db`, created and seeded on startup). The SQLite schema is created with `EnsureCreated` and is **not** migrated; after pulling model changes stop the app, delete `src/InitiativeScoping.Web/initiative-scoping.dev.db` (and any `.db-shm` / `.db-wal` siblings), and restart to rebuild and reseed it.
@@ -124,7 +126,7 @@ npm test                                       # headless; `npm run test:headed`
 npm run report                                 # open the HTML report of the last run
 ```
 
-Set `E2E_BASE_URL=http://localhost:5086` to run against an app you already have running (e.g. the Docker `dev` service). CI does not run the suite while the project is paused (the `e2e` and `lighthouse` jobs were removed from `.github/workflows/ci.yml`; restore them from git history), so run it locally before merging UI changes.
+Set `E2E_BASE_URL=http://localhost:15086` to run against an app you already have running (e.g. the Docker `dev` service). CI does not run the suite while the project is paused (the `e2e` and `lighthouse` jobs were removed from `.github/workflows/ci.yml`; restore them from git history), so run it locally before merging UI changes.
 
 Quality gates in the same suite: `tests/accessibility.spec.ts` runs [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.x A/AA) against every main page and fails on any violation; Lighthouse CI (`e2e/lighthouserc.json`: accessibility and best-practices < 90 fail, performance < 80 warns) writes HTML reports to `e2e/lighthouse-report/`. Run it locally with the app up on port 5199: `cd e2e && npm run lighthouse`. Details in [`e2e/README.md`](e2e/README.md).
 

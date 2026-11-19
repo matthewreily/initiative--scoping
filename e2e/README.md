@@ -40,8 +40,8 @@ Free port 5199 if something else is using it, or point the suite at an app you a
 (no web server is started, the database is whatever that app uses):
 
 ```bash
-dotnet run --project src/InitiativeScoping.Web     # in another terminal → http://localhost:5086
-E2E_BASE_URL=http://localhost:5086 npm test
+dotnet run --project src/InitiativeScoping.Web     # in another terminal → http://localhost:15086
+E2E_BASE_URL=http://localhost:15086 npm test
 ```
 
 `npm run typecheck` type-checks the specs (CI runs this before the tests).
