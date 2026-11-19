@@ -158,7 +158,11 @@ public partial class PeopleController(AppDbContext db, IAuditLog audit) : AdminC
 
     public async Task<IActionResult> Export(CancellationToken ct)
     {
-        var memberships = (await db.PodMembers.Include(m => m.Pod).AsNoTracking().OrderBy(m => m.Pod!.Name).ToListAsync(ct)).ToLookup(m => m.PersonId);
+        var members = await db.PodMembers.Include(m => m.Pod).AsNoTracking().OrderBy(m => m.Pod!.Name).ToListAsync(ct);
+        var invalidNames = members.Select(m => m.Pod!.Name).Where(n => n.IndexOfAny([';', ':']) >= 0).Distinct().ToArray();
+        if (invalidNames.Length > 0)
+            return RedirectWithError($"People CSV export blocked: pod names cannot contain ';' or ':'. Rename these pods before exporting: {string.Join(", ", invalidNames.Take(5))}{(invalidNames.Length > 5 ? $" (+{invalidNames.Length - 5} more)" : "")}.");
+        var memberships = members.ToLookup(m => m.PersonId);
         var people = await db.People.Include(p => p.ResourceType).ThenInclude(t => t!.Discipline).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.ResourcingClass).Include(p => p.Seniority)
             .OrderBy(p => p.DisplayName).ToListAsync(ct);
         var rows = people.Select(p => new PeopleCsvRow(p.DisplayName, SplitIds(p.ExternalIds), p.ResourceType!.Name, p.BusinessUnit!.Name,

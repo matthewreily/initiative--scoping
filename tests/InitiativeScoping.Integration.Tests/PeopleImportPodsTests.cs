@@ -169,6 +169,56 @@ public class PeopleImportPodsTests(WebAppFactory factory) : IClassFixture<WebApp
     }
 
     [Theory]
+    [InlineData(";")]
+    [InlineData(":")]
+    public async Task Export_blocks_legacy_delimiter_names_then_round_trips_memberships_after_renaming(string delimiter)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.GetAsync("/Admin/People");
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var invalidName = $"Legacy{delimiter}{tag}";
+        var safeName = "Renamed " + tag;
+        int podId, personId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var person = await db.People.FirstAsync();
+            personId = person.Id;
+            var pod = new Pod { Name = invalidName, BusinessUnitId = person.BusinessUnitId,
+                Members = [new PodMember { PersonId = personId, MembershipPercent = 37.5m }] };
+            db.Pods.Add(pod);
+            await db.SaveChangesAsync();
+            podId = pod.Id;
+        }
+        var blocked = await client.GetAsync("/Admin/People/Export");
+        Assert.Equal(HttpStatusCode.Redirect, blocked.StatusCode);
+        Assert.Null(blocked.Content.Headers.ContentDisposition);
+        var warning = WebUtility.HtmlDecode(await client.GetStringAsync(blocked.Headers.Location!));
+        Assert.Contains("People CSV export blocked", warning);
+        Assert.Contains(invalidName, warning);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.Pods.FindAsync(podId))!.Name = safeName;
+            await db.SaveChangesAsync();
+        }
+        var csv = await client.GetStringAsync("/Admin/People/Export");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var parsed = PeopleCsv.Parse(new StringReader(csv), await db.ResourcingClasses.ToListAsync());
+            Assert.True(parsed.IsValid);
+            Assert.Contains(parsed.Rows, r => (r.Pods ?? []).Contains(new PeopleCsvPod(safeName, 37.5m)));
+        }
+        Assert.Contains("Import complete:", await Import(client, csv));
+        using var verification = factory.Services.CreateScope();
+        var context = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(37.5m, (await context.PodMembers.SingleAsync(m => m.PodId == podId && m.PersonId == personId)).MembershipPercent);
+        Assert.Equal(1, await context.Pods.CountAsync(p => p.Name == safeName));
+        Assert.False(await context.Pods.AnyAsync(p => p.Name == invalidName));
+    }
+
+    [Theory]
     [InlineData("Broken:0")]
     [InlineData("Broken:101")]
     [InlineData("Broken:invalid")]
