@@ -932,10 +932,12 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<decimal?>("PodWrittenAllocationPercent")
-                        .HasColumnType("numeric");
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
 
                     b.Property<decimal?>("PodWrittenEstimatedHours")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");

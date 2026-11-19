@@ -11,6 +11,22 @@ namespace InitiativeScoping.Integration.Tests;
 
 public class PodTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 {
+    [Theory]
+    [InlineData(nameof(InitiativeAllocation.AllocationPercent), nameof(InitiativeAllocation.PodWrittenAllocationPercent), 6)]
+    [InlineData(nameof(InitiativeAllocation.EstimatedHours), nameof(InitiativeAllocation.PodWrittenEstimatedHours), 18)]
+    public void Pod_write_snapshot_precision_matches_live_value(string live, string snapshot, int precision)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var entity = db.Model.FindEntityType(typeof(InitiativeAllocation))!;
+        foreach (var name in new[] { live, snapshot })
+        {
+            var property = entity.FindProperty(name)!;
+            Assert.Equal(precision, property.GetPrecision());
+            Assert.Equal(2, property.GetScale());
+        }
+    }
+
     [Fact]
     public async Task Membership_percent_is_validated_audited_warned_and_resynced_only_when_selected()
     {

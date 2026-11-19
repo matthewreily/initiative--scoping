@@ -18,6 +18,8 @@ test('membership split previews effective allocation and opt-in resync preserves
   await page.goto(`/Initiatives/DevelopmentPods/${id}`);
   await page.locator('#PodId').selectOption({ label: name });
   const podId = await page.locator('#PodId').inputValue();
+  await page.locator('#AllocationPercent').fill('33.33');
+  await expect(page.locator(`[data-pod-members="${podId}"] output`)).toHaveText('13.33');
   await page.locator('#AllocationPercent').fill('50');
   await expect(page.locator(`[data-pod-members="${podId}"] output`)).toHaveText('20');
   await page.locator('input[name="PhaseIds"]').check();

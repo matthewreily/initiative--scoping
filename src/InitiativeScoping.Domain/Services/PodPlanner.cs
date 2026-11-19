@@ -9,12 +9,14 @@ public sealed record PodSeatChange(InitiativeAllocation Allocation, decimal PodP
 {
     public void Apply()
     {
-        Allocation.AllocationPercent = AllocationPercent;
-        Allocation.EstimatedHours = EstimatedHours;
+        var percent = Math.Round(AllocationPercent, 2, MidpointRounding.AwayFromZero);
+        var hours = Math.Round(EstimatedHours, 2, MidpointRounding.AwayFromZero);
+        Allocation.AllocationPercent = percent;
+        Allocation.EstimatedHours = hours;
         Allocation.PodAllocationPercent = PodPercent;
         Allocation.PodMembershipPercent = MembershipPercent;
-        Allocation.PodWrittenAllocationPercent = AllocationPercent;
-        Allocation.PodWrittenEstimatedHours = EstimatedHours;
+        Allocation.PodWrittenAllocationPercent = percent;
+        Allocation.PodWrittenEstimatedHours = hours;
     }
 }
 
@@ -43,7 +45,7 @@ public static class PodPlanner
                 var person = member.Person!;
                 if (member.MembershipPercent < 1 || member.MembershipPercent > 100)
                     throw new ArgumentOutOfRangeException(nameof(pod), "Membership % must be between 1 and 100.");
-                var effectivePercent = percent * member.MembershipPercent / 100m;
+                var effectivePercent = Math.Round(percent * member.MembershipPercent / 100m, 2, MidpointRounding.AwayFromZero);
                 var hours = DurationCalculator.Hours(effectivePercent, DurationCalculator.WorkingDays(phase.PlannedStart, phase.PlannedEnd, holidays), hoursPerDay);
                 if (person.ResourcingClass?.IsVendor == true && person.VendorId is null)
                 {
@@ -115,7 +117,7 @@ public static class PodPlanner
                 var membership = memberships.Single();
                 if (membership < 1 || membership > 100) throw new ArgumentOutOfRangeException(nameof(pod));
                 var chosen = seat.PodAllocationPercent ?? percent;
-                var effective = chosen * membership / 100m;
+                var effective = Math.Round(chosen * membership / 100m, 2, MidpointRounding.AwayFromZero);
                 var handEdited = seat.PodWrittenAllocationPercent is null || seat.PodWrittenEstimatedHours is null
                     || seat.AllocationPercent != seat.PodWrittenAllocationPercent || seat.EstimatedHours != seat.PodWrittenEstimatedHours;
                 changes.Add(new PodSeatChange(seat, chosen, membership, effective, DurationCalculator.Hours(effective, days, hoursPerDay), handEdited));

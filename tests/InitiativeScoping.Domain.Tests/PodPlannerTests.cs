@@ -7,10 +7,11 @@ namespace InitiativeScoping.Domain.Tests;
 public class PodPlannerTests
 {
     [Theory]
-    [InlineData(0.01, 1, 0.0001)]
-    [InlineData(33.33, 17.5, 5.83275)]
+    [InlineData(0.01, 1, 0)]
+    [InlineData(33.33, 17.5, 5.83)]
+    [InlineData(33.33, 50, 16.67)]
     [InlineData(100, 100, 100)]
-    public void Membership_product_preserves_fractional_percent_and_bounds(decimal chosen, decimal membership, decimal effective)
+    public void Membership_product_rounds_to_persisted_percent_scale(decimal chosen, decimal membership, decimal effective)
     {
         var pod = Team(Member(1));
         pod.Members[0].MembershipPercent = membership;
@@ -18,6 +19,46 @@ public class PodPlannerTests
         Assert.Equal(effective, seat.AllocationPercent);
         Assert.Equal(effective, seat.PodWrittenAllocationPercent);
         Assert.Equal(DurationCalculator.Hours(effective, 4, 8), seat.EstimatedHours);
+        Assert.Equal(seat.EstimatedHours, seat.PodWrittenEstimatedHours);
+    }
+
+    [Fact]
+    public void Fractional_membership_updates_remain_unedited_after_persisted_scale_round_trip()
+    {
+        var pod = Team(Member(1));
+        pod.Members[0].MembershipPercent = 50;
+        var seats = PodPlanner.Assign(9, pod, [Build], 33.33m, Cards(), Holidays, 8).Add;
+        var seat = Assert.Single(seats);
+        Assert.Equal(16.67m, seat.AllocationPercent);
+        Assert.Equal(5.33m, seat.EstimatedHours);
+        void RoundTrip()
+        {
+            seat.AllocationPercent = Math.Round(seat.AllocationPercent!.Value, 2, MidpointRounding.AwayFromZero);
+            seat.EstimatedHours = Math.Round(seat.EstimatedHours, 2, MidpointRounding.AwayFromZero);
+        }
+        RoundTrip();
+        pod.Members[0].MembershipPercent = 25;
+        var change = Assert.Single(PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8).SeatsToUpdate);
+        Assert.False(change.HandEdited);
+        Assert.Equal(8.33m, change.AllocationPercent);
+        Assert.Equal(2.67m, change.EstimatedHours);
+        change.Apply();
+        RoundTrip();
+        Assert.Equal(seat.AllocationPercent, seat.PodWrittenAllocationPercent);
+        Assert.Equal(seat.EstimatedHours, seat.PodWrittenEstimatedHours);
+        pod.Members[0].MembershipPercent = 75;
+        Assert.False(Assert.Single(PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8).SeatsToUpdate).HandEdited);
+    }
+
+    [Fact]
+    public void Seat_change_rounds_both_live_and_snapshot_values_before_writing()
+    {
+        var seat = new InitiativeAllocation { Location = "Remote" };
+        new PodSeatChange(seat, 33.33m, 50, 16.665m, 5.335m, false).Apply();
+        Assert.Equal(16.67m, seat.AllocationPercent);
+        Assert.Equal(5.34m, seat.EstimatedHours);
+        Assert.Equal(seat.AllocationPercent, seat.PodWrittenAllocationPercent);
+        Assert.Equal(seat.EstimatedHours, seat.PodWrittenEstimatedHours);
     }
 
     [Fact]

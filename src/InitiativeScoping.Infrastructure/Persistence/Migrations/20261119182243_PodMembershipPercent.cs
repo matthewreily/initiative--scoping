@@ -32,13 +32,17 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "PodWrittenAllocationPercent",
                 table: "InitiativeAllocations",
-                type: "numeric",
+                type: "numeric(6,2)",
+                precision: 6,
+                scale: 2,
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "PodWrittenEstimatedHours",
                 table: "InitiativeAllocations",
-                type: "numeric",
+                type: "numeric(18,2)",
+                precision: 18,
+                scale: 2,
                 nullable: true);
 
             migrationBuilder.AddCheckConstraint(

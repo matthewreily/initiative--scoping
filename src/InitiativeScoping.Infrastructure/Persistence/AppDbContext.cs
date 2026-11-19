@@ -242,6 +242,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Location).HasMaxLength(100);
             e.Property(x => x.EstimatedHours).HasPrecision(18, 2);
             e.Property(x => x.AllocationPercent).HasPrecision(6, 2);
+            e.Property(x => x.PodWrittenAllocationPercent).HasPrecision(6, 2);
+            e.Property(x => x.PodWrittenEstimatedHours).HasPrecision(18, 2);
             e.Property(x => x.CapexPercent).HasPrecision(5, 2);
             e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);
