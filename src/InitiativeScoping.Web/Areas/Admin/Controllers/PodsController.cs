@@ -31,6 +31,8 @@ public class PodsController(AppDbContext db, IAuditLog audit) : AdminControllerB
         model.Id = id;
         var pod = id == 0 ? new Pod { Name = "" } : await Load(id, ct);
         if (pod is null) return NotFound();
+        if (model.Name.IndexOfAny([';', ':']) >= 0)
+            ModelState.AddModelError(nameof(model.Name), "Pod names cannot contain ';' or ':' because these characters separate pod memberships in People CSV files.");
         if (await db.Pods.AnyAsync(x => x.Id != id && x.Name.ToLower() == model.Name.Trim().ToLower(), ct))
             ModelState.AddModelError(nameof(model.Name), "A pod with this name already exists.");
         if (!await db.BusinessUnits.AnyAsync(x => x.Id == model.BusinessUnitId && (x.IsActive || x.Id == pod.BusinessUnitId), ct))

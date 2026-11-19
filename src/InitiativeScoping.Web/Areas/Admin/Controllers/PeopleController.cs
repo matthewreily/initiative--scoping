@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InitiativeScoping.Web.Areas.Admin.Controllers;
 
-public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControllerBase
+public partial class PeopleController(AppDbContext db, IAuditLog audit) : AdminControllerBase
 {
     private const long MaxImportBytes = 5 * 1024 * 1024;
     private const long MaxImportRequestBytes = MaxImportBytes + 2 * 1024 * 1024;
@@ -158,10 +158,16 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     public async Task<IActionResult> Export(CancellationToken ct)
     {
+        var members = await db.PodMembers.Include(m => m.Pod).AsNoTracking().OrderBy(m => m.Pod!.Name).ToListAsync(ct);
+        var invalidNames = members.Select(m => m.Pod!.Name).Where(n => n.IndexOfAny([';', ':']) >= 0).Distinct().ToArray();
+        if (invalidNames.Length > 0)
+            return RedirectWithError($"People CSV export blocked: pod names cannot contain ';' or ':'. Rename these pods before exporting: {string.Join(", ", invalidNames.Take(5))}{(invalidNames.Length > 5 ? $" (+{invalidNames.Length - 5} more)" : "")}.");
+        var memberships = members.ToLookup(m => m.PersonId);
         var people = await db.People.Include(p => p.ResourceType).ThenInclude(t => t!.Discipline).Include(p => p.BusinessUnit).Include(p => p.Vendor).Include(p => p.ResourcingClass).Include(p => p.Seniority)
             .OrderBy(p => p.DisplayName).ToListAsync(ct);
         var rows = people.Select(p => new PeopleCsvRow(p.DisplayName, SplitIds(p.ExternalIds), p.ResourceType!.Name, p.BusinessUnit!.Name,
-            p.Seniority!.Name, p.Location, p.ResourcingClass!, p.IsActive, p.Vendor?.Name, p.ResourceType.Discipline?.Name));
+            p.Seniority!.Name, p.Location, p.ResourcingClass!, p.IsActive, p.Vendor?.Name, p.ResourceType.Discipline?.Name,
+            memberships[p.Id].Select(m => new PeopleCsvPod(m.Pod!.Name, m.MembershipPercent)).ToArray()));
         return Csv(rows, "people.csv");
     }
 
@@ -170,7 +176,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         var (internalClass, vendorClass) = await RateCardsController.TemplateClassesAsync(db, ct);
         return Csv(
         [
-            new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", "Senior", "Onshore", internalClass, true),
+            new PeopleCsvRow("Jane Doe", ["PV-1001", "jane.doe@example.com"], "Software Engineer", "Boarding", "Senior", "Onshore", internalClass, true, Pods: [new("Delivery", 40), new("Platform")]),
             new PeopleCsvRow("Vendor Dev 1", ["VND-77"], "Software Engineer", "Boarding", "Level 2 (3-5 Years)", "Offshore", vendorClass, true, "Acme Consulting"),
             new PeopleCsvRow("Sam Analyst", [], "Business Analyst", "Boarding", "Mid", "Onshore", internalClass, true, null, "Product")
         ], "people-template.csv");
@@ -264,6 +270,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
         var added = 0;
         var updated = 0;
+        var importedPeople = new Dictionary<PeopleCsvRow, Person>();
         foreach (var (row, existing) in matches)
         {
             var ids = row.ExternalIds.Count == 0 ? null : string.Join(";", row.ExternalIds);
@@ -277,6 +284,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
                 };
                 db.People.Add(person);
                 people.Add(person);
+                importedPeople[row] = person;
                 added++;
                 continue;
             }
@@ -291,6 +299,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             existing.ResourcingClassId = row.ResourcingClass.Id;
             existing.VendorId = row.Vendor is null ? null : vendors[row.Vendor];
             existing.IsActive = row.IsActive;
+            importedPeople[row] = existing;
             if (db.Entry(existing).State == EntityState.Modified)
             {
                 audit.Record(nameof(Person), existing.Id, AuditActions.Update, new { Before = before, After = Snapshot(existing) });
@@ -298,18 +307,21 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             }
         }
 
-        audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated, NewSeniorityLevels = addedLevels, NewResourceTypes = resourceTypes.AddedTypes, NewDisciplines = resourceTypes.AddedDisciplines });
+        PeoplePodImportResult podResult;
         try
         {
+            await db.SaveChangesAsync(ct);
+            podResult = await ImportPods(importedPeople, ct);
+            audit.Record(nameof(Person), 0, AuditActions.Import, new { model.File.FileName, Added = added, Updated = updated, NewSeniorityLevels = addedLevels, NewResourceTypes = resourceTypes.AddedTypes, NewDisciplines = resourceTypes.AddedDisciplines, Pods = podResult });
             await db.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {
-            return RedirectWithError(SeniorityCatalog.ConcurrentImportMessage);
+            return RedirectWithError("Import not applied: roster or catalog data changed during import. Please retry.");
         }
 
         await tx.CommitAsync(ct);
-        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.{ImportCatalogNote.For(addedLevels, resourceTypes)}");
+        return RedirectWithSuccess($"Import complete: {added} added, {updated} updated. Existing actuals keep their calculated cost.{ImportCatalogNote.For(addedLevels, resourceTypes)}{podResult.Message}");
     }
 
     private FileContentResult Csv(IEnumerable<PeopleCsvRow> rows, string fileName)
