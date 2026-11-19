@@ -43,17 +43,18 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
     public async Task<IActionResult> Create(CancellationToken ct)
     {
         await PopulateLists(ct);
-        return View("Edit", new PersonEditModel());
+        return View("Edit", await PopulatePods(new PersonEditModel(), ct));
     }
 
     [HttpPost]
     public async Task<IActionResult> Create(PersonEditModel model, CancellationToken ct)
     {
+        model.Id = 0;
         await Validate(model, ct);
         if (!ModelState.IsValid)
         {
             await PopulateLists(ct);
-            return View("Edit", model);
+            return View("Edit", await PopulatePods(model, ct));
         }
 
         var person = new Person
@@ -68,10 +69,13 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             VendorId = await VendorForAsync(model, ct),
             IsActive = model.IsActive
         };
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         db.People.Add(person);
         await db.SaveChangesAsync(ct);
+        await UpdatePods(person.Id, model.PodIds, ct);
         audit.Record(nameof(Person), person.Id, AuditActions.Create, Snapshot(person));
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return RedirectWithSuccess($"Person '{person.DisplayName}' created.");
     }
 
@@ -84,7 +88,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         }
 
         await PopulateLists(ct, [person.SeniorityId], [person.ResourcingClassId]);
-        return View(new PersonEditModel
+        return View(await PopulatePods(new PersonEditModel
         {
             Id = person.Id,
             DisplayName = person.DisplayName,
@@ -96,7 +100,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
             ResourcingClassId = person.ResourcingClassId,
             VendorId = person.VendorId,
             IsActive = person.IsActive
-        });
+        }, ct, loadSelection: true));
     }
 
     [HttpPost]
@@ -113,7 +117,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         if (!ModelState.IsValid)
         {
             await PopulateLists(ct, [person.SeniorityId, model.SeniorityId], [person.ResourcingClassId, model.ResourcingClassId]);
-            return View(model);
+            return View(await PopulatePods(model, ct));
         }
 
         var before = Snapshot(person);
@@ -126,6 +130,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         person.ResourcingClassId = model.ResourcingClassId;
         person.VendorId = await VendorForAsync(model, ct);
         person.IsActive = model.IsActive;
+        await UpdatePods(person.Id, model.PodIds, ct);
         audit.Record(nameof(Person), person.Id, AuditActions.Update, new { Before = before, After = Snapshot(person) });
         await db.SaveChangesAsync(ct);
         return RedirectWithSuccess($"Person '{person.DisplayName}' updated. Existing actuals keep their calculated cost; re-map an entry to re-price it.");
@@ -323,6 +328,12 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     private async Task Validate(PersonEditModel model, CancellationToken ct)
     {
+        var pods = model.PodIds.Distinct().ToArray();
+        if (await db.Pods.CountAsync(p => pods.Contains(p.Id) && (p.IsActive || p.Members.Any(m => m.PersonId == model.Id)), ct) != pods.Length)
+        {
+            ModelState.AddModelError(nameof(model.PodIds), "Choose active pods or retain existing inactive memberships.");
+        }
+
         if (!await db.ResourceTypes.AnyAsync(t => t.Id == model.ResourceTypeId, ct))
         {
             ModelState.AddModelError(nameof(model.ResourceTypeId), "Choose a resource type.");
@@ -392,6 +403,36 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
 
     private async Task<int?> VendorForAsync(PersonEditModel model, CancellationToken ct) =>
         await db.ResourcingClasses.AnyAsync(c => c.Id == model.ResourcingClassId && c.IsVendor, ct) ? model.VendorId : null;
+
+    private async Task<PersonEditModel> PopulatePods(PersonEditModel model, CancellationToken ct, bool loadSelection = false)
+    {
+        model.PodMembershipPercents = await db.PodMembers.Where(m => m.PersonId == model.Id).ToDictionaryAsync(m => m.PodId, m => m.MembershipPercent, ct);
+        if (loadSelection) model.PodIds = model.PodMembershipPercents.Keys.ToArray();
+        var assigned = model.PodMembershipPercents.Keys.ToArray();
+        model.PodOptions = await db.Pods.Where(p => p.IsActive || assigned.Contains(p.Id)).OrderBy(p => p.Name).ToListAsync(ct);
+        return model;
+    }
+
+    private async Task UpdatePods(int personId, int[] podIds, CancellationToken ct)
+    {
+        var selected = podIds.ToHashSet();
+        var pods = await db.Pods.Include(p => p.Members)
+            .Where(p => selected.Contains(p.Id) || p.Members.Any(m => m.PersonId == personId)).ToListAsync(ct);
+        foreach (var pod in pods)
+        {
+            var membership = pod.Members.SingleOrDefault(m => m.PersonId == personId);
+            if (selected.Contains(pod.Id) == (membership is not null)) continue;
+            var before = pod.Members.Select(m => new { m.PersonId, m.MembershipPercent }).ToArray();
+            if (membership is not null) pod.Members.Remove(membership);
+            else pod.Members.Add(new PodMember { PersonId = personId, MembershipPercent = 100m });
+            audit.Record(nameof(Pod), pod.Id, AuditActions.Update, new
+            {
+                Operation = "PersonMembership", PersonId = personId,
+                Before = new { Memberships = before },
+                After = new { Memberships = pod.Members.Select(m => new { m.PersonId, m.MembershipPercent }).ToArray() }
+            });
+        }
+    }
 
     private static object Snapshot(Person p) =>
         new { p.DisplayName, p.ExternalIds, p.ResourceTypeId, p.BusinessUnitId, p.SeniorityId, p.Location, p.ResourcingClassId, p.VendorId, p.IsActive };
