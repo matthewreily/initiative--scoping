@@ -81,7 +81,7 @@ public class PodsController(AppDbContext db, IAuditLog audit) : AdminControllerB
         var otherMemberships = await db.PodMembers.Where(m => m.PodId != model.Id && model.PersonIds.Contains(m.PersonId)).Select(m => new { m.PersonId, m.MembershipPercent }).ToListAsync(ct);
         model.MembershipWarnings = model.People.Where(p => model.PersonIds.Contains(p.Id))
             .Select(p => new { p.DisplayName, Total = otherMemberships.Where(m => m.PersonId == p.Id).Sum(m => m.MembershipPercent) + model.MembershipPercents.GetValueOrDefault(p.Id, 100m) })
-            .Where(p => p.Total > 100).Select(p => $"{p.DisplayName}: {p.Total:0.##}% total membership across pods (over 100%).").ToList();
+            .Select(p => PodMembershipWarning.For(p.DisplayName, p.Total)).OfType<string>().ToList();
         return model;
     }
     private static object Snapshot(Pod p) => new { p.Name, p.IsActive, p.BusinessUnitId, p.Description, PersonIds = p.Members.Select(x => x.PersonId).ToArray(), Memberships = p.Members.Select(x => new { x.PersonId, x.MembershipPercent }).ToArray(), ApplicationIds = p.Applications.Select(x => x.ApplicationPlatformId).ToArray() };

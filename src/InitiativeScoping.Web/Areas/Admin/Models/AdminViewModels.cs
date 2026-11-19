@@ -211,6 +211,9 @@ public class SizingIndexModel
 
 public class PersonEditModel
 {
+    public int[] PodIds { get; set; } = [];
+    public List<Pod> PodOptions { get; set; } = [];
+    public Dictionary<int, decimal> PodMembershipPercents { get; set; } = [];
     public int Id { get; set; }
     [Required, StringLength(200), Display(Name = "Display name")]
     public string DisplayName { get; set; } = string.Empty;

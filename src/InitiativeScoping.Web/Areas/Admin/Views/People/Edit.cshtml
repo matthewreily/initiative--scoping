@@ -51,6 +51,30 @@
             <span asp-validation-for="VendorId" class="text-danger"></span>
         </div>
     </div>
+    <fieldset class="mb-3" data-filter-picker>
+        <legend class="h6">Development pods</legend>
+        @if (!isNew)
+        {
+            var total = Model.PodMembershipPercents.Values.Sum();
+            var warning = PodMembershipWarning.For(Model.DisplayName, total);
+            <p class="@(warning is null ? "small text-muted" : "alert alert-warning") text-break" role="status">@(warning ?? $"{total:0.##}% total membership across pods.")</p>
+        }
+        <p class="form-text">New memberships start at 100%. Retained memberships keep their percentage; edit percentages on the pod page.</p>
+        <label for="pod-filter" class="form-label">Filter pods</label>
+        <input id="pod-filter" type="search" class="form-control mb-2" data-filter-query aria-controls="person-pods" />
+        <p class="small text-muted" data-filter-status role="status" aria-live="polite"></p>
+        <span asp-validation-for="PodIds" class="text-danger"></span>
+        <div id="person-pods">
+        @foreach (var pod in Model.PodOptions)
+        {
+            <div class="mb-2 text-break" data-filter-name="@pod.Name">
+                <label><input type="checkbox" name="PodIds" value="@pod.Id" checked="@Model.PodIds.Contains(pod.Id)" /> @pod.Name @(!pod.IsActive ? "(inactive)" : "")</label>
+                <span class="small">— @Model.PodMembershipPercents.GetValueOrDefault(pod.Id, 100m).ToString("0.##")%</span>
+                <a asp-controller="Pods" asp-action="Edit" asp-route-id="@pod.Id" class="small" aria-label="Edit membership percentages for @pod.Name">Edit %</a>
+            </div>
+        }
+        </div>
+    </fieldset>
     <div class="form-check mb-3">
         <input asp-for="IsActive" class="form-check-input" />
         <label asp-for="IsActive" class="form-check-label">Active (inactive people are not matched by new imports)</label>
@@ -60,6 +84,7 @@
 </form>
 @section Scripts {
     <partial name="/Views/Shared/_ValidationScriptsPartial.cshtml" />
+    <script src="~/js/filter-picker.js" asp-append-version="true"></script>
     <script>
         (function () {
             const cls = document.getElementById('ResourcingClassId'), wrap = document.getElementById('vendor-wrap'), vendor = document.getElementById('VendorId');
