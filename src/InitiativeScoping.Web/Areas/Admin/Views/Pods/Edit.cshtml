@@ -1,6 +1,10 @@
 @model PodEditModel
 @{ ViewData["Title"] = "Edit Development Pods"; }
 <h2 class="h4">@ViewData["Title"]</h2>
+@foreach (var warning in Model.MembershipWarnings)
+{
+    <p class="alert alert-warning" role="status">@warning</p>
+}
 <form method="post" class="col-12 col-lg-8">
     <div asp-validation-summary="All" class="text-danger"></div>
     <div class="mb-3"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" /></div>
@@ -10,7 +14,10 @@
     <fieldset class="mb-3"><legend class="h6">Active roster members</legend>
     @foreach (var person in Model.People)
     {
-        <label class="d-block"><input type="checkbox" name="PersonIds" value="@person.Id" checked="@Model.PersonIds.Contains(person.Id)" /> @person.DisplayName</label>
+        <div class="row g-2 align-items-center mb-2">
+            <div class="col-8"><label><input type="checkbox" name="PersonIds" value="@person.Id" checked="@Model.PersonIds.Contains(person.Id)" /> @person.DisplayName</label></div>
+            <div class="col-4"><label class="small" for="membership-@person.Id">Membership %</label><input id="membership-@person.Id" name="MembershipPercents[@person.Id]" value="@Model.MembershipPercents.GetValueOrDefault(person.Id, 100m)" type="number" min="1" max="100" step="0.01" class="form-control form-control-sm" aria-label="Membership % for @person.DisplayName" /></div>
+        </div>
     }
     </fieldset>
     <fieldset class="mb-3"><legend class="h6">Applications / Platforms</legend>

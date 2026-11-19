@@ -1,7 +1,19 @@
 @model InitiativePodsModel
 @{ ViewData["Title"] = "Preview pod re-sync"; var plan = Model.Preview!; }
 <h1 class="h3">Re-sync @Model.Pod!.Name</h1>
-<p>Existing member seats are untouched. Additions use the allocation % of the oldest pod seat in each phase. Confirm recalculates against current membership.</p>
+<p>Choose membership percentage updates below. Hand-edited seats are unchecked by default. Additions use the chosen pod % recorded on the oldest pod seat in each phase, multiplied by membership %. Confirm recalculates against current membership.</p>
+<h2 class="h5">Seats to update (@plan.SeatsToUpdate.Count)</h2>
+<div class="mb-4 text-break">
+@foreach (var update in plan.SeatsToUpdate)
+{
+    <label class="d-block border rounded p-2 mb-2">
+        <input type="checkbox" name="updateAllocationIds" value="@update.Allocation.Id" checked="@(!update.HandEdited)" form="pod-resync" />
+        @(update.Allocation.PersonNames ?? string.Join(", ", update.Allocation.PersonIds.Select(id => Model.Pod.Members.FirstOrDefault(m => m.PersonId == id)?.Person?.DisplayName ?? $"Person #{id}"))) — @Model.Initiative.Phases.First(p => p.Id == update.Allocation.PhaseId).Name
+        @if (update.HandEdited) { <span class="badge text-bg-warning">hand-edited</span> }
+        <span class="d-block small">Pod @update.PodPercent.ToString("0.####")% × membership @update.MembershipPercent.ToString("0.##")%: @(update.Allocation.AllocationPercent?.ToString("0.######") ?? "—")% → @update.AllocationPercent.ToString("0.######")%; @update.Allocation.EstimatedHours.ToString("N2") → @update.EstimatedHours.ToString("N2") hours</span>
+    </label>
+}
+</div>
 <h2 class="h5">Seats to add (@plan.Add.Count)</h2>
 <ul>
 @foreach (var seat in plan.Add)
@@ -24,7 +36,7 @@
     <li>@string.Join(", ", update.People.Select(p => p.Person?.DisplayName ?? $"Person #{p.PersonId}")) — @Model.Initiative.Phases.First(p => p.Id == update.Allocation.PhaseId).Name — quantity @update.Allocation.Quantity → @(update.Allocation.Quantity - update.People.Count). Remaining members and per-seat settings are retained.</li>
 }
 </ul>
-<form asp-action="ConfirmResyncPod" asp-route-id="@Model.Initiative.Id" method="post">
+<form id="pod-resync" asp-action="ConfirmResyncPod" asp-route-id="@Model.Initiative.Id" method="post">
     <input type="hidden" name="podId" value="@Model.PodId" />
     <button class="btn btn-primary" type="submit">Confirm re-sync</button>
     <a asp-action="DevelopmentPods" asp-route-id="@Model.Initiative.Id" class="btn btn-outline-secondary">Cancel</a>

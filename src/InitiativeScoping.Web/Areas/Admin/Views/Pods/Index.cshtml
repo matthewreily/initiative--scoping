@@ -1,6 +1,10 @@
 @model List<Pod>
 @{ ViewData["Title"] = "Development Pods"; }
 <h2 class="h4">Development Pods</h2>
+@foreach (var membership in Model.SelectMany(p => p.Members).GroupBy(m => m.PersonId).Where(g => g.Sum(m => m.MembershipPercent) > 100))
+{
+    <p class="alert alert-warning text-break" role="status">@membership.First().Person?.DisplayName: @membership.Sum(m => m.MembershipPercent).ToString("0.##")% total membership across pods (over 100%).</p>
+}
 <p><a asp-action="Create" class="btn btn-primary">Create</a></p>
 <div class="row g-3">
 @foreach (var item in Model)

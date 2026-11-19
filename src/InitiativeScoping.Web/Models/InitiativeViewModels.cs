@@ -121,7 +121,7 @@ public class AllocationEditModel
     /// <summary>Entered directly in effort-driven mode; computed from <see cref="AllocationPercent"/> in fixed-duration mode.</summary>
     [Range(0, 1000000), Display(Name = "Hours (each)")]
     public decimal EstimatedHours { get; set; }
-    [Range(0.01, 100), Display(Name = "Allocation %")]
+    [Range(0.0001, 100), Display(Name = "Allocation %")]
     public decimal? AllocationPercent { get; set; }
     /// <summary>Share of the cost that is capitalised, 0–100; the remainder is Opex.</summary>
     [Required, Range(0, 100), Display(Name = "Capex %")]

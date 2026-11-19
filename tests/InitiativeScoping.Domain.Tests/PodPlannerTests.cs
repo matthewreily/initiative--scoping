@@ -6,6 +6,99 @@ namespace InitiativeScoping.Domain.Tests;
 
 public class PodPlannerTests
 {
+    [Theory]
+    [InlineData(0.01, 1, 0.0001)]
+    [InlineData(33.33, 17.5, 5.83275)]
+    [InlineData(100, 100, 100)]
+    public void Membership_product_preserves_fractional_percent_and_bounds(decimal chosen, decimal membership, decimal effective)
+    {
+        var pod = Team(Member(1));
+        pod.Members[0].MembershipPercent = membership;
+        var seat = Assert.Single(PodPlanner.Assign(9, pod, [Build], chosen, Cards(), Holidays, 8).Add);
+        Assert.Equal(effective, seat.AllocationPercent);
+        Assert.Equal(effective, seat.PodWrittenAllocationPercent);
+        Assert.Equal(DurationCalculator.Hours(effective, 4, 8), seat.EstimatedHours);
+    }
+
+    [Fact]
+    public void Membership_split_is_applied_and_snapshotted_and_resync_updates_only_changed_membership()
+    {
+        var pod = Team(Member(1), Member(2));
+        pod.Members[0].MembershipPercent = 40;
+        var seats = PodPlanner.Assign(9, pod, [Build], 50, Cards(), Holidays, 8).Add;
+        var seat = seats[0];
+        Assert.Equal(20, seat.AllocationPercent);
+        Assert.Equal(6.4m, seat.EstimatedHours);
+        Assert.Equal(50, seat.PodAllocationPercent);
+        Assert.Equal(40, seat.PodMembershipPercent);
+        Assert.Equal(seat.AllocationPercent, seat.PodWrittenAllocationPercent);
+        Assert.Equal(seat.EstimatedHours, seat.PodWrittenEstimatedHours);
+        Assert.Empty(PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8).SeatsToUpdate);
+        pod.Members[0].MembershipPercent = 60;
+        var change = Assert.Single(PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8).SeatsToUpdate);
+        Assert.False(change.HandEdited);
+        Assert.Equal(30, change.AllocationPercent);
+        Assert.Equal(9.6m, change.EstimatedHours);
+        Assert.Equal(20, seat.AllocationPercent);
+        change.Apply();
+        Assert.Equal(30, seat.AllocationPercent);
+        Assert.Equal(60, seat.PodMembershipPercent);
+        Assert.Equal(9.6m, seat.PodWrittenEstimatedHours);
+        Assert.Empty(PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8).SeatsToUpdate);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void Resync_detects_manual_percent_or_hours_edits_and_keeps_the_recorded_chosen_percent(bool percentEdit, bool hoursEdit)
+    {
+        var pod = Team(Member(1));
+        pod.Members[0].MembershipPercent = 40;
+        var seats = PodPlanner.Assign(9, pod, [Build], 50, Cards(), Holidays, 8).Add;
+        if (percentEdit) seats[0].AllocationPercent = 99;
+        if (hoursEdit) seats[0].EstimatedHours = 99;
+        pod.Members[0].MembershipPercent = 60;
+        pod.Members.Add(new PodMember { Person = Member(2), PersonId = 2, MembershipPercent = 30 });
+        var plan = PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8);
+        var change = Assert.Single(plan.SeatsToUpdate);
+        Assert.True(change.HandEdited);
+        Assert.Equal(30, change.AllocationPercent);
+        Assert.Equal(15, Assert.Single(plan.Add).AllocationPercent);
+        change.Apply();
+        pod.Members[0].MembershipPercent = 80;
+        Assert.False(Assert.Single(PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8).SeatsToUpdate).HandEdited);
+    }
+
+    [Fact]
+    public void Legacy_seats_are_conservatively_hand_edited_and_mixed_memberships_require_splitting()
+    {
+        var pod = Team(Member(1));
+        var seats = PodPlanner.Assign(9, pod, [Build], 50, Cards(), Holidays, 8).Add;
+        var seat = seats[0];
+        seat.PodAllocationPercent = seat.PodMembershipPercent = seat.PodWrittenAllocationPercent = seat.PodWrittenEstimatedHours = null;
+        pod.Members[0].MembershipPercent = 40;
+        var change = Assert.Single(PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8).SeatsToUpdate);
+        Assert.True(change.HandEdited);
+        Assert.Equal(20, change.AllocationPercent);
+        pod.Members.Add(new PodMember { Person = Member(2), PersonId = 2, MembershipPercent = 60 });
+        seat.People.Add(new InitiativeAllocationPerson { PersonId = 2 });
+        seat.Quantity = 2;
+        var mixed = PodPlanner.Resync(9, pod, [Build], seats, Cards(), Holidays, 8);
+        Assert.Empty(mixed.SeatsToUpdate);
+        Assert.Contains("split this allocation", Assert.Single(mixed.Skipped));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(101)]
+    public void Invalid_membership_percent_is_rejected(decimal percent)
+    {
+        var pod = Team(Member(1));
+        pod.Members[0].MembershipPercent = percent;
+        Assert.Throws<ArgumentOutOfRangeException>(() => PodPlanner.Assign(9, pod, [Build], 50, Cards(), Holidays, 8));
+    }
+
     [Fact]
     public void Assign_skips_vendor_members_without_a_vendor_even_with_a_generic_rate()
     {

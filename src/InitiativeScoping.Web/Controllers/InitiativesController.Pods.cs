@@ -54,7 +54,8 @@ public partial class InitiativesController
         db.InitiativeAllocations.AddRange(add);
         audit.Record(nameof(Initiative), id, AuditActions.Update, new { Operation = "AssignPod", PodId = pod.Id, model.PhaseIds, model.AllocationPercent, Added = add.Count, plan.Skipped });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Pod assigned: {add.Count} seats added. {SkippedMessage(plan)}", id);
+        var effective = string.Join("; ", add.Select(a => $"{pod.Members.First(m => m.PersonId == a.PersonIds.Single()).Person!.DisplayName} ({phases.First(p => p.Id == a.PhaseId).Name}): {a.AllocationPercent:0.######}%"));
+        return RedirectWithSuccess($"Pod assigned: {add.Count} seats added. Effective allocations: {effective}. {SkippedMessage(plan)}", id);
     }
 
     public async Task<IActionResult> ResyncPod(int id, int podId, CancellationToken ct)
@@ -71,7 +72,7 @@ public partial class InitiativesController
     }
 
     [HttpPost]
-    public async Task<IActionResult> ConfirmResyncPod(int id, int podId, CancellationToken ct)
+    public async Task<IActionResult> ConfirmResyncPod(int id, int podId, int[] updateAllocationIds, CancellationToken ct)
     {
         var initiative = await LoadAsync(id, ct);
         if (initiative is null) return NotFound();
@@ -88,16 +89,19 @@ public partial class InitiativesController
             update.Allocation.Quantity -= update.People.Count;
         }
         db.InitiativeAllocations.AddRange(plan.Add);
-        audit.Record(nameof(Initiative), id, AuditActions.Update, new { Operation = "ResyncPod", PodId = podId, Added = plan.Add.Select(a => new { a.PhaseId, PersonIds = a.PersonIds.ToArray(), a.AllocationPercent }).ToArray(), Removed = plan.Remove.Select(a => a.Id).ToArray(), Updated = plan.Update.Select(u => new { u.Allocation.Id, RemovedPersonIds = u.People.Select(p => p.PersonId).ToArray(), u.Allocation.Quantity }).ToArray(), plan.Skipped });
+        var selected = plan.SeatsToUpdate.Where(u => updateAllocationIds.Contains(u.Allocation.Id)).ToList();
+        var changes = selected.Select(u => new { u.Allocation.Id, BeforePercent = u.Allocation.AllocationPercent, BeforeHours = u.Allocation.EstimatedHours, u.AllocationPercent, u.EstimatedHours, u.PodPercent, u.MembershipPercent, u.HandEdited }).ToArray();
+        foreach (var change in selected) change.Apply();
+        audit.Record(nameof(Initiative), id, AuditActions.Update, new { Operation = "ResyncPod", PodId = podId, Added = plan.Add.Select(a => new { a.PhaseId, PersonIds = a.PersonIds.ToArray(), a.AllocationPercent }).ToArray(), Removed = plan.Remove.Select(a => a.Id).ToArray(), Updated = plan.Update.Select(u => new { u.Allocation.Id, RemovedPersonIds = u.People.Select(p => p.PersonId).ToArray(), u.Allocation.Quantity }).ToArray(), MembershipUpdates = changes, plan.Skipped });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Pod re-synced: {plan.Add.Count} seats added, {plan.Remove.Count} allocations removed, {plan.Update.Sum(u => u.People.Count)} departed people removed from retained allocations. {SkippedMessage(plan)}", id);
+        return RedirectWithSuccess($"Pod re-synced: {plan.Add.Count} seats added, {plan.Remove.Count} allocations removed, {plan.Update.Sum(u => u.People.Count)} departed people removed from retained allocations, {selected.Count} seats updated. {SkippedMessage(plan)}", id);
     }
 
     private Task<Pod?> LoadPod(int id, CancellationToken ct) => db.Pods.Include(p => p.Members).ThenInclude(m => m.Person).ThenInclude(p => p!.ResourcingClass).AsSplitQuery().SingleOrDefaultAsync(p => p.Id == id, ct);
     private async Task<InitiativePodsModel> PodModel(Initiative initiative, int podId, CancellationToken ct)
     {
         var ids = await db.InitiativeApplications.Where(x => x.InitiativeId == initiative.Id).Select(x => x.ApplicationPlatformId).ToArrayAsync(ct);
-        var pods = await db.Pods.Where(x => x.IsActive).Include(x => x.Applications).OrderBy(x => x.Name).ToListAsync(ct);
+        var pods = await db.Pods.Where(x => x.IsActive).Include(x => x.Applications).Include(x => x.Members).ThenInclude(m => m.Person).OrderBy(x => x.Name).AsSplitQuery().ToListAsync(ct);
         return new InitiativePodsModel
         {
             Initiative = initiative, CanEdit = InitiativeAccess.CanEdit(currentUser, initiative) && InitiativeAccess.IsScopeEditable(initiative),

@@ -38,12 +38,41 @@ else
         }
         </fieldset>
         <label asp-for="AllocationPercent" class="form-label">Allocation %</label><input asp-for="AllocationPercent" type="number" min="0.01" max="100" step="0.01" class="form-control mb-3" />
+        <p class="small">Effective allocation = chosen pod % × membership %. Members without a matching rate are skipped.</p>
+        @foreach (var pod in Model.Pods)
+        {
+            <ul data-pod-members="@pod.Id" hidden class="small text-break">
+            @foreach (var member in pod.Members.Where(m => m.Person?.IsActive == true))
+            {
+                <li data-membership-percent="@member.MembershipPercent.ToString(System.Globalization.CultureInfo.InvariantCulture)">@member.Person!.DisplayName — membership @member.MembershipPercent.ToString("0.##")% → <output></output>% effective</li>
+            }
+            </ul>
+        }
         <button class="btn btn-primary" type="submit">Assign pod</button>
     </form>
     <h2 class="h5">Re-sync assigned pods</h2>
-    <p class="small text-muted">Preview membership changes before applying. Existing member seats keep their manual edits.</p>
+    <p class="small text-muted">Preview joiners, leavers and percentage changes. Hand-edited seats are unchecked by default; only checked percentage updates are applied.</p>
     @foreach (var pod in Model.Initiative.Allocations.Where(a => a.Pod?.IsActive == true).Select(a => a.Pod!).DistinctBy(p => p.Id))
     {
         <p><a asp-action="ResyncPod" asp-route-id="@Model.Initiative.Id" asp-route-podId="@pod.Id">Re-sync @pod.Name</a></p>
     }
+}
+@section Scripts {
+<script>
+    (() => {
+        const pod = document.getElementById('PodId'), percent = document.getElementById('AllocationPercent');
+        if (!pod || !percent) return;
+        function preview() {
+            document.querySelectorAll('[data-pod-members]').forEach(list => {
+                list.hidden = list.dataset.podMembers !== pod.value;
+                list.querySelectorAll('[data-membership-percent]').forEach(member => {
+                    member.querySelector('output').value = String(Math.round(Number(percent.value) * Number(member.dataset.membershipPercent) / 100 * 1000000) / 1000000);
+                });
+            });
+        }
+        pod.addEventListener('change', preview);
+        percent.addEventListener('input', preview);
+        preview();
+    })();
+</script>
 }

@@ -15,10 +15,22 @@ public class ScenarioPlannerTests
     {
         var live = Live();
         live.Allocations[0].PodId = podId;
+        live.Allocations[0].PodAllocationPercent = 50;
+        live.Allocations[0].PodMembershipPercent = 40;
+        live.Allocations[0].PodWrittenAllocationPercent = 20;
+        live.Allocations[0].PodWrittenEstimatedHours = 12.5m;
         var scenario = ScenarioPlanner.Clone(live, "Scenario", "owner", Now);
         Assert.Equal(podId, scenario.Allocations[0].PodId);
+        Assert.Equal(50, scenario.Allocations[0].PodAllocationPercent);
+        Assert.Equal(40, scenario.Allocations[0].PodMembershipPercent);
+        Assert.Equal(20, scenario.Allocations[0].PodWrittenAllocationPercent);
+        Assert.Equal(12.5m, scenario.Allocations[0].PodWrittenEstimatedHours);
         ScenarioPlanner.Promote(scenario, live);
         Assert.Equal(podId, live.Allocations[0].PodId);
+        Assert.Equal(50, live.Allocations[0].PodAllocationPercent);
+        Assert.Equal(40, live.Allocations[0].PodMembershipPercent);
+        Assert.Equal(20, live.Allocations[0].PodWrittenAllocationPercent);
+        Assert.Equal(12.5m, live.Allocations[0].PodWrittenEstimatedHours);
     }
 
     private static RateCard Card() => new()

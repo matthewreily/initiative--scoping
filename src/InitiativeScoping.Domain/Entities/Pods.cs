@@ -21,6 +21,7 @@ public class Pod
 
 public class PodMember
 {
+    public decimal MembershipPercent { get; set; } = 100;
     public int PodId { get; set; }
     public Pod? Pod { get; set; }
     public int PersonId { get; set; }
