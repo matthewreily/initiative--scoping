@@ -72,11 +72,11 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         db.People.Add(person);
         await db.SaveChangesAsync(ct);
-        await UpdatePods(person.Id, model.PodIds, ct);
+        var membershipTotal = await UpdatePods(person.Id, model.PodIds, ct);
         audit.Record(nameof(Person), person.Id, AuditActions.Create, Snapshot(person));
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return RedirectWithSuccess($"Person '{person.DisplayName}' created.");
+        return RedirectWithSuccess($"Person '{person.DisplayName}' created." + PodMembershipWarning.AfterSave(person.DisplayName, membershipTotal));
     }
 
     public async Task<IActionResult> Edit(int id, CancellationToken ct)
@@ -130,10 +130,10 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         person.ResourcingClassId = model.ResourcingClassId;
         person.VendorId = await VendorForAsync(model, ct);
         person.IsActive = model.IsActive;
-        await UpdatePods(person.Id, model.PodIds, ct);
+        var membershipTotal = await UpdatePods(person.Id, model.PodIds, ct);
         audit.Record(nameof(Person), person.Id, AuditActions.Update, new { Before = before, After = Snapshot(person) });
         await db.SaveChangesAsync(ct);
-        return RedirectWithSuccess($"Person '{person.DisplayName}' updated. Existing actuals keep their calculated cost; re-map an entry to re-price it.");
+        return RedirectWithSuccess($"Person '{person.DisplayName}' updated. Existing actuals keep their calculated cost; re-map an entry to re-price it." + PodMembershipWarning.AfterSave(person.DisplayName, membershipTotal));
     }
 
     [HttpPost]
@@ -413,7 +413,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
         return model;
     }
 
-    private async Task UpdatePods(int personId, int[] podIds, CancellationToken ct)
+    private async Task<decimal> UpdatePods(int personId, int[] podIds, CancellationToken ct)
     {
         var selected = podIds.ToHashSet();
         var pods = await db.Pods.Include(p => p.Members)
@@ -432,6 +432,7 @@ public class PeopleController(AppDbContext db, IAuditLog audit) : AdminControlle
                 After = new { Memberships = pod.Members.Select(m => new { m.PersonId, m.MembershipPercent }).ToArray() }
             });
         }
+        return pods.SelectMany(p => p.Members).Where(m => m.PersonId == personId).Sum(m => m.MembershipPercent);
     }
 
     private static object Snapshot(Person p) =>

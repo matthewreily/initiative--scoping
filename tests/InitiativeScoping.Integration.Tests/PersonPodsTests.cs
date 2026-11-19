@@ -38,6 +38,9 @@ public class PersonPodsTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         Assert.Contains(pods[0].Name, createHtml);
         Assert.DoesNotContain(pods[3].Name, createHtml);
         Assert.Equal(HttpStatusCode.Redirect, (await Post(client, create, fields, pods[0].Id, pods[1].Id)).StatusCode);
+        var created = await client.GetStringAsync("/Admin/People");
+        Assert.Contains("200% total membership across pods (over 100%).", created);
+        Assert.Contains("Adjust membership % on the pod pages.", created);
         int personId;
         using (var scope = factory.Services.CreateScope())
         {
@@ -46,6 +49,9 @@ public class PersonPodsTests(WebAppFactory factory) : IClassFixture<WebAppFactor
             var members = await db.PodMembers.Where(m => m.PersonId == personId).OrderBy(m => m.PodId).ToListAsync();
             Assert.Equal(2, members.Count);
             Assert.All(members, m => Assert.Equal(100, m.MembershipPercent));
+            var current = await client.GetStringAsync($"/Admin/People/Edit/{personId}");
+            Assert.Contains("200% total membership across pods (over 100%).", current);
+            Assert.Contains("alert alert-warning", current);
             members.Single(m => m.PodId == pods[0].Id).MembershipPercent = 40;
             members.Single(m => m.PodId == pods[1].Id).MembershipPercent = 60;
             db.PodMembers.Add(new PodMember { PodId = pods[2].Id, PersonId = personId, MembershipPercent = 37.5m });
@@ -56,6 +62,7 @@ public class PersonPodsTests(WebAppFactory factory) : IClassFixture<WebAppFactor
         Assert.Contains(pods[2].Name, html);
         Assert.Contains("(inactive)", html);
         Assert.Contains("37.5%", html);
+        Assert.Contains("137.5% total membership across pods (over 100%).", html);
         Assert.DoesNotContain(pods[3].Name, html);
         Assert.Matches($"name=\"PodIds\" value=\"{pods[2].Id}\" checked", html);
         var invalid = await Post(client, edit, fields, pods[0].Id, pods[3].Id);
@@ -67,6 +74,7 @@ public class PersonPodsTests(WebAppFactory factory) : IClassFixture<WebAppFactor
             Assert.Equal(3, await db.PodMembers.CountAsync(m => m.PersonId == personId));
         }
         Assert.Equal(HttpStatusCode.Redirect, (await Post(client, edit, fields, pods[0].Id, pods[2].Id, pods[4].Id, pods[4].Id)).StatusCode);
+        Assert.Contains("177.5% total membership across pods (over 100%).", await client.GetStringAsync("/Admin/People"));
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -88,7 +96,16 @@ public class PersonPodsTests(WebAppFactory factory) : IClassFixture<WebAppFactor
             Assert.Single(events.Where(a => a.EntityId == pods[0].Id.ToString()));
             Assert.DoesNotContain(events, a => a.EntityId == pods[2].Id.ToString());
         }
+        Assert.Equal(HttpStatusCode.Redirect, (await Post(client, edit, fields, pods[4].Id)).StatusCode);
+        Assert.DoesNotContain("over 100%", await client.GetStringAsync("/Admin/People"));
+        var withinLimit = await client.GetStringAsync(edit);
+        Assert.Contains("100% total membership across pods.", withinLimit);
+        Assert.DoesNotContain("alert alert-warning", withinLimit);
         Assert.Equal(HttpStatusCode.Redirect, (await Post(client, edit, fields)).StatusCode);
+        Assert.DoesNotContain("over 100%", await client.GetStringAsync("/Admin/People"));
+        var empty = await client.GetStringAsync(edit);
+        Assert.Contains("0% total membership across pods.", empty);
+        Assert.DoesNotContain("alert alert-warning", empty);
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
