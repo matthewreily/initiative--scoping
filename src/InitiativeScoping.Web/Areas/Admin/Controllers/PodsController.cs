@@ -9,7 +9,7 @@ namespace InitiativeScoping.Web.Areas.Admin.Controllers;
 
 public class PodsController(AppDbContext db, IAuditLog audit) : AdminControllerBase
 {
-    public async Task<IActionResult> Index(CancellationToken ct) => View(await db.Pods.Include(x => x.BusinessUnit).Include(x => x.Members).Include(x => x.Applications).OrderBy(x => x.Name).AsSplitQuery().ToListAsync(ct));
+    public async Task<IActionResult> Index(CancellationToken ct) => View(await db.Pods.Include(x => x.BusinessUnit).Include(x => x.Members).ThenInclude(m => m.Person).Include(x => x.Applications).OrderBy(x => x.Name).AsSplitQuery().ToListAsync(ct));
     public async Task<IActionResult> Create(CancellationToken ct) => View("Edit", await Populate(new PodEditModel(), ct));
     public async Task<IActionResult> Edit(int id, CancellationToken ct)
     {
@@ -17,7 +17,7 @@ public class PodsController(AppDbContext db, IAuditLog audit) : AdminControllerB
         return pod is null ? NotFound() : View(await Populate(new PodEditModel
         {
             Id = id, Name = pod.Name, IsActive = pod.IsActive, BusinessUnitId = pod.BusinessUnitId, Description = pod.Description,
-            PersonIds = pod.Members.Select(x => x.PersonId).ToArray(), ApplicationIds = pod.Applications.Select(x => x.ApplicationPlatformId).ToArray()
+            PersonIds = pod.Members.Select(x => x.PersonId).ToArray(), MembershipPercents = pod.Members.ToDictionary(x => x.PersonId, x => x.MembershipPercent), ApplicationIds = pod.Applications.Select(x => x.ApplicationPlatformId).ToArray()
         }, ct));
     }
     [HttpPost]
@@ -36,6 +36,12 @@ public class PodsController(AppDbContext db, IAuditLog audit) : AdminControllerB
         if (!await db.BusinessUnits.AnyAsync(x => x.Id == model.BusinessUnitId && (x.IsActive || x.Id == pod.BusinessUnitId), ct))
             ModelState.AddModelError(nameof(model.BusinessUnitId), "Choose an active business unit.");
         var people = model.PersonIds.Distinct().ToArray();
+        foreach (var personId in people)
+        {
+            var percent = model.MembershipPercents.GetValueOrDefault(personId, 100m);
+            if (percent < 1 || percent > 100)
+                ModelState.AddModelError($"MembershipPercents[{personId}]", "Membership % must be between 1 and 100.");
+        }
         var apps = model.ApplicationIds.Distinct().ToArray();
         if (await db.People.CountAsync(x => people.Contains(x.Id) && x.IsActive, ct) != people.Length)
             ModelState.AddModelError(nameof(model.PersonIds), "Choose active roster people only.");
@@ -46,6 +52,7 @@ public class PodsController(AppDbContext db, IAuditLog audit) : AdminControllerB
         pod.Name = model.Name.Trim(); pod.IsActive = model.IsActive; pod.BusinessUnitId = model.BusinessUnitId; pod.Description = model.Description?.Trim();
         pod.Members.RemoveAll(x => !people.Contains(x.PersonId));
         foreach (var personId in people.Except(pod.Members.Select(x => x.PersonId))) pod.Members.Add(new PodMember { PersonId = personId });
+        foreach (var member in pod.Members) member.MembershipPercent = model.MembershipPercents.GetValueOrDefault(member.PersonId, 100m);
         pod.Applications.RemoveAll(x => !apps.Contains(x.ApplicationPlatformId));
         foreach (var appId in apps.Except(pod.Applications.Select(x => x.ApplicationPlatformId))) pod.Applications.Add(new PodApplication { ApplicationPlatformId = appId });
         if (id == 0) db.Pods.Add(pod);
@@ -71,7 +78,11 @@ public class PodsController(AppDbContext db, IAuditLog audit) : AdminControllerB
         model.BusinessUnits = await db.BusinessUnits.Where(x => x.IsActive || x.Id == model.BusinessUnitId).OrderBy(x => x.Name).ToListAsync(ct);
         model.People = await db.People.Where(x => x.IsActive).OrderBy(x => x.DisplayName).ToListAsync(ct);
         model.Applications = await db.ApplicationPlatforms.Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct);
+        var otherMemberships = await db.PodMembers.Where(m => m.PodId != model.Id && model.PersonIds.Contains(m.PersonId)).Select(m => new { m.PersonId, m.MembershipPercent }).ToListAsync(ct);
+        model.MembershipWarnings = model.People.Where(p => model.PersonIds.Contains(p.Id))
+            .Select(p => new { p.DisplayName, Total = otherMemberships.Where(m => m.PersonId == p.Id).Sum(m => m.MembershipPercent) + model.MembershipPercents.GetValueOrDefault(p.Id, 100m) })
+            .Where(p => p.Total > 100).Select(p => $"{p.DisplayName}: {p.Total:0.##}% total membership across pods (over 100%).").ToList();
         return model;
     }
-    private static object Snapshot(Pod p) => new { p.Name, p.IsActive, p.BusinessUnitId, p.Description, PersonIds = p.Members.Select(x => x.PersonId).ToArray(), ApplicationIds = p.Applications.Select(x => x.ApplicationPlatformId).ToArray() };
+    private static object Snapshot(Pod p) => new { p.Name, p.IsActive, p.BusinessUnitId, p.Description, PersonIds = p.Members.Select(x => x.PersonId).ToArray(), Memberships = p.Members.Select(x => new { x.PersonId, x.MembershipPercent }).ToArray(), ApplicationIds = p.Applications.Select(x => x.ApplicationPlatformId).ToArray() };
 }

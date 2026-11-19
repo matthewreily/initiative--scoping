@@ -15,6 +15,8 @@ public class PodEditModel : ApplicationPlatformEditModel
     [Range(1, int.MaxValue)] public int BusinessUnitId { get; set; }
     [StringLength(2000)] public string? Description { get; set; }
     public int[] PersonIds { get; set; } = [];
+    public Dictionary<int, decimal> MembershipPercents { get; set; } = [];
+    public List<string> MembershipWarnings { get; set; } = [];
     public int[] ApplicationIds { get; set; } = [];
     public List<BusinessUnit> BusinessUnits { get; set; } = [];
     public List<Person> People { get; set; } = [];

@@ -80,6 +80,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.BusinessUnit).WithMany().HasForeignKey(x => x.BusinessUnitId).OnDelete(DeleteBehavior.Restrict);
         });
         b.Entity<PodMember>().HasKey(x => new { x.PodId, x.PersonId });
+        b.Entity<PodMember>().Property(x => x.MembershipPercent).HasDefaultValue(100m);
+        b.Entity<PodMember>().ToTable(t => t.HasCheckConstraint("CK_PodMembers_MembershipPercent", "CAST(\"MembershipPercent\" AS numeric) >= 1 AND CAST(\"MembershipPercent\" AS numeric) <= 100"));
         b.Entity<PodMember>().HasOne(x => x.Person).WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<PodApplication>().HasKey(x => new { x.PodId, x.ApplicationPlatformId });
         b.Entity<PodApplication>().HasOne(x => x.ApplicationPlatform).WithMany().HasForeignKey(x => x.ApplicationPlatformId).OnDelete(DeleteBehavior.Restrict);
@@ -240,6 +242,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Location).HasMaxLength(100);
             e.Property(x => x.EstimatedHours).HasPrecision(18, 2);
             e.Property(x => x.AllocationPercent).HasPrecision(6, 2);
+            e.Property(x => x.PodWrittenAllocationPercent).HasPrecision(6, 2);
+            e.Property(x => x.PodWrittenEstimatedHours).HasPrecision(18, 2);
             e.Property(x => x.CapexPercent).HasPrecision(5, 2);
             e.HasOne(x => x.Phase).WithMany().HasForeignKey(x => x.PhaseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ResourceType).WithMany().OnDelete(DeleteBehavior.Restrict);

@@ -922,8 +922,22 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Property<int>("PhaseId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("PodAllocationPercent")
+                        .HasColumnType("numeric");
+
                     b.Property<int?>("PodId")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("PodMembershipPercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("PodWrittenAllocationPercent")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
+                    b.Property<decimal?>("PodWrittenEstimatedHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
@@ -1348,11 +1362,19 @@ namespace InitiativeScoping.Infrastructure.Persistence.Migrations
                     b.Property<int>("PersonId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("MembershipPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric")
+                        .HasDefaultValue(100m);
+
                     b.HasKey("PodId", "PersonId");
 
                     b.HasIndex("PersonId");
 
-                    b.ToTable("PodMembers");
+                    b.ToTable("PodMembers", t =>
+                        {
+                            t.HasCheckConstraint("CK_PodMembers_MembershipPercent", "CAST(\"MembershipPercent\" AS numeric) >= 1 AND CAST(\"MembershipPercent\" AS numeric) <= 100");
+                        });
                 });
 
             modelBuilder.Entity("InitiativeScoping.Domain.Entities.RateCard", b =>

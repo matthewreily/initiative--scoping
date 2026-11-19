@@ -121,7 +121,7 @@ else
         {
             <div class="col-md-3">
                 <label asp-for="AllocationPercent" class="form-label"></label>
-                <input asp-for="AllocationPercent" class="form-control" type="number" min="0.01" max="100" step="0.01" required readonly="@staffing" />
+                <input asp-for="AllocationPercent" class="form-control" type="number" min="0.0001" max="100" step="any" required readonly="@staffing" />
                 <span asp-validation-for="AllocationPercent" class="text-danger"></span>
             </div>
             <div class="col-md-3">

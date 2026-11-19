@@ -200,6 +200,10 @@ public class PhaseDateHistory
 
 public class InitiativeAllocation
 {
+    public decimal? PodAllocationPercent { get; set; }
+    public decimal? PodMembershipPercent { get; set; }
+    public decimal? PodWrittenAllocationPercent { get; set; }
+    public decimal? PodWrittenEstimatedHours { get; set; }
     public int? PodId { get; set; }
     public Pod? Pod { get; set; }
     public int Id { get; set; }

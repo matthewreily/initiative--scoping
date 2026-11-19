@@ -11,6 +11,117 @@ namespace InitiativeScoping.Integration.Tests;
 
 public class PodTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
 {
+    [Theory]
+    [InlineData(nameof(InitiativeAllocation.AllocationPercent), nameof(InitiativeAllocation.PodWrittenAllocationPercent), 6)]
+    [InlineData(nameof(InitiativeAllocation.EstimatedHours), nameof(InitiativeAllocation.PodWrittenEstimatedHours), 18)]
+    public void Pod_write_snapshot_precision_matches_live_value(string live, string snapshot, int precision)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var entity = db.Model.FindEntityType(typeof(InitiativeAllocation))!;
+        foreach (var name in new[] { live, snapshot })
+        {
+            var property = entity.FindProperty(name)!;
+            Assert.Equal(precision, property.GetPrecision());
+            Assert.Equal(2, property.GetScale());
+        }
+    }
+
+    [Fact]
+    public async Task Membership_percent_is_validated_audited_warned_and_resynced_only_when_selected()
+    {
+        var client = Client();
+        await client.GetAsync("/");
+        int id, podId, personId, joinerId, phaseId;
+        string podName;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var rate = await db.RateCardEntries.Include(e => e.RateCard).FirstAsync(e => e.ResourcingClassId == ResourcingClass.InternalId);
+            var bu = await db.BusinessUnits.FirstAsync();
+            Person Person(string name) => new() { DisplayName = name, BusinessUnitId = bu.Id, ResourceTypeId = rate.ResourceTypeId, SeniorityId = rate.SeniorityId, Location = rate.Location, ResourcingClassId = rate.ResourcingClassId };
+            var person = Person("Split member");
+            var joiner = Person("Split joiner");
+            db.People.Add(joiner);
+            var pod = new Pod { Name = "Split " + Guid.NewGuid().ToString("N"), BusinessUnitId = bu.Id, Members = [new() { Person = person, MembershipPercent = 40 }] };
+            db.Pods.Add(pod);
+            db.Pods.Add(new Pod { Name = "Other split " + Guid.NewGuid().ToString("N"), BusinessUnitId = bu.Id, Members = [new() { Person = person, MembershipPercent = 50 }] });
+            var initiative = new Initiative { Name = "Split initiative", CreatedBy = "dev-user", BusinessUnitId = bu.Id, TargetStart = rate.RateCard!.EffectiveStart, Phases = [new() { Name = "Build", PlannedStart = rate.RateCard.EffectiveStart, PlannedEnd = rate.RateCard.EffectiveStart.AddDays(20) }] };
+            db.Initiatives.Add(initiative);
+            await db.SaveChangesAsync();
+            id = initiative.Id; podId = pod.Id; personId = person.Id; joinerId = joiner.Id; phaseId = initiative.Phases.Single().Id; podName = pod.Name;
+        }
+        var podPage = $"/Admin/Pods/Edit/{podId}";
+        async Task<HttpResponseMessage> SetMembership(string percent)
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var pod = (await db.Pods.FindAsync(podId))!;
+            return await Post(client, podPage, podPage, ("Name", podName), ("BusinessUnitId", pod.BusinessUnitId.ToString()), ("IsActive", "true"), ("PersonIds", personId.ToString()), ($"MembershipPercents[{personId}]", percent));
+        }
+        Assert.Contains("between 1 and 100", await (await SetMembership("0")).Content.ReadAsStringAsync());
+        Assert.Contains("between 1 and 100", await (await SetMembership("101")).Content.ReadAsStringAsync());
+        var page = $"/Initiatives/DevelopmentPods/{id}";
+        Assert.Contains("membership 40%", await client.GetStringAsync(page));
+        Assert.Equal(HttpStatusCode.Redirect, (await Post(client, page, $"/Initiatives/AssignPod/{id}", ("PodId", podId.ToString()), ("PhaseIds", phaseId.ToString()), ("AllocationPercent", "50"))).StatusCode);
+        Assert.Contains("20%", await client.GetStringAsync($"/Initiatives/Details/{id}"));
+        int seatId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var seat = await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.SingleAsync(a => a.InitiativeId == id);
+            seatId = seat.Id;
+            Assert.Equal(20, seat.AllocationPercent);
+            Assert.Equal(40, seat.PodMembershipPercent);
+            Assert.Equal(50, seat.PodAllocationPercent);
+            Assert.Equal(seat.EstimatedHours, seat.PodWrittenEstimatedHours);
+        }
+        Assert.Equal(HttpStatusCode.Redirect, (await SetMembership("60")).StatusCode);
+        Assert.Contains("110% total membership", await client.GetStringAsync(podPage));
+        var preview = $"/Initiatives/ResyncPod/{id}?podId={podId}";
+        var confirm = $"/Initiatives/ConfirmResyncPod/{id}";
+        var html = await client.GetStringAsync(preview);
+        Assert.Contains("Seats to update (1)", html);
+        Assert.Contains("checked", Regex.Match(html, $"name=\"updateAllocationIds\" value=\"{seatId}\"[^>]*").Value);
+        await Post(client, preview, confirm, ("podId", podId.ToString()), ("updateAllocationIds", "-1"));
+        using (var scope = factory.Services.CreateScope())
+            Assert.Equal(20, (await scope.ServiceProvider.GetRequiredService<AppDbContext>().InitiativeAllocations.FindAsync(seatId))!.AllocationPercent);
+        await Post(client, preview, confirm, ("podId", podId.ToString()), ("updateAllocationIds", seatId.ToString()));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var seat = (await db.InitiativeAllocations.FindAsync(seatId))!;
+            Assert.Equal(30, seat.AllocationPercent);
+            Assert.Equal(30, seat.PodWrittenAllocationPercent);
+            Assert.Equal(60, seat.PodMembershipPercent);
+            Assert.Equal(seat.EstimatedHours, seat.PodWrittenEstimatedHours);
+            seat.EstimatedHours = 999;
+            await db.SaveChangesAsync();
+            Assert.Contains("Memberships", (await db.AuditEvents.FirstAsync(a => a.Entity == nameof(Pod) && a.EntityId == podId.ToString())).DiffJson);
+        }
+        await SetMembership("80");
+        html = await client.GetStringAsync(preview);
+        Assert.Contains("hand-edited", html);
+        Assert.DoesNotContain("checked", Regex.Match(html, $"name=\"updateAllocationIds\" value=\"{seatId}\"[^>]*").Value);
+        await Post(client, preview, confirm, ("podId", podId.ToString()));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(999, (await db.InitiativeAllocations.FindAsync(seatId))!.EstimatedHours);
+            db.PodMembers.Add(new PodMember { PodId = podId, PersonId = joinerId, MembershipPercent = 20 });
+            await db.SaveChangesAsync();
+        }
+        await Post(client, preview, confirm, ("podId", podId.ToString()), ("updateAllocationIds", seatId.ToString()));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var seats = await db.InitiativeAllocations.Include(a => a.People).Where(a => a.InitiativeId == id).ToListAsync();
+            Assert.Equal(40, seats.Single(a => a.Id == seatId).AllocationPercent);
+            Assert.Equal(10, seats.Single(a => a.PersonIds.Contains(joinerId)).AllocationPercent);
+            Assert.Contains(await db.AuditEvents.Where(a => a.Entity == nameof(Initiative) && a.EntityId == id.ToString()).Select(a => a.DiffJson).ToListAsync(), json => json?.Contains("MembershipUpdates") == true);
+        }
+        Assert.Contains("Seats to update (0)", await client.GetStringAsync(preview));
+    }
+
     private HttpClient Client() => factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
     private static async Task<HttpResponseMessage> Post(HttpClient client, string page, string action, params (string Key, string Value)[] fields)
